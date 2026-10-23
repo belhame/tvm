@@ -1,0 +1,65 @@
+# PowerCare · TVM Web
+
+Application de gestion du SAV des onduleurs : **React / TypeScript**, API **Django**, base **PostgreSQL 16** commune à tous les utilisateurs. Les dossiers sont enregistrés sur le serveur ; chaque ordinateur se connecte à la même application. Aucun dossier métier n'est stocké dans le `localStorage` du navigateur.
+
+Le premier parcours fonctionnel est **client → onduleur / numéro de série → demande SAV → intervention → rapport PDF**. L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.
+
+[Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
+
+## Essayer la version de démonstration
+
+Prérequis : Linux ou macOS avec Bash, **Python 3.12**, **Node.js 24**, npm, Docker et Docker Compose v2. Sous Windows, utiliser WSL2 avec Docker Desktop. Le serveur Docker doit être démarré.
+
+Depuis la racine du projet :
+
+```bash
+bash scripts/setup.sh --demo
+bash scripts/start.sh
+```
+
+Ouvrir sur la machine exécutant le serveur l'adresse locale indiquée par Gunicorn, port **8000**. Le serveur écoute par défaut uniquement sur cette machine. Pour un accès depuis plusieurs ordinateurs, suivre [le déploiement sur un serveur partagé](docs/DEPLOIEMENT.md).
+
+Les comptes fictifs sont `admin`, `responsable`, `technicien` et `client`. Leur mot de passe est **généré localement**, disponible dans `.local/demo-access.txt`, jamais codé en dur. Le compte `client` sert à tester le portail limité à sa société. Le mode démonstration est signalé dans l'application.
+
+`setup.sh --demo` initialise `.env`, installe les dépendances, démarre PostgreSQL, compile le frontend, applique les migrations et ajoute les données fictives. Un `.env` existant est conservé. Si ce fichier désactive la démo, le script n'y active pas silencieusement les comptes fictifs.
+
+## Documents et commandes
+
+| Besoin | Document ou commande |
+|---|---|
+| Installer, démarrer, développer | [Installation](docs/INSTALLATION.md) |
+| Comprendre ce qui fonctionne et ce qui reste à connecter | [Fonctionnalités et limites](docs/FONCTIONNALITES.md) |
+| Mettre en service pour 5–15 personnes | [Déploiement, comptes et sauvegardes](docs/DEPLOIEMENT.md) |
+| Examiner les 25 tables et les limites de récupération WINDEV | [Analyse du projet fourni](docs/ANALYSE_WINDEV.md) |
+| Demander l'export au développeur HFSQL | [Spécification d'export](docs/EXPORT_HFSQL.md) |
+| Contrat HTTP des ressources | [API](docs/API_CONTRACT.md) |
+| Résultats des tests et limites vérifiées | [Validation](docs/VALIDATION.md) |
+| Exécuter les contrôles backend et la compilation frontend | `bash scripts/test.sh` |
+| Tester le parcours dans Chromium sur une base distincte | `bash scripts/e2e.sh` |
+| Sauvegarder PostgreSQL | `bash scripts/backup.sh` |
+
+## Installation sans données fictives
+
+```bash
+bash scripts/setup.sh
+set -a
+source .env
+set +a
+.venv/bin/python backend/manage.py createsuperuser --username admin
+bash scripts/start.sh
+```
+
+Le superutilisateur créé a les droits administrateur effectifs. Depuis l'application, créer ensuite les comptes de responsable SAV, technicien et client ; associer chaque compte client à la bonne société. Ne pas exposer les comptes de démonstration à des utilisateurs réels.
+
+## Sources
+
+```text
+backend/       Django, modèles, API, droits, PDF, migrations et tests
+frontend/      React, TypeScript, interface responsive et scanner
+scripts/       Installation, démarrage, tests et sauvegarde
+docs/          Analyse WINDEV, contrat d'export et instructions
+compose.yaml   PostgreSQL persistant et service web conteneurisé optionnel
+Dockerfile     Compilation frontend puis serveur web Python
+```
+
+L'archive WINDEV et les exports de données restent hors des sources versionnées. Le schéma récupéré n'est pas une traduction des traitements binaires WLangage. La reprise HFSQL commence par une validation et un stockage de préparation ; elle ne met pas automatiquement en production des relations ou règles métier non confirmées.

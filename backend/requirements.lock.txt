@@ -1,0 +1,13 @@
+asgiref==3.12.1
+charset-normalizer==3.5.2
+dj-database-url==3.1.2
+Django==5.2.18
+djangorestframework==3.18.3
+gunicorn==26.2.0
+pillow==13.0.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+reportlab==5.1.0
+sqlparse==0.6.0
+typing_extensions==4.16.0
+whitenoise==6.12.0
