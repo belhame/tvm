@@ -28,6 +28,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, os, urllib.request;
+          host = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')[0].strip() or 'localhost';
+          host = ('healthcheck' + host) if host.startswith('.') else ('localhost' if host == '*' else host);
+          request = urllib.request.Request('http://127.0.0.1:8000/api/health/', headers={'Host': host, 'X-Forwarded-Proto': 'https'});
+          data = json.load(urllib.request.urlopen(request, timeout=3));
+          assert data.get('status') == 'ok' and data.get('database') == 'ok'
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
     command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --no-control-socket --bind 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile -"]
 volumes:
   tvm_postgres:

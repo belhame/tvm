@@ -1,5 +1,7 @@
 # Installation et développement
 
+Pour un PC Windows, utiliser le [guide avec lanceurs à double-clic](INSTALLATION_WINDOWS.md). Seul Docker Desktop est requis sur Windows pour ce mode ; les prérequis Python et Node.js ci-dessous concernent le développement hors conteneur.
+
 ## Choisir le mode
 
 La configuration standard utilise une vraie base PostgreSQL 16 dans Docker, un serveur Django / Gunicorn et le frontend React compilé. Elle convient à l'installation sur un serveur unique auquel les utilisateurs accèdent avec leur navigateur.

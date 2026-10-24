@@ -1,0 +1,2 @@
+# Preserve the native Windows launcher format in clones and ZIP downloads.
+*.cmd -text whitespace=cr-at-eol

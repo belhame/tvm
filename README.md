@@ -8,7 +8,15 @@ Le premier parcours fonctionnel est **client → onduleur / numéro de série �
 
 ## Essayer la version de démonstration
 
-Prérequis : Linux ou macOS avec Bash, **Python 3.12**, **Node.js 24**, npm, Docker et Docker Compose v2. Sous Windows, utiliser WSL2 avec Docker Desktop. Le serveur Docker doit être démarré.
+### Sur un PC Windows
+
+Installer et ouvrir **Docker Desktop**, puis décompresser le projet et double-cliquer sur **`INSTALLER_TVM.cmd`**. Le lanceur prépare la base et la démonstration, attend le serveur, puis ouvre le navigateur et les accès locaux. Python et Node.js sont exécutés dans Docker ; leur installation sur Windows n'est pas nécessaire.
+
+Les fois suivantes, utiliser **`DEMARRER_TVM.cmd`**. **`ARRETER_TVM.cmd`** arrête les services en conservant les données. Voir le [guide Windows pas à pas](docs/INSTALLATION_WINDOWS.md).
+
+### Sur Linux / macOS, ou pour développer hors conteneur
+
+Prérequis : Bash, **Python 3.12**, **Node.js 24**, npm, Docker et Docker Compose v2. Le serveur Docker doit être démarré. Sous Windows, ce mode de développement peut aussi s'utiliser dans WSL2.
 
 Depuis la racine du projet :
 

@@ -42,3 +42,11 @@ La recherche manuelle d'une série a aussi été exécutée dans l'écran scanne
 ## Particularité de la construction Docker dans ce cloud
 
 Le builder a nécessité le proxy existant, une résolution explicite de son nom, le réseau hôte et le certificat CA fourni par la plateforme. Les vérifications TLS ont été maintenues. Le Dockerfile accepte un secret BuildKit optionnel `build_ca` ; ce certificat n'est pas incorporé à l'image. La construction standard décrite dans le guide reste adaptée à un serveur disposant d'un accès réseau normal. Aucun identifiant de proxy n'est enregistré dans les sources.
+
+## Installation Windows — complément du 24 octobre 2026
+
+Les lanceurs `INSTALLER_TVM.cmd`, `DEMARRER_TVM.cmd` et `ARRETER_TVM.cmd` utilisent Docker Desktop, sans installation locale de Python ou Node.js. Leur format ASCII/CRLF, les chemins cités, les destinations de saut et la conservation des codes d'erreur ont été revus statiquement. Les fichiers CMD conservent leurs fins de ligne Windows dans Git et les archives.
+
+Les étapes Docker ont été exécutées sur Linux, dans un projet et un volume PostgreSQL distincts : génération de configuration, migrations sur base neuve, comptes de démonstration, authentification et tableau de bord, disponibilité HTTP et PostgreSQL, répétition sans modifier `.env`, puis arrêt et redémarrage avec conservation d'un client ajouté. Les six clients attendus étaient présents après redémarrage. Le contrôle de disponibilité fonctionne aussi avec un domaine personnalisé et la configuration HTTPS d'un proxy de confiance.
+
+Le lancement natif des fichiers CMD, l'ouverture du Bloc-notes et la configuration Docker Desktop / WSL 2 sur un PC Windows ne peuvent pas être validés depuis ce cloud Linux. Ils restent à vérifier sur le PC de l'utilisateur avec le [guide Windows](INSTALLATION_WINDOWS.md).
