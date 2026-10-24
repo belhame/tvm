@@ -22,9 +22,16 @@ if not "%TVM_EXIT_CODE%"=="0" goto docker_not_ready
 docker compose version >nul 2>&1
 set "TVM_EXIT_CODE=%ERRORLEVEL%"
 if not "%TVM_EXIT_CODE%"=="0" goto compose_missing
-docker info --format "{{.OSType}}" | findstr /x /c:"linux" >nul
-set "TVM_EXIT_CODE=%ERRORLEVEL%"
-if not "%TVM_EXIT_CODE%"=="0" goto linux_required
+set "TVM_DOCKER_OS="
+for /f "tokens=1" %%O in ('docker info --format "{{.OSType}}" 2^>nul') do set "TVM_DOCKER_OS=%%O"
+if not defined TVM_DOCKER_OS goto docker_mode_unknown
+echo Moteur Docker detecte : "%TVM_DOCKER_OS%"
+if /i "%TVM_DOCKER_OS%"=="linux" goto docker_linux_ready
+if /i "%TVM_DOCKER_OS%"=="windows" goto linux_required
+goto docker_mode_unknown
+
+:docker_linux_ready
+set "TVM_EXIT_CODE=0"
 
 echo Demarrage sans reinstaller l'application ni reinitialiser les comptes...
 docker compose --profile container up -d --no-build --wait --wait-timeout 180
@@ -68,7 +75,22 @@ echo Docker Compose est indisponible. Mettez Docker Desktop a jour.
 goto failed
 
 :linux_required
-echo Docker Desktop doit utiliser les conteneurs Linux.
+set "TVM_EXIT_CODE=1"
+echo Le moteur Docker a indique le mode Windows.
+echo Dans la zone de notification Windows, clic droit sur l'icone baleine Docker.
+echo Choisissez "Switch to Linux containers..." si cette option est proposee.
+echo Attendez que le moteur soit pret, puis relancez ce script.
+echo Aucun changement de moteur n'est effectue automatiquement.
+goto failed
+
+:docker_mode_unknown
+set "TVM_EXIT_CODE=1"
+echo Impossible d'identifier le mode du moteur Docker.
+echo Une sortie absente ou inconnue ne signifie pas que le moteur est en mode Windows.
+echo Dans un terminal, executez cette commande et conservez son resultat :
+echo docker info --format "{{.OSType}}"
+echo Resultat attendu : linux. Si une erreur s'affiche, conservez aussi son message.
+echo Ne changez pas le mode du moteur sans avoir verifie ce resultat.
 goto failed
 
 :startup_failed

@@ -70,7 +70,8 @@ Les scripts laissent leur fenêtre ouverte jusqu’à l’appui sur une touche, 
 |---|---|
 | Docker Desktop introuvable | Installer Docker Desktop, puis ouvrir une nouvelle fenêtre ou relancer le script après installation. |
 | Moteur Docker non prêt | Ouvrir Docker Desktop, attendre son démarrage et appliquer ses instructions WSL 2 ou de redémarrage. |
-| Conteneurs Linux requis | Passer au mode conteneurs Linux dans Docker Desktop. |
+| Le moteur a indiqué le mode Windows | Dans la zone de notification Windows, faire un clic droit sur l’icône baleine Docker, choisir **Switch to Linux containers…** si cette option est proposée, puis attendre que le moteur soit prêt. |
+| Mode Docker absent ou non reconnu | Exécuter la commande de diagnostic ci-dessous. Cette erreur ne prouve pas que Docker utilise des conteneurs Windows ; ne pas changer de mode sans vérifier le résultat. |
 | Échec de téléchargement ou de certificat | Vérifier Internet et, en entreprise, le proxy et le certificat de confiance autorisé. Ne pas désactiver les vérifications TLS. |
 | Fichiers manquants ou dossier inaccessible | Extraire toute l’archive dans un dossier local accessible, puis relancer le script dans ce dossier. |
 | Port `8000` ou `55432` déjà utilisé | Identifier l’application qui utilise ce port. Ne pas arrêter un service inconnu ; faire adapter les ports par votre support si nécessaire. |
@@ -83,6 +84,16 @@ Pour consulter l’état ou les derniers journaux, ouvrez un terminal **dans le 
 docker compose --profile container ps
 docker compose --profile container logs --tail 80
 ```
+
+Pour vérifier directement le mode du moteur, sans installer ni modifier quoi que ce soit :
+
+```powershell
+docker info --format "{{.OSType}}"
+```
+
+Le résultat attendu est **`linux`**. Si le résultat est **`windows`**, utilisez le menu **Switch to Linux containers…** de Docker Desktop. Si le menu propose au contraire **Switch to Windows containers…**, ne choisissez pas cette option : elle ferait passer vers les conteneurs Windows. Si une erreur s’affiche ou si le résultat diffère, conservez la sortie exacte pour le diagnostic ; les scripts n’en déduisent plus automatiquement un mode Windows et ne changent jamais le moteur à votre place.
+
+Les lanceurs affichent désormais le mode détecté et distinguent une réponse `windows` d’une sortie absente ou inconnue. Ils n’utilisent plus la correspondance exacte d’une ligne par `FINDSTR` pour ce contrôle. Une réponse `linux` permet de continuer l’installation normalement.
 
 Ne partagez pas le fichier `.env` ni `.local\demo-access.txt` : ils contiennent les secrets de votre installation. N’utilisez pas la suppression des volumes ou une réinitialisation des données de Docker Desktop pour réparer un démarrage : cela peut effacer la base. Une simple relance des scripts ne demande aucune suppression de données.
 
