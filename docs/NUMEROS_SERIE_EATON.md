@@ -65,6 +65,10 @@ Ces confirmations permettront de faire évoluer l'aide avec des exemples vérifi
 
 ## Mettre à jour une installation Windows existante
 
-Arrêter l'application avec `ARRETER_TVM.cmd`. Extraire la nouvelle archive, puis copier son contenu dans le dossier TVM déjà utilisé, en acceptant le remplacement des fichiers. Conserver le fichier `.env`, le dossier `.local` et les données Docker de l'installation. Relancer `INSTALLER_TVM.cmd` depuis ce même dossier pour reconstruire et démarrer l'application. Le volume PostgreSQL existant est conservé ; cette mise à jour ne demande aucune réinitialisation de la base.
+Arrêter l'application avec `ARRETER_TVM.cmd`. Extraire la nouvelle archive, puis copier ses fichiers sources dans le dossier TVM déjà utilisé. **Conserver le fichier `.env`, le dossier `.local` et les données Docker de l'installation.** Relancer `INSTALLER_TVM.cmd` depuis ce même dossier pour reconstruire et démarrer l'application.
 
-Voir le [guide Windows](INSTALLATION_WINDOWS.md) pour les lanceurs et les prérequis. Ne pas supprimer les volumes Docker pour appliquer cette évolution.
+Si la nouvelle version est utilisée depuis un autre dossier, y récupérer d'abord **le `.env` et le dossier `.local` de l'ancien dossier TVM**. Si le nouveau dossier possède déjà ces éléments, en conserver une copie dans un dossier de sauvegarde local avant de les remplacer par ceux de l'ancienne installation. Pour les afficher dans l'Explorateur Windows, activer **Afficher → Afficher → Éléments masqués** ; sous Windows 10, cocher **Éléments masqués** dans l'onglet **Affichage**. Ne pas confondre `.env` et `.env.example`.
+
+Un nouveau dossier d'archive ne crée pas une nouvelle base : le nom de projet Docker Compose reste fixe et retrouve le volume PostgreSQL conservé. Un nouveau mot de passe dans `.env` ne change pas celui de cette base déjà initialisée et peut provoquer l'erreur `password authentication failed for user "tvm"`. La récupération de la configuration d'origine, suivie du lancement de `INSTALLER_TVM.cmd`, permet de réutiliser les accès existants.
+
+Voir le [dépannage du guide Windows](INSTALLATION_WINDOWS.md#erreur-de-mot-de-passe-postgresql-après-une-mise-à-jour) si cette erreur apparaît. Cette évolution ne demande aucune suppression de volume ni réinitialisation de base. Garder `.env`, `.local` et leurs sauvegardes sur le PC, sans les publier.

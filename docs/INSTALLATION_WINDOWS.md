@@ -64,6 +64,16 @@ Pour arrêter l’application, double-cliquez sur **`ARRETER_TVM.cmd`**. Le serv
 
 Les scripts laissent leur fenêtre ouverte jusqu’à l’appui sur une touche, y compris en cas d’erreur. Ils conservent le code d’échec de la commande concernée. Un code `0` signifie que l’opération a abouti ; les codes non nuls sont accompagnés d’un message décrivant l’étape en échec. Le code `2` est utilisé lorsqu’un fichier nécessaire manque.
 
+## Mettre à jour l’application sans perdre la configuration
+
+Le plus simple est de conserver le dossier TVM qui fonctionnait déjà. Arrêtez l’application avec `ARRETER_TVM.cmd`, puis remplacez ses fichiers sources par ceux de la nouvelle archive. **Conservez son fichier `.env`, son dossier `.local` et les données Docker.** Relancez ensuite `INSTALLER_TVM.cmd` depuis ce dossier pour reconstruire et démarrer l’application.
+
+Si vous préférez utiliser un nouveau dossier extrait, copiez-y d’abord **le fichier `.env` et le dossier `.local` de l’ancienne installation**. Si le nouveau dossier possède déjà ces éléments, conservez-en une copie dans un dossier de sauvegarde local avant de les remplacer par ceux de l’ancienne installation. Relancez ensuite `INSTALLER_TVM.cmd` dans le dossier que vous utiliserez désormais.
+
+Si ces éléments ne sont pas visibles, ouvrez l’Explorateur Windows et activez **Afficher → Afficher → Éléments masqués**. Sous Windows 10, cochez **Éléments masqués** dans l’onglet **Affichage**. Le fichier à récupérer s’appelle exactement `.env`, et non `.env.example`.
+
+Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs utilisent un nom de projet Docker Compose fixe et retrouvent le volume PostgreSQL existant. La mise à jour ne demande ni suppression de volume, ni réinitialisation de la base. Gardez les fichiers de configuration et leur copie de sauvegarde sur votre PC ; ils ne doivent pas être partagés.
+
 ## Si quelque chose bloque
 
 | Message ou symptôme | Action |
@@ -76,7 +86,22 @@ Les scripts laissent leur fenêtre ouverte jusqu’à l’appui sur une touche, 
 | Fichiers manquants ou dossier inaccessible | Extraire toute l’archive dans un dossier local accessible, puis relancer le script dans ce dossier. |
 | Port `8000` ou `55432` déjà utilisé | Identifier l’application qui utilise ce port. Ne pas arrêter un service inconnu ; faire adapter les ports par votre support si nécessaire. |
 | Image locale manquante au prochain démarrage | Relancer `INSTALLER_TVM.cmd`. La configuration est conservée et les données ne sont pas effacées. |
+| `password authentication failed for user "tvm"` | Après un changement de dossier ou une nouvelle extraction, récupérer la configuration de l’ancienne installation selon les étapes ci-dessous. Ne pas supprimer la base. |
 | Échec de disponibilité après trois minutes | Lire les messages dans la fenêtre. Les services peuvent avoir démarré sans être prêts ; consulter leurs journaux avant de réessayer. |
+
+### Erreur de mot de passe PostgreSQL après une mise à jour
+
+L’erreur `password authentication failed for user "tvm"` peut se produire si le nouveau dossier contient un `.env` généré avec un nouveau mot de passe, alors que Docker conserve la base de l’installation précédente. **Modifier le mot de passe dans `.env` ne change pas celui d’une base PostgreSQL déjà initialisée.**
+
+Pour retrouver les bons accès sans effacer les données :
+
+1. Fermez la fenêtre de l’installateur en échec et retrouvez le dossier TVM utilisé lorsque l’application fonctionnait.
+2. Dans l’Explorateur, activez **Afficher → Afficher → Éléments masqués** si nécessaire. Repérez le fichier `.env` et le dossier `.local` dans cet ancien dossier.
+3. Dans le dossier où vous lancez maintenant TVM, conservez d’abord une copie locale du `.env` et du dossier `.local` qui s’y trouvent déjà. Ne les écrasez pas avant cette copie.
+4. Copiez ensuite **le `.env` et le dossier `.local` de l’ancienne installation** vers ce dossier, en acceptant le remplacement des nouveaux éléments après la sauvegarde.
+5. Relancez `INSTALLER_TVM.cmd` depuis ce même dossier. Le programme réutilise la base existante avec sa configuration d’origine.
+
+Si vous ne retrouvez pas l’ancien `.env`, conservez les dossiers et les données Docker pour que votre support puisse examiner la situation. Ne régénérez pas des mots de passe au hasard, ne supprimez aucun volume et n’utilisez pas la réinitialisation de Docker Desktop. Ne publiez ni `.env`, ni `.local`, ni leurs copies de sauvegarde.
 
 Pour consulter l’état ou les derniers journaux, ouvrez un terminal **dans le dossier du projet** et utilisez :
 
