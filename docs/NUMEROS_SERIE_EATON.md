@@ -1,5 +1,7 @@
 # Analyse consultative des numéros de série Eaton
 
+Cette page décrit le premier outil de découpage. Pour retrouver le modèle et calculer la garantie dans une nouvelle demande, voir [le parcours série → demande SAV](PARCOURS_DEMANDE_SERIE.md), qui utilise le catalogue importé et la règle TVM « fabrication + six mois calendaires ».
+
 ## Source et périmètre
 
 Le fichier fourni `eaton structure.xlsx` contient une feuille `Table 1` et neuf cellules renseignées. Il décrit une structure de sérialisation de produits et sous-ensembles. Il ne contient ni inventaire d'onduleurs, ni liste de clients, ni correspondance entre codes et usines ou modèles.

@@ -31,3 +31,4 @@ legacy-exports/
 *.[xX][lL][sS][mM]
 *.[xX][lL][sS][bB]
 !backend/core/tests/fixtures/catalogue_synthetic.xls
+!backend/core/tests/fixtures/request_intake_synthetic.xls

@@ -44,6 +44,7 @@ Les comptes fictifs sont `admin`, `responsable`, `technicien` et `client`. Leur 
 | Demander l'export au développeur HFSQL | [Spécification d'export](docs/EXPORT_HFSQL.md) |
 | Comprendre l'aide de lecture des séries Eaton | [Structure des numéros de série Eaton](docs/NUMEROS_SERIE_EATON.md) |
 | Importer le catalogue Eaton BN dans sa propre instance TVM | [Import du catalogue Eaton](docs/IMPORT_CATALOGUE_EATON.md) |
+| Retrouver modèle et garantie depuis la série pendant une nouvelle demande | [Parcours de demande SAV par numéro de série](docs/PARCOURS_DEMANDE_SERIE.md) |
 | Contrat HTTP des ressources | [API](docs/API_CONTRACT.md) |
 | Résultats des tests et limites vérifiées | [Validation](docs/VALIDATION.md) |
 | Exécuter les contrôles backend et la compilation frontend | `bash scripts/test.sh` |

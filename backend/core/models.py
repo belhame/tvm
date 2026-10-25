@@ -64,6 +64,8 @@ class Equipment(LegacyModel):
     power_kva = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     location = models.CharField(max_length=250, blank=True)
     commissioned_on = models.DateField(null=True, blank=True)
+    manufactured_on = models.DateField(null=True, blank=True)
+    catalogue_product = models.ForeignKey('core.CatalogueProduct', on_delete=models.SET_NULL, null=True, blank=True, related_name='equipment')
     warranty_until = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -104,6 +106,8 @@ class ServiceRequest(ReferencedModel):
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
     requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    intake_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    intake_data = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
@@ -194,7 +198,13 @@ class Contract(LegacyModel):
 
 
 class Warranty(LegacyModel):
+    class Scope(models.TextChoices):
+        ELECTRONICS = 'electronics', 'Électronique'
+        BATTERIES = 'batteries', 'Batteries'
+        COMBINED = 'electronics_and_batteries', 'Électronique et batteries'
+        UNSPECIFIED = 'unspecified', 'Portée non précisée'
     equipment = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name='warranties')
+    scope = models.CharField(max_length=32, choices=Scope.choices, default=Scope.UNSPECIFIED)
     provider = models.CharField(max_length=150, blank=True)
     starts_on = models.DateField()
     ends_on = models.DateField()

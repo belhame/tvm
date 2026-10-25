@@ -17,7 +17,7 @@ HEADERS = [
 ]
 
 
-def build(destination):
+def build(destination, *, intake=False):
     book = xlwt.Workbook()
     summary = book.add_sheet("Summary")
     for c, value in enumerate(["Date", "Revision", "Modifications", "Who", "", "Links"]):
@@ -34,6 +34,8 @@ def build(destination):
         ["Laboratoire fiction", "Onduleur laboratoire Beta", "QX1", 2001, "MFG-DEMO-003", "DEMO-003", "No longer into market", "No replacement", "No replacement", "Pulsar", "", ""],
         ["Laboratoire fiction", "Onduleur laboratoire Gamma", "NA", "NA", 1234500000, "00012", "In market", "", "", "Powerware", "", ""],
     ]
+    if intake:
+        rows.append(["Laboratoire Garantie", "Onduleur laboratoire Unique", "AB2", 2020, "LAB-IND-850", "LAB850F", "In market", "", "", "Eaton", "Demo2", ""])
     for r, row in enumerate(rows, start=1):
         for c, value in enumerate(row):
             serial.write(r, c, value)
@@ -50,11 +52,13 @@ def build(destination):
         (5, 7, "Accessoire de laboratoire", "3 months"),
         (6, 7, "Batterie de laboratoire", "1 year"),
     ]
+    if intake:
+        entries.append((7, 1, "Laboratoire Garantie", 2))
     for r, c, label, duration in entries:
         warranty.write(r, c, label)
         warranty.write(r, c + 1, duration)
     for name, column, pairs in [
-        ("Eaton Structure", 10, [("A", 2040), ("I/J", 2041)]),
+        ("Eaton Structure", 10, [("A", 2023), ("I/J", 2024)] if intake else [("A", 2040), ("I/J", 2041)]),
         ("Pulsar Structure", 10, [("A", 2001), ("I,J", 2002)]),
         ("Powerware Structure", 8, [("S", 2020), ("Z or A", 2021)]),
     ]:
@@ -72,3 +76,4 @@ def build(destination):
 
 if __name__ == "__main__":
     build(Path(__file__).with_name("catalogue_synthetic.xls"))
+    build(Path(__file__).with_name("request_intake_synthetic.xls"), intake=True)

@@ -5755,3 +5755,557 @@ th {
   line-height: 1.7;
   margin-top: 5px;
 }
+.request-intake fieldset {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 0;
+}
+.request-intake-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 15px 16px;
+  background: #f2f7ff;
+  border: 1px solid #e2ebfb;
+  border-radius: 9px;
+  margin-bottom: 23px;
+  color: #7b9bc9;
+}
+.request-intake-intro > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.request-intake-intro strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: #6e8cb7;
+}
+.request-intake-intro p {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #93a8c5;
+  line-height: 1.75;
+}
+.request-intake-section {
+  min-width: 0;
+  padding-bottom: 23px;
+  margin-bottom: 23px;
+  border-bottom: 1px solid #eaf0f9;
+}
+.request-intake-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+.request-intake-section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 17px;
+}
+.request-intake-section-title > span {
+  height: 24px;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #eef4ff;
+  color: #7ca1dd;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.request-intake-section-title h3 {
+  font-size: 13px;
+  color: #7188a9;
+  line-height: 1.6;
+}
+.request-intake-serial-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 19px 0 16px;
+}
+.request-intake-serial-row > label {
+  min-width: 160px;
+  flex: 1 1 220px;
+}
+.request-intake-serial-row > .button {
+  min-height: 40px;
+  font-size: 11px;
+  white-space: normal;
+  line-height: 1.6;
+  text-align: left;
+}
+.request-intake-serial-row > .button > svg {
+  flex-shrink: 0;
+}
+.request-intake-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.7;
+  padding: 13px 0;
+  color: #92a9c9;
+}
+.request-intake-loading > svg {
+  flex-shrink: 0;
+}
+.request-intake-choice {
+  margin: 18px 0;
+}
+.request-intake-product-choice,
+.request-intake-warranty-choice {
+  margin-bottom: 18px;
+}
+.request-intake-choice-warning,
+.request-intake-existing {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff8ee;
+  border: 1px solid #f5e7d1;
+  border-radius: 8px;
+  color: #ae987a;
+  padding: 12px 13px;
+  margin: 13px 0;
+  font-size: 11px;
+  line-height: 1.75;
+}
+.request-intake-choice-warning > svg,
+.request-intake-existing > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.request-intake-existing {
+  background: #f1faf5;
+  border-color: #dbefe4;
+  color: #83a993;
+  margin-bottom: 19px;
+}
+.request-intake-existing strong {
+  color: #719a82;
+  font-size: 11px;
+  font-weight: 600;
+}
+.request-intake-existing p {
+  font-size: 10px;
+  margin-top: 5px;
+}
+.request-intake-product-name {
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid #e6edf8;
+  background: #fafcff;
+  border-radius: 7px;
+  color: #8b9fbd;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.request-intake-product-name > span {
+  display: block;
+  margin-bottom: 3px;
+  color: #a1b1c8;
+  font-size: 10px;
+}
+.request-intake-model-limit {
+  color: #c29872 !important;
+}
+.request-intake-manual {
+  margin-top: 20px;
+  padding: 14px;
+  background: #fcfbf8;
+  border: 1px solid #eee9df;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #a4957b;
+}
+.request-intake-manual > summary {
+  cursor: pointer;
+}
+.request-intake-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 15px 0 18px;
+  font-size: 11px;
+  color: #9b907c;
+  line-height: 1.7;
+}
+.request-intake-checkbox > input {
+  margin-top: 3px;
+}
+.serial-lookup-summary {
+  min-width: 0;
+  border: 1px solid #dfe9f8;
+  background: #f9fbff;
+  border-radius: 10px;
+  padding: 17px;
+  margin-top: 17px;
+}
+.serial-lookup-summary-heading,
+.serial-lookup-summary-title,
+.serial-lookup-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.serial-lookup-summary-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+.serial-lookup-summary-title {
+  min-width: 0;
+  color: #7297cc;
+}
+.serial-lookup-summary-title > svg {
+  flex-shrink: 0;
+}
+.serial-lookup-summary-title h3 {
+  color: #6988af;
+  font-size: 13px;
+}
+.serial-lookup-summary-title p {
+  color: #a0b2ca;
+  font-size: 11px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.serial-lookup-summary .badge.blue {
+  color: #6894d5;
+  background: #ecf3ff;
+}
+.serial-lookup-summary .badge.amber {
+  color: #b39465;
+  background: #fff4e2;
+}
+.serial-lookup-summary .badge.green {
+  color: #5ba67d;
+  background: #edf8f1;
+}
+.serial-lookup-summary .badge.red {
+  color: #c38686;
+  background: #fff0ef;
+}
+.serial-lookup-existing {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid #deeee4;
+  border-radius: 7px;
+  background: #f2f9f5;
+  color: #8eaf9c;
+  margin: 0 0 14px;
+}
+.serial-lookup-existing > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.serial-lookup-existing strong {
+  font-size: 11px;
+  color: #739a84;
+}
+.serial-lookup-existing p {
+  font-size: 10px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.serial-lookup-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 12px;
+}
+.serial-lookup-card {
+  min-width: 0;
+  border: 1px solid #e2eaf7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+  margin-bottom: 13px;
+}
+.serial-lookup-card-heading {
+  color: #91aacb;
+  align-items: flex-start;
+  margin-bottom: 13px;
+}
+.serial-lookup-card-heading > svg {
+  flex-shrink: 0;
+}
+.serial-lookup-card-heading h4 {
+  font-size: 12px;
+  color: #7d96b7;
+  line-height: 1.5;
+}
+.serial-lookup-card-heading > .badge {
+  margin-left: auto;
+}
+.serial-lookup-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 13px;
+  margin: 0;
+}
+.serial-lookup-fact {
+  min-width: 0;
+}
+.serial-lookup-fact-wide {
+  grid-column: span 2;
+}
+.serial-lookup-fact dt {
+  color: #a5b4ca;
+  font-size: 9px;
+  line-height: 1.6;
+  margin-bottom: 5px;
+}
+.serial-lookup-fact dd {
+  margin: 0;
+  color: #7891b2;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.serial-lookup-note,
+.serial-lookup-rule,
+.serial-lookup-recorded-priority {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 10px;
+  color: #a1afc4;
+  line-height: 1.75;
+  margin-top: 13px;
+}
+.serial-lookup-note > svg,
+.serial-lookup-rule > svg,
+.serial-lookup-recorded-priority > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.serial-lookup-source,
+.serial-lookup-precision,
+.serial-lookup-section-note {
+  color: #a4b4ca;
+  font-size: 10px;
+  line-height: 1.75;
+  margin-top: 11px;
+  overflow-wrap: anywhere;
+}
+.serial-lookup-warranty-basis {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #8eacd0;
+  font-size: 11px;
+  margin-bottom: 16px;
+}
+.serial-lookup-warranty-basis.recorded {
+  color: #7eab94;
+}
+.serial-lookup-warranty-dates {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 13px;
+  border-radius: 7px;
+  background: #f6f9ff;
+}
+.serial-lookup-warranty-option {
+  font-size: 10px;
+  color: #a1b1c8;
+  margin-top: 13px;
+  line-height: 1.75;
+}
+.serial-lookup-warranty-option > strong {
+  color: #8ca3c0;
+  font-size: 11px;
+}
+.serial-lookup-rule {
+  padding: 12px;
+  background: #f6f9fe;
+  border-radius: 7px;
+  margin-top: 15px;
+}
+.serial-lookup-rule strong {
+  color: #93a8c5;
+  font-weight: 600;
+}
+.serial-lookup-recorded-warranties {
+  border-top: 1px solid #edf2f9;
+  margin-top: 14px;
+  padding-top: 2px;
+}
+.serial-lookup-recorded-priority {
+  color: #88ab98;
+}
+.serial-lookup-recorded-warranties > ul,
+.serial-lookup-contract-list {
+  list-style: none;
+  margin: 13px 0 0;
+  padding: 0;
+}
+.serial-lookup-recorded-warranties li,
+.serial-lookup-contract-list li {
+  padding: 11px 0;
+  border-bottom: 1px solid #edf2f9;
+  color: #90a6c1;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.serial-lookup-recorded-warranties li:last-child,
+.serial-lookup-contract-list li:last-child {
+  border-bottom: 0;
+}
+.serial-lookup-recorded-warranties li > strong,
+.serial-lookup-contract-list li > strong {
+  color: #7f9bba;
+  font-size: 11px;
+}
+.serial-lookup-recorded-warranties li > p,
+.serial-lookup-contract-list li > p {
+  margin-top: 4px;
+}
+.serial-lookup-history-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.serial-lookup-history-group h5 {
+  font-size: 10px;
+  color: #8ea6c4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 11px;
+}
+.serial-lookup-history-group > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.serial-lookup-history-group li {
+  font-size: 10px;
+  color: #a0b2c9;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf2f9;
+  line-height: 1.7;
+}
+.serial-lookup-history-group li:last-child {
+  border-bottom: 0;
+}
+.serial-lookup-history-group a {
+  font-size: 11px;
+  color: #7d9fc8;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.serial-lookup-history-group p {
+  margin-top: 4px;
+}
+.serial-lookup-history-group time {
+  display: block;
+  font-size: 9px;
+  color: #b0bed0;
+  margin-top: 4px;
+}
+.serial-lookup-warnings {
+  padding: 12px 13px;
+  border: 1px solid #f3e8d7;
+  border-radius: 7px;
+  background: #fffaf2;
+  color: #b8a384;
+  font-size: 10px;
+  line-height: 1.8;
+  margin-top: 14px;
+}
+.serial-lookup-warnings > ul {
+  padding-left: 17px;
+  margin: 5px 0 0;
+}
+.serial-lookup-warnings li + li {
+  margin-top: 4px;
+}
+.serial-lookup-empty {
+  font-size: 10px;
+  color: #adbbcf;
+  line-height: 1.75;
+}
+@media (max-width: 540px) {
+  .request-intake-intro {
+    padding: 13px;
+  }
+  .request-intake-intro strong {
+    font-size: 12px;
+  }
+  .request-intake-section-title h3 {
+    font-size: 12px;
+  }
+  .request-intake-serial-row {
+    gap: 12px;
+  }
+  .request-intake-serial-row > label {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .request-intake-serial-row > .button {
+    font-size: 11px;
+    min-height: 39px;
+  }
+  .request-intake-section > .form-field > .input,
+  .request-intake-choice select,
+  .request-intake-product-choice select,
+  .request-intake-warranty-choice select {
+    font-size: 12px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .serial-lookup-summary {
+    padding: 13px 11px;
+  }
+  .serial-lookup-grid,
+  .serial-lookup-history-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .serial-lookup-card {
+    padding: 13px;
+  }
+  .serial-lookup-summary-heading {
+    gap: 11px;
+  }
+  .serial-lookup-fact dt {
+    font-size: 10px;
+  }
+  .serial-lookup-fact dd {
+    font-size: 12px;
+  }
+  .serial-lookup-warranty-dates {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .serial-lookup-warranty-basis,
+  .serial-lookup-note,
+  .serial-lookup-rule,
+  .serial-lookup-source,
+  .serial-lookup-precision,
+  .serial-lookup-section-note,
+  .serial-lookup-warnings,
+  .serial-lookup-empty {
+    font-size: 11px;
+  }
+  .serial-lookup-recorded-warranties li,
+  .serial-lookup-contract-list li,
+  .serial-lookup-history-group li {
+    font-size: 11px;
+  }
+}
+.serial-lookup-summary .badge.gray {
+  color: #9aa7bb;
+  background: #f0f3f8;
+}

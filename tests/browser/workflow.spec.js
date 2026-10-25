@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
 const catalogueFixture = fileURLToPath(new URL('../../backend/core/tests/fixtures/catalogue_synthetic.xls', import.meta.url));
+const intakeFixture = fileURLToPath(new URL('../../backend/core/tests/fixtures/request_intake_synthetic.xls', import.meta.url));
 
 const password = process.env.TVM_DEMO_PASSWORD;
 test.beforeAll(() => {
@@ -306,4 +307,78 @@ test('un modèle du catalogue est choisi explicitement et le catalogue reste ré
     expect((await customer.request.get(`/api/${path}`)).status()).toBe(403);
   }
   await clientContext.close();
+});
+
+test('nouvelle demande depuis une série : modèle court, garantie plus six mois et sauvegarde atomique', async ({ page }) => {
+  await login(page);
+  const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
+  await navigation.getByText('Catalogue Eaton', { exact: true }).click();
+  await page.getByLabel('Fichier catalogue XLS', { exact: true }).setInputFiles(intakeFixture);
+  const imported = page.waitForResponse(response => response.url().endsWith('/api/catalogue/import/') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Importer le catalogue', exact: true }).click();
+  expect((await imported).ok()).toBeTruthy();
+
+  let serial;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    serial = `GAB2A49${String((Date.now() + attempt) % 1000).padStart(3, '0')}`;
+    if ((await api(page, `equipment/?serial=${serial}`)).length === 0) break;
+  }
+  expect(await api(page, `equipment/?serial=${serial}`)).toEqual([]);
+  await navigation.getByText('Demandes SAV', { exact: true }).click();
+  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/^Numéro de série/).fill(serial);
+  const lookupResponse = page.waitForResponse(response => response.url().endsWith('/api/serial-lookup/') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Rechercher le modèle et la garantie', exact: true }).click();
+  const lookup = await (await lookupResponse).json();
+  expect(lookup.selected_product.catalogue_number).toBe('LAB850F');
+  expect(lookup.manufactured_on).toBe('2023-12-04');
+  expect(lookup.computed_warranty).toMatchObject({ starts_on: '2024-06-04', ends_on: '2026-06-04', duration_months: 24 });
+  await expect(dialog).toContainText('LAB850F');
+  await expect(dialog).toContainText('04/06/2024');
+  await expect(dialog).toContainText('04/06/2026');
+  expect(await api(page, `equipment/?serial=${serial}`)).toEqual([]);
+  const clients = await api(page, 'clients/');
+  await dialog.getByLabel(/^Client\s/).selectOption(String(clients[0].id));
+  const subject = `Série complète ${Date.now()}`;
+  await dialog.getByLabel(/Objet du signalement/).fill(subject);
+  await dialog.getByLabel(/Description de la panne/).fill('Alarme de test du parcours numéro de série et garantie.');
+  const intakeResponse = page.waitForResponse(response => response.url().endsWith('/api/requests/intake/') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  const response = await intakeResponse;
+  expect(response.status()).toBe(201);
+  const payload = response.request().postDataJSON();
+  const saved = await response.json();
+  expect(saved.equipment.model).toBe('LAB850F');
+  expect(saved.equipment.manufactured_on).toBe('2023-12-04');
+  expect(saved.warranty).toMatchObject({ starts_on: '2024-06-04', ends_on: '2026-06-04' });
+  expect(saved.request.equipment).toBe(saved.equipment.id);
+  await expect(dialog).toHaveCount(0);
+  const replay = await api(page, 'requests/intake/', 'POST', payload);
+  expect(replay.created).toBe(false);
+  expect(replay.request.id).toBe(saved.request.id);
+  const equipment = await api(page, `equipment/?serial=${serial}`);
+  expect(equipment).toHaveLength(1);
+  const requests = await api(page, 'requests/');
+  expect(requests.filter(row => row.subject === subject)).toHaveLength(1);
+});
+
+test('modifier une série efface les anciennes propositions et annuler ne crée aucun équipement', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await page.getByRole('button', { name: 'Ouvrir le menu', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Navigation principale' }).getByText('Demandes SAV', { exact: true }).click();
+  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/^Numéro de série/).fill('GAB2A49999');
+  await dialog.getByRole('button', { name: 'Rechercher le modèle et la garantie', exact: true }).click();
+  await expect(dialog).toContainText('LAB850F');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)).toBeFalsy();
+  const marker = `INCONNU-${Date.now()}`;
+  await dialog.getByLabel(/^Numéro de série/).fill(marker);
+  await expect(dialog.locator('.serial-lookup-summary')).toHaveCount(0);
+  await expect(dialog.getByLabel('Modèle identifié', { exact: true })).toHaveValue('');
+  await expect(dialog.getByRole('button', { name: 'Enregistrer', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+  expect(await api(page, `equipment/?serial=${marker}`)).toEqual([]);
 });

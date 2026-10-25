@@ -13,11 +13,12 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
 | Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
+| Demande à partir d'une série | Recherche interne du modèle et de la garantie, puis création transactionnelle de la demande et, si nécessaire, de l'équipement et de sa garantie | Création d'équipement administrateur/responsable ; données existantes prioritaires ; cas ambigus ou dates imprécises à compléter explicitement |
 | Interventions | Affectation, date, durée, diagnostic, travaux, recommandations et état | Pas d'optimisation automatique des tournées |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
 | Rapports | Téléchargement PDF par intervention, soumis aux mêmes droits que le dossier | Pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
 | Contrats | Fiche de contrat liée au client et éventuellement à un équipement, dates et couverture | Pas de facturation ni de génération automatique d'échéanciers |
-| Garanties | Périodes et conditions par équipement | La décision de prise en charge et les règles WINDEV ne sont pas converties automatiquement |
+| Garanties | Périodes et conditions par équipement ; nouveau parcours appliquant le début de garantie à fabrication + six mois calendaires lorsque la date est connue | La prise en charge reste à valider ; aucune garantie existante écrasée et aucun contrôle direct via une API Eaton |
 | Pièces et stock | Catalogue, seuils et mouvements d'entrée/sortie ; contrôle du stock négatif ; rattachement possible à une intervention | Module nouveau : aucune table de stock n'a été identifiée avec certitude dans l'archive WINDEV |
 | Bons de livraison | Fiche de livraison, lignes, client et rattachement éventuel à une intervention | Pas de PDF de BL dans cette étape ; un BL ne débite pas implicitement le stock, enregistrer le mouvement une seule fois |
 | Tableau de bord | Compteurs, interventions récentes, activité et répartition des états issus de la base | Pas de statistiques historiques importées avant reprise des données |
@@ -50,6 +51,12 @@ Une aide de lecture des séries Eaton est proposée dans le scanner et la fiche 
 Le menu interne **Catalogue Eaton** permet d'importer et de consulter le fichier de référence `Product serial number Vers BN.xls`. L'import conserve les versions, la provenance des lignes, les entrées `NA` et les collisions de codes. Il reconnaît un fichier identique par SHA-256 et active une version complète de façon atomique ; les références d'années et de garanties restent distinctes.
 
 Ce catalogue ne transforme pas l'aide de lecture initiale en décodeur universel des quatre profils et ne modifie aucun équipement automatiquement. Un import dans le cloud n'alimente pas la base de votre PC : le fichier original doit être importé une fois dans votre propre instance après mise à jour. Voir [la procédure et les contrôles attendus](IMPORT_CATALOGUE_EATON.md).
+
+## Nouvelle demande à partir d'un numéro de série
+
+Le formulaire de demande SAV propose une recherche interne du modèle et des informations de garantie à partir de la série. Les fiches, garanties et contrats déjà enregistrés sont prioritaires. Pour un nouvel équipement, un administrateur ou responsable peut enregistrer l'équipement, la demande et une garantie calculable dans une même transaction ; le technicien utilise un équipement existant.
+
+La règle confirmée est **début de garantie = fabrication + six mois calendaires**, affichée comme règle TVM. Les profils utilisent leurs propres références d'années ; les dates imprécises, les cycles ambigus et les modèles non déductibles ne sont pas remplacés par des suppositions. Voir [le parcours et les limites par profil](PARCOURS_DEMANDE_SERIE.md).
 
 ## Intégrations à connecter
 

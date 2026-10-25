@@ -78,6 +78,12 @@ Le catalogue BN est une source de référence plus riche, importée et consultab
 
 Ni l'import ni la consultation du catalogue ne modifient automatiquement le numéro de série, le modèle, la date de fabrication ou la garantie d'un équipement. Une correspondance de code ou une durée mentionnée dans le catalogue ne vaut pas une décision de prise en garantie d'un dossier SAV.
 
+## Utiliser le catalogue pendant une nouvelle demande SAV
+
+Un parcours distinct permet de saisir la série pendant une nouvelle demande, puis de rechercher le modèle et les informations de garantie côté serveur. La recherche ne crée rien. Lors de l'enregistrement explicite par un administrateur ou responsable, un nouvel équipement, sa demande et une garantie calculable peuvent être créés de façon atomique. Les fiches, garanties et contrats existants ne sont jamais écrasés par ce parcours.
+
+Le début de garantie suit la règle TVM confirmée par l'utilisateur : **date de fabrication + six mois calendaires**. Il ne s'agit pas d'une réponse en direct d'Eaton. Une précision limitée au mois, un code d'année ambigu ou un modèle non identifié doit être signalé ; les données manuelles nécessitent une justification. Voir [le parcours demande à partir d'une série](PARCOURS_DEMANDE_SERIE.md) et [son contrat API](API_CONTRACT.md#demande-sav-à-partir-dune-série).
+
 ## Confidentialité et conservation
 
 Le code source de l'importeur et de l'application peut être livré séparément. **Le fichier XLS fourni et les données privées du catalogue ne sont pas inclus dans les sources publiques, dans GitHub ou dans l'archive des sources.** Ils sont chargés dans la base de l'instance autorisée lors de l'import.

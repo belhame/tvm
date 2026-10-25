@@ -72,6 +72,7 @@ import SerialAnalysis from "./SerialAnalysis";
 import Integrations from "./Integrations";
 import EatonCatalogue from "./EatonCatalogue";
 import CatalogueModelPicker from "./CatalogueModelPicker";
+import RequestIntake from "./RequestIntake";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -454,6 +455,25 @@ function EditForm({
   );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  if (modal.resource === "requests" && !editing && !readonly) {
+    return (
+      <Modal
+        title={config.button}
+        subtitle="Retrouvez le modèle, la garantie et l’historique depuis le numéro de série."
+        onClose={onClose}
+        wide
+      >
+        <RequestIntake
+          user={user}
+          equipment={data.equipment || []}
+          clients={data.clients || []}
+          initialEquipmentId={modal.values?.equipment}
+          onSaved={onSaved}
+          onClose={onClose}
+        />
+      </Modal>
+    );
+  }
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");

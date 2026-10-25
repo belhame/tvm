@@ -25,7 +25,14 @@ class EquipmentSerializer(LegacySerializer):
     client_name = serializers.CharField(source='client.name', read_only=True)
     class Meta:
         model = Equipment
-        fields = ['id', 'client', 'client_name', 'serial_number', 'brand', 'model', 'power_kva', 'location', 'commissioned_on', 'warranty_until', 'status', 'legacy_id']
+        fields = ['id', 'client', 'client_name', 'serial_number', 'brand', 'model', 'power_kva', 'location', 'commissioned_on', 'manufactured_on', 'catalogue_product', 'warranty_until', 'status', 'legacy_id']
+        read_only_fields = ['manufactured_on', 'catalogue_product']
+    def get_fields(self):
+        fields = super().get_fields()
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.is_authenticated and user.effective_role == 'client':
+            fields.pop('catalogue_product', None)
+        return fields
     def validate_serial_number(self, value):
         value = value.strip()
         qs = Equipment.objects.filter(serial_number__iexact=value)
@@ -49,8 +56,15 @@ class ServiceRequestSerializer(LegacySerializer):
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'created_at', 'legacy_id']
-        read_only_fields = ['reference', 'created_at']
+        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'created_at', 'legacy_id', 'intake_key', 'intake_data']
+        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
+    def get_fields(self):
+        fields = super().get_fields()
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.is_authenticated and user.effective_role == 'client':
+            fields.pop('intake_key', None)
+            fields.pop('intake_data', None)
+        return fields
     def validate(self, attrs):
         if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and self.instance.interventions.exists():
             raise serializers.ValidationError({'equipment': 'Un dossier ayant des interventions ne peut pas changer d’équipement.'})
@@ -241,7 +255,7 @@ class WarrantySerializer(DateRangeMixin, LegacySerializer):
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
     class Meta:
         model = Warranty
-        fields = ['id', 'equipment', 'equipment_serial', 'client_name', 'provider', 'starts_on', 'ends_on', 'terms', 'legacy_id']
+        fields = ['id', 'equipment', 'equipment_serial', 'client_name', 'provider', 'scope', 'starts_on', 'ends_on', 'terms', 'legacy_id']
 
 
 class DeliveryLineSerializer(serializers.ModelSerializer):
