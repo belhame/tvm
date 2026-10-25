@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from .models import AuditLog, Client, Contract, DeliveryNote, Equipment, Intervention, LoginAttempt, Part, ServiceRequest, StockMovement, Warranty
 from .pdf import intervention_report
 from .permissions import AdminAccountsPermission, BusinessPermission, InternalPermission, ManagerPermission
+from .serial_numbers import analyze_serial_number
 from .serializers import AuditSerializer, ClientSerializer, ContractSerializer, DeliveryNoteSerializer, EquipmentSerializer, InterventionSerializer, PartSerializer, ServiceRequestSerializer, StaffSerializer, StockMovementSerializer, UserSerializer, WarrantySerializer
 
 User = get_user_model()
@@ -308,6 +309,20 @@ def integrations_view(request):
         'ai': {'configured': False, 'operational': False, 'status': 'requires_credentials', 'message': 'Assistant non connecté. Aucune réponse de diagnostic n’est simulée et aucun dossier n’est transmis à un fournisseur.', 'requirements': ['Fournisseur et modèle IA approuvés', 'Clé API fournie par canal sécurisé', 'Politique de conservation, localisation et traitement des données', 'Recherche filtrée selon les droits de l’utilisateur et audit des accès']},
         'scanner': {'operational': True, 'requires_https': True, 'message': 'Recherche par numéro de série opérationnelle. Le scan caméra nécessite HTTPS et une caméra autorisée ; prise en charge selon navigateur, saisie manuelle disponible.'},
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def serial_analysis_view(request):
+    """Analyse consultative ; aucune recherche dans le parc ni écriture métier."""
+    value = request.data.get('serial_number') if isinstance(request.data, dict) else None
+    if not isinstance(value, str):
+        raise ValidationError({'serial_number': 'Une chaîne de caractères est obligatoire.'})
+    if not value.strip():
+        raise ValidationError({'serial_number': 'Indiquez un numéro de série.'})
+    if len(value) > 120:
+        raise ValidationError({'serial_number': '120 caractères maximum.'})
+    return Response(analyze_serial_number(value))
 
 
 def api_not_found(request, *args, **kwargs):

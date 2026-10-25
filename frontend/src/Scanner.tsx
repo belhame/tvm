@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
+import SerialAnalysis from "./SerialAnalysis";
 
 type Equipment = {
   id: number;
@@ -423,6 +424,7 @@ export default function Scanner({
               {searching ? "Recherche en cours…" : "Rechercher l’équipement"}
             </button>
           </form>
+          <SerialAnalysis serialNumber={serial} brand="" />
           {error && (
             <p
               role="alert"

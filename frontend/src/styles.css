@@ -4844,3 +4844,165 @@ th {
     max-width: 80%;
   }
 }
+/* Optional serial format guidance never changes the equipment form. */
+.serial-analysis-field {
+  min-width: 0;
+  margin-top: -4px;
+}
+.serial-analysis {
+  min-width: 0;
+  margin-top: 12px;
+}
+.serial-analysis-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+}
+.serial-analysis-toolbar > span {
+  color: #91a0b9;
+  font-size: 11px;
+}
+.serial-analysis-toolbar > .button {
+  white-space: normal;
+  text-align: left;
+  min-height: 33px;
+}
+.serial-analysis-toolbar > .button svg {
+  flex-shrink: 0;
+}
+.serial-analysis-result {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.serial-analysis-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  background: #f4f7fd;
+  border: 1px solid #e7edf7;
+  border-radius: 8px;
+  padding: 13px 14px;
+  margin-top: 12px;
+  color: #7e92b2;
+}
+.serial-analysis-message > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.serial-analysis-message strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5b7398;
+  line-height: 1.6;
+}
+.serial-analysis-message p {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.serial-analysis-error {
+  background: #fff8f0;
+  border-color: #fae9d3;
+  color: #ae8f66;
+}
+.serial-analysis-error strong {
+  color: #a27b4a;
+}
+.serial-analysis-card {
+  margin-top: 12px;
+  background: #f6f9ff;
+  border: 1px solid #dfe9fb;
+  border-radius: 9px;
+  padding: 15px;
+}
+.serial-analysis-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #4380dc;
+}
+.serial-analysis-heading > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.serial-analysis-heading strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.serial-analysis-heading p {
+  color: #8a9fc2;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.serial-segments {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 15px 0 13px;
+}
+.serial-segments > div {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e4ecf9;
+  border-radius: 7px;
+  padding: 11px 9px;
+}
+.serial-segments dt {
+  color: #8799b5;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.serial-segments dd {
+  margin: 7px 0 5px;
+  color: #3776db;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.serial-segments span {
+  display: block;
+  color: #a0aec5;
+  font-size: 9px;
+  line-height: 1.6;
+}
+.serial-analysis-caution {
+  color: #8a9fbd;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.serial-analysis-provenance {
+  color: #9ba9bf;
+  font-size: 10px;
+  margin-top: 10px;
+  line-height: 1.7;
+}
+.serial-analysis-provenance ul {
+  padding-left: 17px;
+  margin: 0 0 8px;
+}
+.serial-analysis-provenance li + li {
+  margin-top: 4px;
+}
+@media (max-width: 540px) {
+  .serial-segments {
+    grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+    gap: 7px;
+  }
+  .serial-analysis-card {
+    padding: 13px 11px;
+  }
+  .serial-analysis-toolbar > span {
+    font-size: 10px;
+  }
+  .serial-analysis-heading strong,
+  .serial-analysis-message strong {
+    font-size: 12px;
+  }
+  .serial-analysis-provenance {
+    font-size: 10px;
+  }
+}

@@ -50,3 +50,13 @@ Les lanceurs `INSTALLER_TVM.cmd`, `DEMARRER_TVM.cmd` et `ARRETER_TVM.cmd` utilis
 Les étapes Docker ont été exécutées sur Linux, dans un projet et un volume PostgreSQL distincts : génération de configuration, migrations sur base neuve, comptes de démonstration, authentification et tableau de bord, disponibilité HTTP et PostgreSQL, répétition sans modifier `.env`, puis arrêt et redémarrage avec conservation d'un client ajouté. Les six clients attendus étaient présents après redémarrage. Le contrôle de disponibilité fonctionne aussi avec un domaine personnalisé et la configuration HTTPS d'un proxy de confiance.
 
 Le lancement natif des fichiers CMD, l'ouverture du Bloc-notes et la configuration Docker Desktop / WSL 2 sur un PC Windows ne peuvent pas être validés depuis ce cloud Linux. Ils restent à vérifier sur le PC de l'utilisateur avec le [guide Windows](INSTALLATION_WINDOWS.md).
+
+## Lecture des séries Eaton — complément du 25 octobre 2026
+
+L'analyse du classeur fourni a relevé une feuille et neuf cellules de description, sans inventaire ni dictionnaire des usines ou des produits. Le classeur reste hors du dépôt. La fonctionnalité ajoutée est une aide de lecture, sans migration de base ni écriture automatique.
+
+- `bash scripts/test.sh` : **65 tests serveur réussis sur PostgreSQL, 0 échec, 0 ignoré**, puis compilation TypeScript / Vite réussie. Les 13 contrôles ajoutés couvrent les segments et zéros initiaux, les exclusions différentes selon la position, les semaines 01–53, les autres formats, les entrées invalides, les quatre rôles, CSRF et l'absence de requêtes métier pendant l'analyse. Aucune année civile n'est calculée ; les exemples A/B ne sont pas utilisés pour interdire les chiffres dans le code d'année.
+- `bash scripts/e2e.sh` : **6 scénarios Chromium réussis**, dont l'analyse dans la fiche équipement, l'effacement du résultat après modification du numéro, l'enregistrement d'un autre format, la conservation du modèle et des dates saisis, puis l'analyse et la recherche manuelle dans le scanner sur écran mobile sans débordement horizontal.
+- Image Docker reconstruite avec les nouvelles sources ; API d'analyse exécutée dans cette image avec la base PostgreSQL distincte de test, assets compilés et utilisateur non privilégié vérifiés. Les nombres d'équipements et d'événements d'audit sont conservés pendant ces appels d'analyse.
+
+La compatibilité avec des étiquettes Eaton réelles, la portée du format et les correspondances de codes restent à confirmer. Voir [les ambiguïtés du document et les règles appliquées](NUMEROS_SERIE_EATON.md). Aucun appel à Eaton, calcul de garantie ou essai caméra physique n'a été effectué pour cette évolution.

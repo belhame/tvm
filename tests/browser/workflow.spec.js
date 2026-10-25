@@ -146,6 +146,52 @@ test('la navigation reste utilisable sur téléphone', async ({ page }) => {
   await page.screenshot({ path: '../../.local/powercare-mobile.png', fullPage: true });
 });
 
+test('analyse Eaton consultative dans la fiche et le scanner, sans modifier les données', async ({ page }) => {
+  await login(page);
+  const navigate = async label => {
+    await page.getByRole('navigation', { name: 'Navigation principale' }).getByText(label, { exact: true }).click();
+  };
+  await navigate('Équipements');
+  await page.getByRole('button', { name: 'Nouvel équipement', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  const serialInput = dialog.getByLabel(/Numéro de série/);
+  await serialInput.fill('1ABCW01007');
+  await dialog.getByRole('button', { name: 'Analyser le format Eaton', exact: true }).click();
+  await expect(dialog.locator('.serial-analysis')).toContainText('ABC');
+  await expect(dialog.locator('.serial-analysis')).toContainText('007');
+  await expect(dialog.getByLabel(/^Modèle/)).toHaveValue('');
+  await expect(dialog.getByLabel(/Mise en service/)).toHaveValue('');
+  await expect(dialog.getByLabel(/Fin de garantie/)).toHaveValue('');
+
+  const marker = `LIBRE-${Date.now()}`;
+  await serialInput.fill(marker);
+  await expect(dialog.locator('.serial-analysis')).not.toContainText('007');
+  await dialog.getByRole('button', { name: 'Analyser le format Eaton', exact: true }).click();
+  await expect(dialog.locator('.serial-analysis')).toContainText('Ce numéro peut être conservé');
+  const clients = await api(page, 'clients/');
+  await dialog.getByLabel(/^Client/).selectOption(String(clients[0].id));
+  await dialog.getByLabel(/^Modèle/).fill('Modèle saisi manuellement');
+  await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const equipment = await api(page, `equipment/?serial=${encodeURIComponent(marker)}`);
+  expect(equipment).toHaveLength(1);
+  expect(equipment[0].serial_number).toBe(marker);
+  expect(equipment[0].model).toBe('Modèle saisi manuellement');
+  expect(equipment[0].commissioned_on).toBeNull();
+  expect(equipment[0].warranty_until).toBeNull();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Ouvrir le menu', exact: true }).click();
+  await navigate('Scanner un équipement');
+  await page.getByLabel('Ou saisir le numéro de série', { exact: true }).fill('1ABCW01007');
+  await page.getByRole('button', { name: 'Analyser le format Eaton', exact: true }).click();
+  await expect(page.locator('.serial-analysis')).toContainText('ABC');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)).toBeFalsy();
+  await page.getByLabel('Ou saisir le numéro de série', { exact: true }).fill(marker);
+  await page.getByRole('button', { name: /Rechercher l’équipement/ }).click();
+  await expect(page.locator('main')).toContainText('Modèle saisi manuellement');
+});
+
 test('un changement de compte ignore les anciennes réponses et efface les données privées', async ({ page }) => {
   let delayed = false;
   let release;

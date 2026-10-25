@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -66,6 +67,7 @@ import {
 } from "./api";
 import { resources, statuses, optionLabel, type Resource } from "./resources";
 import Scanner from "./Scanner";
+import SerialAnalysis from "./SerialAnalysis";
 import Integrations from "./Integrations";
 
 type DataMap = Record<string, RecordData[]>;
@@ -518,102 +520,110 @@ function EditForm({
             {config.fields
               .filter((f) => !readonly || f.name !== "password")
               .map((field) => (
-                <label
-                  key={field.name}
-                  className={`form-field ${field.wide ? "span-2" : ""}`}
-                >
-                  {field.label}
-                  {field.required && <span className="required"> *</span>}
-                  {field.type === "select" ? (
-                    <select
-                      className="input"
-                      disabled={
-                        readonly ||
-                        (field.name === "technician" &&
-                          user.role === "technician")
-                      }
-                      required={field.required}
-                      value={values[field.name]}
-                      onChange={(e) =>
-                        setValues({ ...values, [field.name]: e.target.value })
-                      }
-                    >
-                      <option value="">Sélectionner…</option>
-                      {field.options?.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                      {field.resource &&
-                        (data[field.resource] || [])
-                          .filter(
-                            (row) =>
-                              field.resource !== "users" ||
-                              ["technician", "manager", "admin"].includes(
-                                row.role,
-                              ),
-                          )
-                          .filter(
-                            (row) =>
-                              field.name !== "equipment" ||
-                              !values.client ||
-                              Number(row.client) === Number(values.client),
-                          )
-                          .map((row) => (
-                            <option key={row.id} value={row.id}>
-                              {optionLabel(field.resource!, row)}
-                            </option>
-                          ))}
-                    </select>
-                  ) : field.type === "textarea" ? (
-                    <textarea
-                      className="input"
-                      rows={3}
-                      disabled={
-                        readonly ||
-                        (field.name === "technician" &&
-                          user.role === "technician")
-                      }
-                      required={field.required}
-                      value={values[field.name]}
-                      placeholder={field.placeholder}
-                      onChange={(e) =>
-                        setValues({ ...values, [field.name]: e.target.value })
-                      }
-                    />
-                  ) : (
-                    <input
-                      className="input"
-                      disabled={readonly}
-                      type={field.type || "text"}
-                      step={
-                        field.type === "number"
-                          ? [
-                              "quantity",
-                              "duration_minutes",
-                              "min_stock",
-                              "visits_per_year",
-                            ].includes(field.name)
-                            ? "1"
-                            : "any"
-                          : undefined
-                      }
-                      required={
-                        field.required ||
-                        (!editing && field.name === "password")
-                      }
-                      value={values[field.name]}
-                      placeholder={field.placeholder}
-                      autoComplete={
-                        field.type === "password" ? "new-password" : "off"
-                      }
-                      onChange={(e) =>
-                        setValues({ ...values, [field.name]: e.target.value })
-                      }
-                    />
-                  )}{" "}
-                  {field.help && <small>{field.help}</small>}
-                </label>
+                <Fragment key={field.name}>
+                  <label className={`form-field ${field.wide ? "span-2" : ""}`}>
+                    {field.label}
+                    {field.required && <span className="required"> *</span>}
+                    {field.type === "select" ? (
+                      <select
+                        className="input"
+                        disabled={
+                          readonly ||
+                          (field.name === "technician" &&
+                            user.role === "technician")
+                        }
+                        required={field.required}
+                        value={values[field.name]}
+                        onChange={(e) =>
+                          setValues({ ...values, [field.name]: e.target.value })
+                        }
+                      >
+                        <option value="">Sélectionner…</option>
+                        {field.options?.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                        {field.resource &&
+                          (data[field.resource] || [])
+                            .filter(
+                              (row) =>
+                                field.resource !== "users" ||
+                                ["technician", "manager", "admin"].includes(
+                                  row.role,
+                                ),
+                            )
+                            .filter(
+                              (row) =>
+                                field.name !== "equipment" ||
+                                !values.client ||
+                                Number(row.client) === Number(values.client),
+                            )
+                            .map((row) => (
+                              <option key={row.id} value={row.id}>
+                                {optionLabel(field.resource!, row)}
+                              </option>
+                            ))}
+                      </select>
+                    ) : field.type === "textarea" ? (
+                      <textarea
+                        className="input"
+                        rows={3}
+                        disabled={
+                          readonly ||
+                          (field.name === "technician" &&
+                            user.role === "technician")
+                        }
+                        required={field.required}
+                        value={values[field.name]}
+                        placeholder={field.placeholder}
+                        onChange={(e) =>
+                          setValues({ ...values, [field.name]: e.target.value })
+                        }
+                      />
+                    ) : (
+                      <input
+                        className="input"
+                        disabled={readonly}
+                        type={field.type || "text"}
+                        step={
+                          field.type === "number"
+                            ? [
+                                "quantity",
+                                "duration_minutes",
+                                "min_stock",
+                                "visits_per_year",
+                              ].includes(field.name)
+                              ? "1"
+                              : "any"
+                            : undefined
+                        }
+                        required={
+                          field.required ||
+                          (!editing && field.name === "password")
+                        }
+                        value={values[field.name]}
+                        placeholder={field.placeholder}
+                        autoComplete={
+                          field.type === "password" ? "new-password" : "off"
+                        }
+                        onChange={(e) =>
+                          setValues({ ...values, [field.name]: e.target.value })
+                        }
+                      />
+                    )}{" "}
+                    {field.help && <small>{field.help}</small>}
+                  </label>
+                  {modal.resource === "equipment" &&
+                    field.name === "serial_number" && (
+                      <div className="serial-analysis-field span-2">
+                        <SerialAnalysis
+                          serialNumber={String(values.serial_number || "")}
+                          brand={String(values.brand || "")}
+                        />
+                      </div>
+                    )}
+                </Fragment>
               ))}
           </div>
           {modal.resource === "delivery-notes" && (

@@ -10,6 +10,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Portail client | Lecture des équipements, demandes, interventions et documents autorisés de sa société | Portail en lecture seule ; pas de création publique de compte |
 | Clients | Fiches clients, contacts et coordonnées | Pas de synchronisation CRM externe |
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
+| Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
 | Interventions | Affectation, date, durée, diagnostic, travaux, recommandations et état | Pas d'optimisation automatique des tournées |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
@@ -40,6 +41,8 @@ Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, �
 Le scanner utilise la caméra du navigateur et l'API `BarcodeDetector` lorsqu'elle est disponible. Il lit un code-barres ou QR code contenant le numéro, puis effectue une recherche réelle côté serveur. La vidéo reste sur l'appareil ; elle n'est pas envoyée pour reconnaissance.
 
 La caméra requiert un contexte sécurisé : HTTPS en déploiement, ou l'exception locale du navigateur pour `localhost`. Le navigateur doit accepter l'accès caméra et supporter les formats de code concernés. La saisie manuelle du numéro de série reste disponible si le navigateur ou la caméra ne convient pas. La compatibilité d'un téléphone précis se valide avec une vraie étiquette de l'entreprise.
+
+Une aide de lecture des séries Eaton est proposée dans le scanner et la fiche équipement. Elle découpe le format documenté en codes usine, produit, année, semaine et ordre de fabrication sans modifier les données. Les autres formats restent autorisés. Le document source comporte des ambiguïtés et ne permet pas de calculer une année civile ou une garantie ; voir [le détail et les points à valider](NUMEROS_SERIE_EATON.md).
 
 ## Intégrations à connecter
 
