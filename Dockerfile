@@ -13,6 +13,7 @@ COPY backend/requirements.lock.txt ./backend/requirements.lock.txt
 RUN --mount=type=secret,id=build_ca \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; pip install --no-cache-dir -r backend/requirements.lock.txt
 COPY backend/ ./backend/
+COPY scripts/check_database_connection.py ./scripts/check_database_connection.py
 COPY --from=frontend /build/frontend/dist ./frontend/dist/
 RUN useradd --create-home --uid 10001 tvm && chown -R tvm:tvm /app
 USER tvm

@@ -1,2 +1,4 @@
 # Preserve the native Windows launcher format in clones and ZIP downloads.
 *.cmd -text whitespace=cr-at-eol
+# PostgreSQL recovery scripts are copied directly to Linux containers.
+*.sh text eol=lf

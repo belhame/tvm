@@ -36,9 +36,14 @@ goto docker_mode_unknown
 :docker_linux_ready
 set "TVM_EXIT_CODE=0"
 
+if exist ".env" goto prepare_local_configuration
+docker volume inspect tvm-powercare_tvm_postgres >nul 2>&1
+if not errorlevel 1 goto existing_database_without_configuration
+
+:prepare_local_configuration
 echo [1/3] Preparation de la configuration locale...
 echo Un fichier .env existant sera conserve sans modification.
-docker run --rm --mount "type=bind,source=%CD%,target=/app" -w /app python:3.12-slim python scripts/init_env.py --demo
+docker run --rm --volume "%CD%:/app" -w /app python:3.12-slim python scripts/init_env.py --demo
 set "TVM_EXIT_CODE=%ERRORLEVEL%"
 if not "%TVM_EXIT_CODE%"=="0" goto configuration_failed
 
@@ -117,6 +122,14 @@ echo Resultat attendu : linux. Si une erreur s'affiche, conservez aussi son mess
 echo Ne changez pas le mode du moteur sans avoir verifie ce resultat.
 goto failed
 
+:existing_database_without_configuration
+set "TVM_EXIT_CODE=2"
+echo Une base TVM existe deja sur ce PC, mais ce dossier ne contient pas son .env.
+echo Recuperez le fichier .env et le dossier .local dans votre ancien dossier TVM.
+echo Copiez-les dans CE dossier, puis relancez INSTALLER_TVM.cmd.
+echo Aucun nouveau mot de passe n'a ete genere et aucun volume n'a ete supprime.
+goto failed
+
 :configuration_failed
 echo La preparation du fichier .env a echoue.
 echo Verifiez Internet, le partage du dossier avec Docker et les messages ci-dessus.
@@ -126,6 +139,8 @@ goto failed
 echo La construction ou l'initialisation de la base a echoue.
 echo Verifiez les messages Docker ci-dessus et votre connexion Internet.
 echo Une base existante n'est pas effacee. Ne supprimez aucun volume Docker.
+echo Si le message indique "password authentication failed", utilisez le guide
+echo docs\INSTALLATION_WINDOWS.md et le bouton REPARER_CONNEXION_TVM.cmd.
 goto failed
 
 :startup_failed

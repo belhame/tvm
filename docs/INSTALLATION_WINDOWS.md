@@ -20,6 +20,7 @@ Le dossier doit contenir notamment :
 INSTALLER_TVM.cmd
 DEMARRER_TVM.cmd
 ARRETER_TVM.cmd
+REPARER_CONNEXION_TVM.cmd
 compose.yaml
 Dockerfile
 backend\
@@ -37,7 +38,7 @@ Double-cliquez sur **`INSTALLER_TVM.cmd`**. Laissez la fenêtre ouverte pendant 
 Le programme :
 
 1. Vérifie la présence de Docker Desktop, de son moteur actif et de Docker Compose, ainsi que le mode conteneurs Linux.
-2. Crée la configuration locale `.env` avec des secrets aléatoires. **Un fichier `.env` existant est conservé sans modification.**
+2. Crée la configuration locale `.env` avec des secrets aléatoires. **Un fichier `.env` existant est conservé sans modification.** Si le volume de base TVM existe déjà mais que le dossier ne contient pas de `.env`, l'installation s'arrête avant de générer de nouveaux secrets et demande de récupérer l'ancienne configuration.
 3. Construit l’application et prépare les tables PostgreSQL. Les comptes et les données fictives sont ajoutés uniquement si la configuration indique `TVM_DEMO_MODE=1`.
 4. Démarre la base et le serveur, puis attend leurs contrôles de disponibilité avant d’ouvrir le navigateur.
 
@@ -86,7 +87,7 @@ Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs
 | Fichiers manquants ou dossier inaccessible | Extraire toute l’archive dans un dossier local accessible, puis relancer le script dans ce dossier. |
 | Port `8000` ou `55432` déjà utilisé | Identifier l’application qui utilise ce port. Ne pas arrêter un service inconnu ; faire adapter les ports par votre support si nécessaire. |
 | Image locale manquante au prochain démarrage | Relancer `INSTALLER_TVM.cmd`. La configuration est conservée et les données ne sont pas effacées. |
-| `password authentication failed for user "tvm"` | Après un changement de dossier ou une nouvelle extraction, récupérer la configuration de l’ancienne installation selon les étapes ci-dessous. Ne pas supprimer la base. |
+| `password authentication failed for user "tvm"` | Récupérer d’abord la configuration de l’ancienne installation. Si le refus persiste, suivre la procédure `REPARER_CONNEXION_TVM.cmd` ci-dessous. Ne pas supprimer la base. |
 | Échec de disponibilité après trois minutes | Lire les messages dans la fenêtre. Les services peuvent avoir démarré sans être prêts ; consulter leurs journaux avant de réessayer. |
 
 ### Erreur de mot de passe PostgreSQL après une mise à jour
@@ -101,7 +102,22 @@ Pour retrouver les bons accès sans effacer les données :
 4. Copiez ensuite **le `.env` et le dossier `.local` de l’ancienne installation** vers ce dossier, en acceptant le remplacement des nouveaux éléments après la sauvegarde.
 5. Relancez `INSTALLER_TVM.cmd` depuis ce même dossier. Le programme réutilise la base existante avec sa configuration d’origine.
 
-Si vous ne retrouvez pas l’ancien `.env`, conservez les dossiers et les données Docker pour que votre support puisse examiner la situation. Ne régénérez pas des mots de passe au hasard, ne supprimez aucun volume et n’utilisez pas la réinitialisation de Docker Desktop. Ne publiez ni `.env`, ni `.local`, ni leurs copies de sauvegarde.
+### Si le refus persiste : réparer la connexion existante
+
+Si l’erreur persiste après avoir recopié l’ancien `.env`, utilisez le réparateur fourni dans la version corrigée. Vous pouvez aussi l’utiliser si l’ancien `.env` est introuvable mais que **le dossier en échec possède déjà son propre `.env`**. Le réparateur ne génère pas de configuration manquante.
+
+1. Ouvrez Docker Desktop et attendez que son moteur Linux soit prêt.
+2. Depuis la nouvelle archive, copiez **`REPARER_CONNEXION_TVM.cmd` et le dossier complet `scripts`** dans le dossier où `INSTALLER_TVM.cmd` affiche le refus de connexion. Acceptez le remplacement des scripts. **Conservez le `.env` et le dossier `.local` déjà présents.**
+3. Dans ce même dossier, double-cliquez sur **`REPARER_CONNEXION_TVM.cmd`** et laissez la fenêtre ouverte jusqu’au résultat.
+4. Si la fenêtre annonce que la connexion fonctionne déjà ou que la réparation est terminée, fermez-la puis relancez **`INSTALLER_TVM.cmd` depuis ce même dossier**.
+
+Le réparateur vérifie d’abord la connexion sur le réseau Docker. Si elle fonctionne, il ne change aucun mot de passe. Si un refus de mot de passe est confirmé, il sauvegarde la base et une copie de la configuration dans **`.local\backups`**, vérifie la copie de sauvegarde sur le PC, puis aligne le mot de passe technique PostgreSQL sur celui du `.env` existant. Il contrôle ensuite la connexion et vérifie qu’un mauvais mot de passe est bien refusé. Si la sauvegarde ne peut pas être copiée et vérifiée, l’alignement n’est pas effectué.
+
+Le contenu du `.env` reste inchangé. Le réparateur ne recrée pas la base, ne supprime aucun volume ni dossier et ne modifie pas les règles d’authentification PostgreSQL. **Les comptes TVM et leurs mots de passe restent ceux de l’installation précédente.** Si `.local\demo-access.txt` a été créé dans un nouveau dossier lors de l’échec, son mot de passe peut ne pas correspondre aux comptes déjà présents dans la base : le réparateur ne les réinitialise pas. Utilisez vos accès précédents.
+
+Si le lanceur signale que l’image web manque, relancez `INSTALLER_TVM.cmd` pour la construire, puis revenez au réparateur si le refus PostgreSQL est toujours présent. Pour toute autre interruption, conservez le message affiché et les sauvegardes pour le diagnostic ; ne relancez pas des réparations au hasard.
+
+Ne régénérez pas des mots de passe au hasard, ne supprimez aucun volume et n’utilisez pas la réinitialisation de Docker Desktop. Ne publiez ni `.env`, ni `.local`, ni les fichiers de `.local\backups` : les copies de configuration et la base contiennent des informations privées.
 
 Pour consulter l’état ou les derniers journaux, ouvrez un terminal **dans le dossier du projet** et utilisez :
 
@@ -143,3 +159,5 @@ Les données sont conservées dans le volume PostgreSQL Docker de cette installa
 ## Périmètre de validation
 
 L’application et le parcours conteneurisé sont validés dans l’environnement Linux de développement. Les fichiers Windows ont fait l’objet d’une revue statique ; **leur lancement natif dans Windows / Docker Desktop reste à vérifier sur votre PC**. L’état du cloud ne prouve pas que Docker, WSL 2, les ports ou les autorisations sont déjà configurés sur votre ordinateur personnel.
+
+Ce périmètre s’applique également à `REPARER_CONNEXION_TVM.cmd` : sa revue et les contrôles de ses composants sous Linux ne constituent pas une validation de son exécution native sous Windows.

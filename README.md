@@ -14,6 +14,8 @@ Installer et ouvrir **Docker Desktop**, puis décompresser le projet et double-c
 
 Les fois suivantes, utiliser **`DEMARRER_TVM.cmd`**. **`ARRETER_TVM.cmd`** arrête les services en conservant les données. Voir le [guide Windows pas à pas](docs/INSTALLATION_WINDOWS.md).
 
+En cas de refus de mot de passe PostgreSQL malgré la récupération de l’ancienne configuration, le [réparateur de connexion Windows](docs/INSTALLATION_WINDOWS.md#si-le-refus-persiste--réparer-la-connexion-existante) fournit une procédure avec sauvegarde préalable, sans réinitialiser la base ni les comptes TVM.
+
 ### Sur Linux / macOS, ou pour développer hors conteneur
 
 Prérequis : Bash, **Python 3.12**, **Node.js 24**, npm, Docker et Docker Compose v2. Le serveur Docker doit être démarré. Sous Windows, ce mode de développement peut aussi s'utiliser dans WSL2.

@@ -60,3 +60,18 @@ L'analyse du classeur fourni a relevé une feuille et neuf cellules de descripti
 - Image Docker reconstruite avec les nouvelles sources ; API d'analyse exécutée dans cette image avec la base PostgreSQL distincte de test, assets compilés et utilisateur non privilégié vérifiés. Les nombres d'équipements et d'événements d'audit sont conservés pendant ces appels d'analyse.
 
 La compatibilité avec des étiquettes Eaton réelles, la portée du format et les correspondances de codes restent à confirmer. Voir [les ambiguïtés du document et les règles appliquées](NUMEROS_SERIE_EATON.md). Aucun appel à Eaton, calcul de garantie ou essai caméra physique n'a été effectué pour cette évolution.
+
+## Réparation de connexion PostgreSQL — complément du 25 octobre 2026
+
+L'erreur d'authentification provoquée par un nouveau mot de passe de configuration et un volume conservant l'ancien a été reproduite sur des projets et volumes PostgreSQL jetables. La base de démonstration principale n'a pas été modifiée par ces essais.
+
+- Les phases réelles de `scripts/repair_database.sh` ont été exécutées : sauvegarde personnalisée, copie sur l'hôte, restauration vérifiée dans une base distincte, puis alignement du mot de passe du seul rôle connecté avec `psql \password`. Le mot de passe en clair n'apparaît ni dans les arguments, ni dans les sorties, ni dans les journaux PostgreSQL même avec `log_statement=all`.
+- Les données, identifiants, clés étrangères, attributs de droits du rôle et autorisations sont identiques avant et après réparation. Le nouveau mot de passe permet une connexion TCP sur le réseau Docker ; l'ancien et un mot de passe aléatoire sont refusés.
+- Les appels du diagnostic Python monté en lecture seule dans l'image web passent du code `10` (refus d'authentification) au code `0` (connexion vérifiée avec témoin incorrect refusé). Aucun accès aux dossiers n'est nécessaire au diagnostic ; il exécute `SELECT 1` dans une transaction en lecture seule. Le petit conteneur de diagnostic utilise ponctuellement l'UID 0 pour lire les scripts montés ; le serveur web reste non privilégié.
+- Une tentative sans sauvegarde, un nouvel échec de sauvegarde après une première vérification, un dump altéré et un verrou concurrent sont refusés avant alignement. Le marqueur de vérification est consommé avant changement du mot de passe.
+- La copie de sauvegarde hôte est contrôlée par SHA-256 et par lecture du catalogue avant l'étape de réparation du lanceur. Ces contrôles Docker fonctionnent avec des espaces, une virgule et des parenthèses dans le chemin hôte Linux ; une copie altérée est refusée.
+- **72 tests Django réussis sur PostgreSQL**, dont sept nouveaux tests du diagnostic et de la non-divulgation des erreurs de connexion. L'image Docker reconstruite passe aussi ces 72 tests.
+
+`REPARER_CONNEXION_TVM.cmd` a été revu statiquement : ASCII/CRLF, chemins cités, codes de sortie, destinations des sauts, copie et vérification de la sauvegarde avant alignement. Le lancement natif Windows / Docker Desktop reste à vérifier sur le PC de l'utilisateur. Aucun mot de passe de compte applicatif n'est réinitialisé. Le guide précise qu'un fichier d'accès démo généré dans un nouveau dossier peut ne pas correspondre aux comptes conservés.
+
+L'installateur refuse désormais de générer un nouveau `.env` si le volume TVM existe déjà sans configuration dans le dossier courant. Il demande de récupérer la configuration précédente ; aucun volume n'est supprimé et aucune règle d'authentification n'est modifiée.
