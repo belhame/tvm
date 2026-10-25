@@ -47,6 +47,8 @@ Changer une valeur d'environnement n'est pas une rotation automatique des identi
 
 Placer un reverse proxy avec certificat TLS devant le serveur web, sur un nom DNS contrôlé. Il transmet le nom d'hôte d'origine à Django et les requêtes au port web en boucle locale. Définir les hôtes et origines HTTPS exacts dans `.env`, puis activer les cookies sécurisés. Vérifier connexion, déconnexion, écriture et téléchargement PDF avec cette configuration.
 
+L'import du catalogue accepte un fichier XLS de 8 Mio au maximum. Le proxy doit laisser passer ce fichier et l'enveloppe multipart : par exemple `client_max_body_size 9m;` dans le contexte Nginx concerné. Vérifier un import de la taille du fichier réel fourni (environ 3,8 Mo) après déploiement ; un refus HTTP 413 du proxy intervient avant les contrôles de Django.
+
 L'application ne fournit pas de certificat ni de nom de domaine. L'accès HTTPS est aussi nécessaire à la caméra d'un téléphone distant. Les options `DJANGO_TRUST_PROXY_HEADERS=1` et `DJANGO_SSL_REDIRECT=1` sont à activer après configuration du proxy : celui-ci doit écraser l'en-tête `X-Forwarded-Proto` et empêcher l'accès direct au backend depuis les clients. Vérifier la redirection et l'absence de boucle avant ouverture. HSTS et la politique de certificat restent à définir dans l'infrastructure retenue ; ne pas supposer leur activation par le seul lancement de Gunicorn.
 
 Ne pas publier le port PostgreSQL sur Internet. Compose le lie à `127.0.0.1` sur l'hôte ; les navigateurs communiquent avec l'application, jamais directement avec la base. Le port web est également local par défaut pour être placé derrière le proxy.

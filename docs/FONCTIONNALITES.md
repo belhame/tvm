@@ -11,6 +11,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Clients | Fiches clients, contacts et coordonnées | Pas de synchronisation CRM externe |
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
+| Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
 | Interventions | Affectation, date, durée, diagnostic, travaux, recommandations et état | Pas d'optimisation automatique des tournées |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
@@ -43,6 +44,12 @@ Le scanner utilise la caméra du navigateur et l'API `BarcodeDetector` lorsqu'el
 La caméra requiert un contexte sécurisé : HTTPS en déploiement, ou l'exception locale du navigateur pour `localhost`. Le navigateur doit accepter l'accès caméra et supporter les formats de code concernés. La saisie manuelle du numéro de série reste disponible si le navigateur ou la caméra ne convient pas. La compatibilité d'un téléphone précis se valide avec une vraie étiquette de l'entreprise.
 
 Une aide de lecture des séries Eaton est proposée dans le scanner et la fiche équipement. Elle découpe le format documenté en codes usine, produit, année, semaine et ordre de fabrication sans modifier les données. Les autres formats restent autorisés. Le document source comporte des ambiguïtés et ne permet pas de calculer une année civile ou une garantie ; voir [le détail et les points à valider](NUMEROS_SERIE_EATON.md).
+
+## Catalogue Eaton BN
+
+Le menu interne **Catalogue Eaton** permet d'importer et de consulter le fichier de référence `Product serial number Vers BN.xls`. L'import conserve les versions, la provenance des lignes, les entrées `NA` et les collisions de codes. Il reconnaît un fichier identique par SHA-256 et active une version complète de façon atomique ; les références d'années et de garanties restent distinctes.
+
+Ce catalogue ne transforme pas l'aide de lecture initiale en décodeur universel des quatre profils et ne modifie aucun équipement automatiquement. Un import dans le cloud n'alimente pas la base de votre PC : le fichier original doit être importé une fois dans votre propre instance après mise à jour. Voir [la procédure et les contrôles attendus](IMPORT_CATALOGUE_EATON.md).
 
 ## Intégrations à connecter
 

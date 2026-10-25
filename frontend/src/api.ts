@@ -26,16 +26,22 @@ export async function api<T = any>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (options.body instanceof FormData) {
+    // The browser adds the multipart boundary when sending an XLS upload.
+    headers.delete("Content-Type");
+  } else if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (!headers.has("X-CSRFToken")) {
+    headers.set("X-CSRFToken", cookieCsrf());
+  }
   const response = await fetch(
     path.startsWith("/api/") ? path : `/api/${path}`,
     {
       credentials: "same-origin",
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": cookieCsrf(),
-        ...options.headers,
-      },
+      headers,
     },
   );
   const contentType = response.headers.get("content-type") || "";

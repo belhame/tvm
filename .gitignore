@@ -25,3 +25,9 @@ tests/browser/test-results/
 *.MMO
 *.zip
 legacy-exports/
+# Uploaded catalogues stay private; only the fictional test workbook is public.
+*.[xX][lL][sS]
+*.[xX][lL][sS][xX]
+*.[xX][lL][sS][mM]
+*.[xX][lL][sS][bB]
+!backend/core/tests/fixtures/catalogue_synthetic.xls

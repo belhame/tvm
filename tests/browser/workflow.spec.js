@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+
+const catalogueFixture = fileURLToPath(new URL('../../backend/core/tests/fixtures/catalogue_synthetic.xls', import.meta.url));
 
 const password = process.env.TVM_DEMO_PASSWORD;
 test.beforeAll(() => {
@@ -225,4 +228,82 @@ test('un changement de compte ignore les anciennes réponses et efface les donn�
   await expect(page.locator('tbody tr')).toHaveCount(ownEquipment.length);
   for (const equipment of ownEquipment) await expect(page.getByRole('cell', { name: new RegExp(equipment.serial_number) }).first()).toBeVisible();
   await expect(page.getByRole('navigation')).not.toContainText('Comptes & accès');
+});
+
+test('import XLS du catalogue partagé, garanties et années conservées sans doublon', async ({ page }) => {
+  await login(page);
+  const before = await api(page, 'equipment/');
+  await page.getByRole('navigation', { name: 'Navigation principale' }).getByText('Catalogue Eaton', { exact: true }).click();
+  await page.getByLabel('Fichier catalogue XLS', { exact: true }).setInputFiles(catalogueFixture);
+  const uploaded = page.waitForResponse(response => response.url().endsWith('/api/catalogue/import/') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Importer le catalogue', exact: true }).click();
+  const response = await uploaded;
+  expect(response.ok()).toBeTruthy();
+  const first = await api(page, 'catalogue/');
+  expect(first.counts).toMatchObject({ products: 4, warranties: 6, year_mappings: 9, na_codes: 1, duplicate_code_groups: 1 });
+  await expect(page.locator('.catalogue-current')).toContainText('ZZ');
+  await expect(page.getByRole('region', { name: 'Produits du catalogue', exact: true })).toContainText('Onduleur laboratoire Alpha');
+  await page.getByLabel('Structure des produits', { exact: true }).selectOption('Eaton');
+  await page.getByLabel('Rechercher dans le catalogue', { exact: true }).fill('QX1');
+  await page.getByRole('region', { name: 'Produits du catalogue', exact: true }).getByRole('button', { name: 'Rechercher', exact: true }).click();
+  const products = page.getByRole('region', { name: 'Produits du catalogue', exact: true });
+  await expect(products.locator('tbody tr')).toHaveCount(2);
+  await expect(products).toContainText('Plusieurs correspondances');
+  await page.getByRole('tab', { name: /^Garanties/ }).click();
+  const warranties = page.getByRole('region', { name: 'Informations de garantie du catalogue', exact: true });
+  await expect(warranties).toContainText('36 mois');
+  await expect(warranties).toContainText('24 mois');
+  await expect(warranties).toContainText('selon contrat');
+  await page.getByRole('tab', { name: /^Années/ }).click();
+  await expect(page.getByRole('region', { name: 'Tables des années du catalogue', exact: true })).toContainText('2041');
+
+  await page.getByLabel('Fichier catalogue XLS', { exact: true }).setInputFiles(catalogueFixture);
+  const repeated = page.waitForResponse(result => result.url().endsWith('/api/catalogue/import/') && result.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Importer le catalogue', exact: true }).click();
+  expect((await repeated).status()).toBe(200);
+  const second = await api(page, 'catalogue/');
+  expect(second.active_import.id).toBe(first.active_import.id);
+  expect(second.counts).toEqual(first.counts);
+  const after = await api(page, 'equipment/');
+  expect(after).toEqual(before);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)).toBeFalsy();
+});
+
+test('un modèle du catalogue est choisi explicitement et le catalogue reste réservé aux internes', async ({ page, browser }) => {
+  await login(page);
+  await page.getByRole('navigation', { name: 'Navigation principale' }).getByText('Équipements', { exact: true }).click();
+  await page.getByRole('button', { name: 'Nouvel équipement', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(/Numéro de série/).fill('CHOIX-CATALOGUE-TEST');
+  await dialog.getByRole('button', { name: 'Choisir dans le catalogue Eaton', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Rechercher', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Choisir Onduleur laboratoire Alpha variante', exact: true })).toBeVisible();
+  await expect(dialog.getByLabel(/^Modèle/)).toHaveValue('');
+  await dialog.getByRole('button', { name: 'Choisir Onduleur laboratoire Alpha variante', exact: true }).click();
+  await expect(dialog.getByLabel(/^Modèle/)).toHaveValue('Onduleur laboratoire Alpha variante');
+  await expect(dialog.getByLabel(/Numéro de série/)).toHaveValue('CHOIX-CATALOGUE-TEST');
+  await expect(dialog.getByLabel('Mise en service', { exact: true })).toHaveValue('');
+  await expect(dialog.getByLabel('Fin de garantie', { exact: true })).toHaveValue('');
+  await dialog.getByRole('button', { name: 'Annuler', exact: true }).click();
+  expect(await api(page, 'equipment/?serial=CHOIX-CATALOGUE-TEST')).toEqual([]);
+
+  const staffContext = await browser.newContext();
+  const staff = await staffContext.newPage();
+  await login(staff, 'technicien');
+  await staff.getByRole('navigation', { name: 'Navigation principale' }).getByText('Catalogue Eaton', { exact: true }).click();
+  await expect(staff.getByRole('heading', { name: 'Catalogue Eaton', exact: true })).toBeVisible();
+  await expect(staff.getByRole('button', { name: 'Importer le catalogue', exact: true })).toHaveCount(0);
+  await expect(staff.locator('.catalogue-current')).toContainText('ZZ');
+  await staffContext.close();
+
+  const clientContext = await browser.newContext();
+  const customer = await clientContext.newPage();
+  await login(customer, 'client');
+  await expect(customer.getByRole('navigation')).not.toContainText('Catalogue Eaton');
+  for (const path of ['catalogue/', 'catalogue/products/', 'catalogue/warranties/']) {
+    expect((await customer.request.get(`/api/${path}`)).status()).toBe(403);
+  }
+  await clientContext.close();
 });

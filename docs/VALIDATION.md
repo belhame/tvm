@@ -75,3 +75,25 @@ L'erreur d'authentification provoquée par un nouveau mot de passe de configurat
 `REPARER_CONNEXION_TVM.cmd` a été revu statiquement : ASCII/CRLF, chemins cités, codes de sortie, destinations des sauts, copie et vérification de la sauvegarde avant alignement. Le lancement natif Windows / Docker Desktop reste à vérifier sur le PC de l'utilisateur. Aucun mot de passe de compte applicatif n'est réinitialisé. Le guide précise qu'un fichier d'accès démo généré dans un nouveau dossier peut ne pas correspondre aux comptes conservés.
 
 L'installateur refuse désormais de générer un nouveau `.env` si le volume TVM existe déjà sans configuration dans le dossier courant. Il demande de récupérer la configuration précédente ; aucun volume n'est supprimé et aucune règle d'authentification n'est modifiée.
+
+## Import du catalogue BN — complément du 25 octobre 2026
+
+Le fichier privé original `Product serial number Vers BN.xls` a été validé puis importé dans PostgreSQL de l'instance cloud de travail. Le fichier et son contenu ne figurent pas dans les sources publiques. L'instance Windows de l'utilisateur reste une base distincte, à alimenter via le nouvel écran **Catalogue Eaton**.
+
+| Contrôle | Résultat exécuté |
+|---|---|
+| Fichier original, révision BN du 30 novembre 2023 | 1 582 produits, 69 entrées de garantie, 64 correspondances code/année |
+| Fidélité source | Lignes produits 2–1583 toutes conservées ; 109 codes NA, 5 collisions au sein des profils et 102 codes partagés entre profils conservés |
+| Téléversement du fichier original | POST multipart de 3 886 080 octets traité par l'API avec Django `APIClient`, import actif et consultable |
+| Réimport via la commande d'administration | Même version active, aucun produit ni aucune garantie dupliqués |
+| Données métier préexistantes | Comptages et empreintes SHA-256 des lignes clients, équipements, comptes, demandes, interventions, contrats, garanties métier, pièces, mouvements, livraisons et staging identiques avant/après |
+| Contrôles serveur sur PostgreSQL | **120 tests réussis, 0 échec, 0 ignoré**, y compris deux imports simultanés, rollback et activation atomique |
+| Interface | TypeScript et compilation Vite réussis ; **8 scénarios Chromium réussis** sur base distincte avec un XLS entièrement fictif |
+| Image Docker | Construction réussie avec `xlrd==2.0.2` ; les **120 tests** passent également dans l'image non privilégiée |
+| Conservation | Sauvegardes PostgreSQL privées créées avant et après l'import ; catalogue original, exports et sauvegardes exclus de Git |
+
+Les 48 nouveaux contrôles serveur comprennent 28 tests du parseur et 20 tests du stockage, de l'API, des droits et de la concurrence. Ils couvrent les alias d'année propres à chaque profil, les zéros initiaux, les unités de garantie, les durées ambiguës conservées textuellement, le format XLS et ses bornes, les permissions et CSRF, la limite de 8 Mio, la pagination et l'épinglage à une version, l'idempotence et les erreurs sans remplacement partiel du catalogue actif.
+
+Les scénarios navigateur ajoutés exercent l'import depuis le sélecteur de fichier, les compteurs et la révision, les onglets garanties/années, les codes ambigus, le réimport sans doublon, la consultation technicien et le refus client. Le choix explicite d'un modèle ne modifie ni série ni dates ; annuler la fiche n'enregistre aucun équipement. L'affichage du catalogue a été vérifié sur écran mobile sans débordement horizontal.
+
+Cette étape importe un référentiel ; elle ne remplace pas l'ancienne aide de série par une identification universelle des quatre profils et ne calcule aucune fin de garantie. Les limites Windows natives et caméra physique décrites plus haut restent applicables.

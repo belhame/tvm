@@ -43,6 +43,7 @@ Les comptes fictifs sont `admin`, `responsable`, `technicien` et `client`. Leur 
 | Examiner les 25 tables et les limites de récupération WINDEV | [Analyse du projet fourni](docs/ANALYSE_WINDEV.md) |
 | Demander l'export au développeur HFSQL | [Spécification d'export](docs/EXPORT_HFSQL.md) |
 | Comprendre l'aide de lecture des séries Eaton | [Structure des numéros de série Eaton](docs/NUMEROS_SERIE_EATON.md) |
+| Importer le catalogue Eaton BN dans sa propre instance TVM | [Import du catalogue Eaton](docs/IMPORT_CATALOGUE_EATON.md) |
 | Contrat HTTP des ressources | [API](docs/API_CONTRACT.md) |
 | Résultats des tests et limites vérifiées | [Validation](docs/VALIDATION.md) |
 | Exécuter les contrôles backend et la compilation frontend | `bash scripts/test.sh` |

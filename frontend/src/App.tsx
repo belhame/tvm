@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   Activity,
+  BookOpen,
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
@@ -69,6 +70,8 @@ import { resources, statuses, optionLabel, type Resource } from "./resources";
 import Scanner from "./Scanner";
 import SerialAnalysis from "./SerialAnalysis";
 import Integrations from "./Integrations";
+import EatonCatalogue from "./EatonCatalogue";
+import CatalogueModelPicker from "./CatalogueModelPicker";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -102,6 +105,7 @@ const navGroups = [
       { id: "stock", label: "Pièces & stock", icon: Package },
       { id: "delivery-notes", label: "Bons de livraison", icon: Truck },
       { id: "reports", label: "Rapports", icon: FileText },
+      { id: "catalogue", label: "Catalogue Eaton", icon: BookOpen },
     ],
   },
   {
@@ -621,6 +625,26 @@ function EditForm({
                           serialNumber={String(values.serial_number || "")}
                           brand={String(values.brand || "")}
                         />
+                      </div>
+                    )}
+                  {modal.resource === "equipment" &&
+                    field.name === "model" &&
+                    !readonly &&
+                    (user.role === "admin" || user.role === "manager") && (
+                      <div className="catalogue-picker-field span-2">
+                        <CatalogueModelPicker
+                          onSelect={({ model, brand }) =>
+                            setValues((previous) => ({
+                              ...previous,
+                              model,
+                              brand,
+                            }))
+                          }
+                        />
+                        <small>
+                          Le choix remplit uniquement le modèle et la marque.
+                          Enregistrez la fiche pour conserver ces modifications.
+                        </small>
                       </div>
                     )}
                 </Fragment>
@@ -2661,6 +2685,8 @@ export default function App() {
                 )
               }
             />
+          ) : allowedPage === "catalogue" ? (
+            <EatonCatalogue user={user} />
           ) : allowedPage === "integrations" ? (
             <Integrations />
           ) : resources[allowedPage] ? (

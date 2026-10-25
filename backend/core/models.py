@@ -259,3 +259,7 @@ class LoginAttempt(models.Model):
 class DemoInitialization(models.Model):
     name = models.CharField(max_length=80, primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+# Keep catalogue models separately while registering them with the core app.
+from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueState, CatalogueWarranty  # noqa: E402,F401
