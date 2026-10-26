@@ -7,6 +7,7 @@ import OperationTimeline, { type OperationEvent } from "./OperationTimeline";
 import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import RequestDocuments from "./RequestDocuments";
 import CallReference, { callIdentity } from "./CallReference";
+import PreventiveProgress from "./PreventiveProgress";
 
 const tabs = [
   ["followup", "Suivi"],
@@ -466,6 +467,15 @@ export default function RequestDossier({
                   </button>
                 )}
               </div>
+              {tab === "preventive" && <PreventiveProgress record={record} />}
+              {tab === "commissioning" && (
+                <p className="operation-tab-description">
+                  Chaque fiche conserve le site, le contact, les contrôles
+                  d’installation et d’essai ainsi que la date réelle de mise en
+                  service. Son rapport PDF reprend les informations
+                  enregistrées.
+                </p>
+              )}
               {shown.length ? (
                 shown.map((intervention) => (
                   <article

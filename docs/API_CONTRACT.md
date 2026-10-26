@@ -9,7 +9,7 @@ Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (ba
 
 ## Ressources
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
-- `/api/clients/` : `id,name,contact_name,email,phone,address,city,postal_code,country,legacy_id`.
+- `/api/clients/` : `id,name,contact_name,tax_id,email,phone,address,city,postal_code,country,notes,legacy_id,created_at,equipment_count,open_requests_count,portal_users_count`. `tax_id` est un texte de 80 caractères ; `notes` est un texte interne de 4 000 caractères, absent du portail client. La date de création et les trois compteurs sont en lecture seule ; `portal_users_count` reste réservé aux comptes internes. `q` recherche dans le nom, le contact, le matricule fiscal, l'email, le téléphone et la ville.
 - `/api/equipment/` : `id,client,client_name,serial_number,brand,model,power_kva,location,commissioned_on,manufactured_on,catalogue_product,warranty_until,status,legacy_id`. Statuts `active,maintenance,inactive`. `manufactured_on` et `catalogue_product` sont en lecture seule dans ce CRUD ; leur création contrôlée passe par le parcours d'admission SAV. `catalogue_product` est absent des réponses du portail client.
 - `/api/requests/` : `id,reference,call_number,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,created_at,legacy_id,intake_key,intake_data`, complétés par les champs de suivi, dont `client_reference`, ci-dessous. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `call_number`, `assigned_technician_name`, `timing`, `category`, `is_overdue` et `is_due_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
 - `/api/interventions/` : `id,reference,service_request,request_reference,call_number,client_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. `request_reference`, `call_number` et `client_reference` sont des valeurs liées en lecture seule. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
@@ -24,6 +24,18 @@ Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création P
 - `/api/search/?q=...` : recherche autorisée `{equipment,clients,requests,interventions}`.
 - `POST /api/serial-analysis/` : analyse consultative du format Eaton décrit dans le classeur fourni, avec `{serial_number: string}` (1–120 caractères), session et CSRF obligatoires. Réponse `{status: "matches" | "not_applicable", normalized_serial_number, rule_id, source, segments: null | {manufacturing_location_code, product_identification_code, year_code, week_code, week_number, unit_order_code}, calendar_year: null, warnings: string[]}`. Aucune recherche d'équipement ni écriture ; un résultat compatible n'authentifie pas le matériel. Voir [les règles et leurs limites](NUMEROS_SERIE_EATON.md).
 - `/api/dashboard/` : `{metrics:{active_interventions,open_requests,critical_stock,equipment_count,client_count,completed_interventions},recent_interventions:[],activity:[{label,interventions,requests}],status_distribution:[{name,value}],upcoming:[]}`. Données réellement en base et filtrées par utilisateur.
+
+## Import d'annuaire clients
+
+`POST /api/clients/import/` est réservé aux administrateurs et responsables, avec session et CSRF. Formulaire multipart : `file` CSV et `mode: "preview" | "apply"` (`preview` par défaut). Le fichier est limité à **2 Mio et 5 000 lignes**, encodé en UTF-8 avec ou sans BOM, séparé par `;` ou `,`.
+
+En-têtes autorisés : `name`, `contact_name`, `tax_id`, `email`, `phone`, `address`, `city`, `postal_code`, `country`, `notes`. Seul `name` est obligatoire. Un pays absent reste vide. Les colonnes inconnues, notamment d'anciens identifiants ou mots de passe, ne sont pas acceptées. Aucun compte ni accès portail n'est créé ou modifié.
+
+La réponse HTTP `200` fournit notamment `sha256`, les `rows` avec `status: create | existing | duplicate | conflict | invalid` et une liste `errors`, ainsi qu'un `summary` contenant `total`, `create`, `existing`, `duplicate`, `conflict`, `invalid`, `created`, `skipped`. `preview` n'écrit rien. `apply` crée seulement les lignes saines et nouvelles ; les conflits et lignes invalides sont ignorés et signalés, sans bloquer à eux seuls toutes les autres lignes. Le formulaire peut transmettre le `sha256` de prévisualisation pour vérifier que le fichier n'a pas changé ; l'interface le fait.
+
+L'idempotence repose sur les données : nom comparé après normalisation Unicode, espaces et casse, sans rapprochement approximatif. Un nom déjà présent n'est jamais écrasé ; des valeurs renseignées contradictoires sont des conflits, et une donnée nouvelle pour un champ existant vide entraîne un avertissement de complétion manuelle. Un même matricule fiscal sous un autre nom est un conflit ; l'email seul n'est pas une identité. Des lignes de même nom contradictoires dans le fichier sont toutes signalées en conflit.
+
+Erreurs principales : `400` pour un fichier ou une empreinte invalide, `413` pour la taille, `403` pour le rôle. Commande serveur : `python manage.py import_clients FILE --actor USER` simule ; ajouter `--apply` active les créations. L'acteur actif administrateur ou responsable est obligatoire dans les deux modes. Voir [le guide d'import](GUIDE_SUIVI_SAV.md#annuaire-clients-et-import-csv).
 
 ## Numéro TVM, référence du centre client et visites
 
@@ -199,6 +211,14 @@ Chaque section accepte aussi un `comment` texte de 4 000 caractères maximum. `m
 Une case absente signifie « non renseignée » ; une valeur booléenne `false` signifie « explicitement non cochée ». Les fiches existantes ne sont pas remplies avec des contrôles ou conclusions supposés.
 
 `GET /api/interventions/{id}/report/` reprend les champs structurés connus, les références liées, les séries ancien/nouveau matériel, la synthèse et la conclusion. Les cases connues distinguent `[X]` / `[ ]` / `[-]` pour cochée / non cochée / non renseignée. Les visas ou signatures non recueillis ne sont pas présentés comme acquis. Les textes longs sont conservés dans le document, au besoin en annexes. Les notes internes et les clés JSON inconnues ne sont pas imprimées. Une case ne modifie pas automatiquement le stock, les contrats, les garanties ou les fiches équipements.
+
+### Objectif et réalisation des visites préventives
+
+`ServiceRequest.planned_visit_count` est un entier nullable de 1 à 1 000. Administrateurs et responsables peuvent le définir par POST/PATCH de demande ou lors de l'admission. Sur une intervention, ce champ est un alias lié en lecture seule.
+
+Demandes et interventions exposent en lecture seule `preventive_completed_visit_count`, `preventive_total_visit_count` et `preventive_remaining_visit_count`. Le calcul porte uniquement sur les interventions du **même dossier** : `kind=preventive` et `status=completed` pour les terminées ; `kind=preventive` hors `cancelled` pour le total enregistré ; reste = `max(prévues - terminées, 0)`. Sans objectif, `planned_visit_count` et le reste sont `null`, tandis que les compteurs réels restent des entiers. Les autres types d'intervention et les autres dossiers du même équipement ne sont pas inclus.
+
+Renseigner un objectif ne crée aucune visite, planification, garantie ou contrat. Les anciens objectifs restent inconnus ; les visites déjà déclarées terminées peuvent compter sans leur inventer une date de réalisation. Les numéros TVM et références de visite restent inchangés. Le PDF préventif affiche cette progression ; la mise en service conserve son récapitulatif dédié de matériel, lieu, contact et date connue.
 
 ### Pièces jointes privées des demandes
 

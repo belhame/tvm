@@ -34,11 +34,35 @@ class BoundedDocumentUploadHandler(FileUploadHandler):
         return None
 
 
+class BoundedClientImportUploadHandler(BoundedDocumentUploadHandler):
+    def receive_data_chunk(self, raw_data, start):
+        self.total_bytes += len(raw_data)
+        if self.total_bytes > 2 * 1024 * 1024:
+            self.request._client_import_upload_too_large = True
+            raise StopUpload(connection_reset=True)
+        return raw_data
+
+
 class AttachmentUploadLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.method == 'POST' and request.path_info == '/api/clients/import/':
+            raw_length = request.META.get('CONTENT_LENGTH', '')
+            try:
+                length = int(raw_length) if raw_length else None
+                if length is not None and length < 0:
+                    raise ValueError()
+            except (TypeError, ValueError):
+                return JsonResponse({'detail': 'Taille de requête invalide.'}, status=400)
+            if length is not None and length > 3 * 1024 * 1024:
+                return JsonResponse({'detail': 'La requête dépasse la limite de 3 Mio (CSV : 2 Mio).'}, status=413)
+            request.upload_handlers.insert(0, BoundedClientImportUploadHandler(request))
+            response = self.get_response(request)
+            if getattr(request, '_client_import_upload_too_large', False):
+                return JsonResponse({'detail': 'Le fichier clients dépasse la limite de 2 Mio.'}, status=413)
+            return response
         if request.method != 'POST' or not DOCUMENT_UPLOAD.fullmatch(request.path_info):
             return self.get_response(request)
         raw_length = request.META.get('CONTENT_LENGTH', '')

@@ -22,6 +22,34 @@ L'équipe interne peut rechercher un dossier par l'un ou l'autre numéro. Dans l
 
 Les deux PDF présentent clairement **N° d'intervention / appel TVM** et **N° d'appel client**. Les `INT-…` y figurent sous **Réf. de visite**. Une référence client absente reste **Non renseigné**.
 
+## Annuaire clients et import CSV
+
+L'annuaire **Clients** permet de retrouver une société par son nom, son contact, son matricule fiscal, son email, son téléphone ou sa ville. Le matricule fiscal reste du texte, avec ses zéros initiaux. Les notes internes de la fiche ne sont pas exposées au portail client.
+
+Un administrateur ou responsable peut utiliser **Importer des clients** pour charger un fichier **UTF-8**, séparé de préférence par des **points-virgules** ; la virgule et le marqueur UTF-8 d'Excel sont aussi acceptés. La seule colonne obligatoire est `name`. Les coordonnées absentes peuvent rester vides : ne pas inventer un téléphone, un pays ou une adresse pour terminer la saisie.
+
+En-têtes autorisés : `name`, `contact_name`, `tax_id`, `email`, `phone`, `address`, `city`, `postal_code`, `country`, `notes`. Exemple entièrement fictif :
+
+```csv
+name;notes
+Client fictif;Coordonnées à vérifier
+```
+
+1. Sélectionner le **Fichier clients CSV**, ou choisir **Coller un CSV**, puis cliquer sur **Prévisualiser l'import**. Cette étape ne crée aucune fiche ; le modèle CSV proposé ne contient que les en-têtes.
+2. Examiner les lignes nouvelles, déjà présentes, en doublon, en conflit ou invalides et leurs messages. Une information tronquée ou incertaine dans une capture doit rester à vérifier ; utiliser une note interne sans reconstituer une valeur supposée.
+3. Corriger le fichier si nécessaire et refaire la prévisualisation, puis cliquer sur **Appliquer l'import**.
+4. Contrôler le bilan : seules les lignes nouvelles et saines sont créées ; les lignes ignorées ou en erreur restent signalées. Une ligne invalide ne bloque pas à elle seule toutes les autres.
+
+L'import ne remplace aucune fiche existante. Un même nom est comparé après normalisation de l'Unicode, des espaces et de la casse ; une divergence d'informations déjà renseignées est signalée comme conflit. Si une fiche existante manque d'une coordonnée fournie dans le CSV, un avertissement invite à la compléter manuellement : l'import ne la renseigne pas silencieusement. Un même matricule fiscal associé à un autre nom est également un conflit ; un email seul ne sert jamais d'identité.
+
+Deux lignes identiques du même nom dans le fichier sont signalées en doublon ; si elles se contredisent, elles sont signalées en conflit. Réimporter les mêmes données ne crée pas une nouvelle copie de ces clients. Vérifier les cas ambigus plutôt que fusionner des sociétés sur une ressemblance de nom.
+
+**Aucun compte portail ni mot de passe n'est créé ou modifié par cet import.** Les anciennes colonnes de connexion visibles dans des captures ne doivent pas être incluses ; les en-têtes non autorisés sont refusés. Ne pas recopier d'anciens accès dans les notes. Les comptes et leur association à une société restent gérés séparément par l'administrateur.
+
+Le fichier privé contenant les clients réels est fourni séparément des sources publiques. Un import dans le cloud ne remplit pas la base Docker du PC : après mise à jour, importer ce CSV dans l'instance Windows concernée. La limite est de **2 Mio et 5 000 lignes** par fichier.
+
+Cet import d'annuaire ne reconstitue pas les anciens dossiers, identifiants et relations HFSQL ; [la reprise historique](EXPORT_HFSQL.md) reste une opération distincte.
+
 ## Retrouver les dossiers
 
 Le suivi SAV utilise les dossiers enregistrés dans la base commune. Les vues par type d'opération et par état servent à retrouver les demandes à traiter, les échanges, les mises en service et les opérations préventives. Les compteurs sont calculés sur le serveur à partir des données accessibles au compte connecté.
@@ -123,6 +151,16 @@ La synthèse et la conclusion de la fiche sont destinées au suivi et au rapport
 Un contrôle non renseigné n'est pas présenté comme réalisé. L'absence d'une valeur reste distincte d'une case explicitement enregistrée comme non cochée ; les anciennes fiches ne reçoivent pas de résultats de contrôle inventés. Le rapport PDF reprend les données enregistrées au moment de sa génération ; il ne remplace pas une signature client et ne constitue pas une archive immuable des versions antérieures. Le téléchargement reste soumis aux droits d'accès au dossier.
 
 Le PDF utilise les cadres et rubriques du modèle fourni, avec une identité typographique TVM neutre, sans reprendre les coordonnées privées d'un exemple. Il distingue les cases **[X]** cochées, **[ ]** non cochées et **[-]** non renseignées. Les visas et signatures non recueillis sont explicitement indiqués comme tels. Les textes longs peuvent se poursuivre en annexes pour éviter une perte de contenu. Les notes internes sont exclues du rapport.
+
+### Prévoir et compter les visites préventives
+
+L'administrateur ou le responsable peut fixer le **Nombre de visites préventives prévues** sur le dossier, de 1 à 1 000, ou le laisser non renseigné. Un objectif de trois visites ne crée pas trois interventions : chaque visite doit être enregistrée et suivie comme une fiche liée à ce dossier.
+
+Le nombre réalisé est calculé depuis ses fiches **Préventive** au statut **Terminée**. Le total enregistré inclut ses fiches préventives non annulées ; le reste correspond à l'objectif moins les terminées, sans devenir négatif. Les autres dossiers du même onduleur et les fiches de maintenance ou de mise en service ne gonflent pas ce compteur. Une prévision absente reste inconnue ; les compteurs réellement enregistrés restent visibles.
+
+Le PDF présente les **visites réalisées / prévues**, les **visites enregistrées** et les **visites restant à réaliser**. Une ancienne fiche déjà terminée peut être comptée, mais une date absente n'est pas inventée. Modifier l'objectif ne change ni les visites existantes, ni leur référence `INT-…`, ni le numéro d'appel TVM commun.
+
+La fiche et le PDF de **Mise en service** présentent séparément le matériel, le site, le client final, le contact et la date de réalisation. Ils ne sont pas comptés comme une visite préventive ; une date manquante reste explicitement non renseignée.
 
 ## Fiche de suivi et documents du dossier
 

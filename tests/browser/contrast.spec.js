@@ -125,11 +125,26 @@ test('les textes de connexion et des listes SAV ont un contraste minimal de 4,5:
   await login(page, 'admin');
   await expectNormalTextContrast(page, 'Tableau de bord interne');
   const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
-  for (const label of ['Demandes SAV', 'Équipements', 'Interventions']) {
+  for (const label of ['Demandes SAV', 'Équipements', 'Interventions', 'Clients']) {
     await navigation.getByText(label, { exact: true }).click();
     await expect(page.getByRole('heading', { name: label, exact: true }).first()).toBeVisible();
+    if (label === 'Clients') await expect(page.locator('.client-directory-table tbody tr').first()).toBeVisible();
     await expectNormalTextContrast(page, label);
   }
+  // The dedicated E2E database contains only seeded or test-created fictional clients.
+  await page.getByRole('button', { name: /^Consulter la fiche / }).first().click();
+  const clientProfile = page.getByRole('dialog', { name: 'Fiche client', exact: true });
+  await expect(clientProfile).toBeVisible();
+  await expect(clientProfile.getByLabel('Actualisation de la fiche')).toHaveCount(0);
+  await expectNormalTextContrast(page, 'Fiche client');
+  await clientProfile.getByRole('button', { name: 'Fermer', exact: true }).first().click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Importer des clients', exact: true }).click();
+  const clientImport = page.getByRole('dialog', { name: 'Importer des clients', exact: true });
+  await expect(clientImport.getByLabel('Fichier clients CSV', { exact: true })).toBeVisible();
+  await expectNormalTextContrast(page, 'Formulaire import clients');
+  await clientImport.getByRole('button', { name: 'Fermer', exact: true }).first().click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await navigation.getByText('Contrats & garanties', { exact: true }).click();
   await page.getByRole('button', { name: /^Garanties\s+\d+$/ }).click();
   await expectNormalTextContrast(page, 'Garanties');

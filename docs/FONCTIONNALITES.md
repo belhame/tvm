@@ -8,7 +8,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 |---|---|---|
 | Comptes | Administrateur, responsable SAV, technicien et client ; sessions serveur ; gestion des comptes par l'administrateur | Pas de SSO ni d'authentification multifacteur fournis |
 | Portail client | Lecture des équipements, demandes, interventions et documents autorisés de sa société | Portail en lecture seule ; pas de création publique de compte |
-| Clients | Fiches clients, contacts et coordonnées | Pas de synchronisation CRM externe |
+| Clients | Annuaire recherchable, contacts, coordonnées, matricule fiscal et notes internes ; import CSV avec prévisualisation | Aucun écrasement de fiche ni reprise de compte ; conflits et valeurs incertaines à vérifier, CSV réel séparé des sources publiques |
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
 | Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
@@ -20,6 +20,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Historique métier | Suivi des événements réellement enregistrés autour des demandes et des équipements, avec observations et synthèse du dossier | État de référence des anciennes fiches distinct d'un changement utilisateur ; aucun ancien journal HFSQL importé automatiquement |
 | Interventions | Affectation, dates, durée, diagnostic, travaux, recommandations, état et fiches de maintenance, échange, mise en service ou préventive | Cases et conclusions déclaratives ; aucun mouvement de stock, décision de garantie ou facturation déclenchés par une case |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
+| Visites préventives | Objectif par dossier et nombre réalisé calculé depuis ses fiches préventives terminées ; progression sur la fiche et le PDF | L'objectif ne crée pas de visites ; aucune date ou ancienne prévision inventée, aucun autre dossier inclus |
 | Rapports | Rapport PDF d'intervention structuré d'après le modèle fourni et fiche PDF de suivi du dossier, soumis aux droits d'accès | Documents générés depuis la base ; pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
 | Pièces jointes SAV | Fichiers privés côté serveur, liés aux dossiers et partagés au client uniquement de façon explicite | Formats autorisés et limite de taille ; contrôle de format, sans prétendre fournir un antivirus |
 | Contrats | Fiche de contrat liée au client et éventuellement à un équipement, dates et couverture | Pas de facturation ni de génération automatique d'échéanciers |
@@ -44,6 +45,8 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
+
+L'import d'annuaire est réservé aux administrateurs et responsables. Il accepte une fiche avec son nom seul, garde les informations absentes vides et ne reprend aucune ancienne colonne de connexion. Les notes `Client.notes` et le nombre de comptes portail restent internes ; créer les accès utilisateurs est une opération distincte.
 
 ## Catégories et historique SAV
 

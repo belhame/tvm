@@ -1,3 +1,4 @@
+import { Fragment, useId } from "react";
 import type { RecordData } from "./api";
 
 const checklists: Record<
@@ -59,11 +60,28 @@ export default function InterventionWorksheet({
   onChange: (value: RecordData) => void;
   readonly?: boolean;
 }) {
+  const id = useId();
   const checklist = checklists[kind];
   if (!checklist) return null;
   const section = value[kind] || {};
   const update = (name: string, entry: unknown) =>
     onChange({ ...value, [kind]: { ...section, [name]: entry } });
+  const groupTitles: Record<string, string> =
+    kind === "commissioning"
+      ? {
+          electrical_protection: "Préparation et installation",
+          normal_operation_test: "Essais et validation",
+        }
+      : kind === "preventive"
+        ? {
+            environment: "Inspection de l’installation",
+            runtime_test: "Tests de fonctionnement",
+            dusting: "Entretien",
+          }
+        : {};
+  const answered = checklist.fields.filter(
+    ([key]) => typeof section[key] === "boolean",
+  ).length;
   return (
     <section className="intervention-worksheet" aria-label={checklist.title}>
       <div className="intervention-worksheet-heading">
@@ -73,31 +91,47 @@ export default function InterventionWorksheet({
           l’intervention.
         </p>
       </div>
+      {["commissioning", "preventive"].includes(kind) && (
+        <p className="operation-checklist-summary">
+          {answered} / {checklist.fields.length} contrôles renseignés. Une case
+          cochée confirme l’opération indiquée ; une information absente reste
+          non renseignée.
+        </p>
+      )}
       <div className="intervention-checklist">
         {checklist.fields.map(([key, label]) => (
-          <label className="intervention-checklist-item" key={key}>
-            <input
-              type="checkbox"
-              disabled={readonly}
-              checked={section[key] === true}
-              onChange={(event) => update(key, event.target.checked)}
-            />
-            <span>{label}</span>
-            {readonly && section[key] === undefined && (
-              <small>Non renseigné</small>
+          <Fragment key={key}>
+            {groupTitles[key] && (
+              <h4 className="operation-checklist-group">{groupTitles[key]}</h4>
             )}
-          </label>
+            <label className="intervention-checklist-item" key={key}>
+              <input
+                type="checkbox"
+                disabled={readonly}
+                checked={section[key] === true}
+                onChange={(event) => update(key, event.target.checked)}
+              />
+              <span>{label}</span>
+              {readonly && section[key] === undefined && (
+                <small>Non renseigné</small>
+              )}
+            </label>
+          </Fragment>
         ))}
       </div>
       {kind === "maintenance" && (
-        <label className="form-field">
-          Nombre de batteries remplacées
+        <div className="form-field">
+          <label htmlFor={`${id}-batteries`}>
+            Nombre de batteries remplacées
+          </label>
           <input
+            id={`${id}-batteries`}
             className="input"
             type="number"
             min="0"
             step="1"
             disabled={readonly}
+            aria-describedby={`${id}-batteries-help`}
             value={section.battery_replaced_count ?? ""}
             onChange={(event) => {
               if (event.target.value === "") {
@@ -108,10 +142,10 @@ export default function InterventionWorksheet({
                 update("battery_replaced_count", Number(event.target.value));
             }}
           />
-          <small>
+          <small id={`${id}-batteries-help`}>
             Un remplacement terminé demande au moins une batterie remplacée.
           </small>
-        </label>
+        </div>
       )}
       <label className="form-field intervention-checklist-note">
         Commentaire de la fiche

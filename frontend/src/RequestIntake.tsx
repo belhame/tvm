@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   Check,
@@ -50,6 +50,7 @@ export default function RequestIntake({
   onSaved: () => Promise<void>;
   onClose: () => void;
 }) {
+  const formId = useId();
   const initialEquipment = equipment.find(
     (row) => row.id === initialEquipmentId,
   );
@@ -66,6 +67,7 @@ export default function RequestIntake({
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("normal");
+  const [plannedVisits, setPlannedVisits] = useState("");
   const [reception, setReception] = useState<RecordData>(() =>
     Object.fromEntries(
       requestReceptionFields
@@ -269,6 +271,12 @@ export default function RequestIntake({
       subject: subject.trim(),
       description: description.trim(),
       priority,
+      ...(canCreateEquipment
+        ? {
+            planned_visit_count:
+              plannedVisits === "" ? null : Number(plannedVisits),
+          }
+        : {}),
       ...Object.fromEntries(
         requestReceptionFields
           .filter((field) => field.name !== "closed_at")
@@ -822,6 +830,31 @@ export default function RequestIntake({
                   <option value="urgent">Urgente</option>
                 </select>
               </label>
+              {canCreateEquipment && (
+                <div className="form-field">
+                  <label htmlFor={`${formId}-planned-visits`}>
+                    Nombre de visites préventives prévues
+                  </label>
+                  <input
+                    id={`${formId}-planned-visits`}
+                    className="input"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    step="1"
+                    value={plannedVisits}
+                    onChange={(event) => {
+                      edited();
+                      setPlannedVisits(event.target.value);
+                    }}
+                    aria-describedby={`${formId}-planned-visits-help`}
+                  />
+                  <small id={`${formId}-planned-visits-help`}>
+                    Objectif facultatif pour ce dossier. Laissez vide si non
+                    défini ; les visites se créent et se planifient séparément.
+                  </small>
+                </div>
+              )}
             </div>
           </section>
         </fieldset>

@@ -2,6 +2,8 @@
 
 Contrôles exécutés le **22 octobre 2026** dans l'environnement cloud, sur PostgreSQL 16 et Chromium 154. Les données utilisées sont fictives. Le serveur et les données de démonstration sont distincts de la base réservée aux essais navigateur.
 
+Ce document conserve les validations successives, datées ci-dessous. [L'étape annuaire et visites préventives](#annuaire-clients-import-csv-et-visites-préventives--26-octobre-2026) distingue les essais automatisés fictifs de l'import privé réalisé dans la base cloud ; aucune donnée nominative de cet import n'est publiée.
+
 | Contrôle exécuté | Résultat |
 |---|---|
 | `bash scripts/setup.sh --demo` | Installation puis répétition réussies ; `.env` strictement conservé, démo et données préservées, migrations et compilation réussies |
@@ -147,3 +149,14 @@ Le numéro métier TVM est commun au dossier et à ses visites. La référence d
 - Les deux exemples PDF publics ont été régénérés à partir de données entièrement fictives : ils montrent le numéro d’appel/intervention TVM et un numéro client différent avec zéros initiaux. Les comptes et dossiers des centres de recette restent dans la base E2E dédiée ; aucun client réel de la capture n’a été créé ou publié.
 
 Les limites Windows natives, caméra et reprise HFSQL décrites plus haut restent applicables. La version source ne transfère pas automatiquement la base cloud vers le PC.
+
+## Annuaire clients, import CSV et visites préventives — 26 octobre 2026
+
+- **346 tests Django réussis sur PostgreSQL, aucun échec ni test ignoré.** Les 45 contrôles ajoutés portent sur l'annuaire et son import, la revue indépendante de ses limites et droits, ainsi que l'objectif et le calcul des visites préventives. Les tests automatisés utilisent des données fictives.
+- Les migrations additives **0010 et 0011** ont été appliquées à l'instance principale après sauvegarde. Les empreintes des colonnes et lignes préexistantes contrôlées dans **21 tables** restent inchangées, avant l'ajout de l'annuaire privé. Les anciens numéros et relations ne sont pas réécrits.
+- Un CSV privé de **56 clients distincts** a été importé effectivement dans la base cloud, portant son total à **61 clients**. Un second passage crée **0 fiche** et reconnaît les **56 fiches existantes**. Aucun compte, équipement ou visite n'est créé par cet import.
+- Les six matricules fiscaux concernés conservent leurs zéros initiaux. Les sources distinctes ne sont pas fusionnées ; les coordonnées illisibles ou tronquées ont été omises plutôt que complétées par supposition. Les valeurs restant à vérifier sont signalées dans les notes internes. Noms, contacts, captures et anciens accès ne figurent pas dans les sources publiques.
+- **24 scénarios Chromium réussis**, dont l'annuaire fiscal, l'accès aux comptes de la société, l'import par fichier ou CSV collé, l'absence de fusion et la progression réelle des campagnes. Les textes visibles de l'annuaire, de la fiche client et du formulaire d'import passent les contrôles de contraste à 4,5:1. Une capture sur téléphone de l'annuaire fictif confirme l'absence de débordement de page.
+- L'image Docker finale a été construite et démarrée : santé PostgreSQL et ressources de production identiques au build navigateur vérifiées. Sa suite découvre **346 tests : 336 exécutés avec succès, 10 contrôles PDF ignorés faute de Poppler** ; ces dix contrôles passent dans les 346 tests PostgreSQL exécutés sur l'hôte. Aucun essai n'installe l'application sur le PC de l'utilisateur.
+
+Le ZIP public contient le code générique. Le CSV réel reste séparé pour une importation dans l'instance Windows via **Clients → Importer des clients**, après mise à jour conservant `.env`, `.local` et les volumes. L'import cloud ne modifie pas la base du PC.

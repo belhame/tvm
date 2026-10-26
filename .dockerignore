@@ -13,4 +13,16 @@ backend/media
 **/privateuploads
 docs
 legacy-exports
+private-imports
+**/private-imports
+**/clients_tvm*.[cC][sS][vV]
+**/*clients-reels*
+**/*clients_reels*
+# Keep uploaded catalogues out of build context; fixtures contain fiction only.
+**/*.[xX][lL][sS]
+**/*.[xX][lL][sS][xX]
+**/*.[xX][lL][sS][mM]
+**/*.[xX][lL][sS][bB]
+!backend/core/tests/fixtures/catalogue_synthetic.xls
+!backend/core/tests/fixtures/request_intake_synthetic.xls
 *.zip

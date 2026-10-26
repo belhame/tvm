@@ -74,6 +74,7 @@ import {
   requestCategories,
   requestStatusLabels,
   interventionKinds,
+  type Column,
   type Resource,
 } from "./resources";
 import Scanner from "./Scanner";
@@ -90,6 +91,8 @@ import OperationTimeline from "./OperationTimeline";
 import InterventionWorksheet from "./InterventionWorksheet";
 import RequestReceptionFields from "./RequestReceptionFields";
 import CallReference, { callIdentity, callPrimary } from "./CallReference";
+import ClientsDirectory from "./ClientsDirectory";
+import PreventiveProgress from "./PreventiveProgress";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -148,6 +151,14 @@ const clientPages = new Set([
   "reports",
   "scanner",
 ]);
+const operationFormSections: Record<string, string> = {
+  kind: "Dossier et type d’opération",
+  technician: "Planification et réalisation",
+  contract: "Contrat et couverture",
+  cabinet_serial: "Matériel et contact sur site",
+  diagnosis: "Constats et travaux",
+  conclusion: "Conclusion de la fiche",
+};
 
 function Logo({ compact = false }: { compact?: boolean }) {
   return (
@@ -587,6 +598,12 @@ function EditForm({
     try {
       const payload: RecordData = {};
       for (const field of config.fields) {
+        if (
+          field.managerOnly &&
+          user.role !== "admin" &&
+          user.role !== "manager"
+        )
+          continue;
         let value = values[field.name];
         if (field.name === "password" && !value) continue;
         if (field.name === "closed_at" && (!canBackfillClosure || !value))
@@ -694,19 +711,61 @@ function EditForm({
         <form onSubmit={submit}>
           <div className="modal-content">
             {error && <ErrorBox>{error}</ErrorBox>}
+            {modal.resource === "interventions" &&
+              ["preventive", "commissioning"].includes(values.kind) && (
+                <div className="operation-form-intro">
+                  <span className="operation-form-icon">
+                    {values.kind === "preventive" ? (
+                      <ShieldCheck size={23} />
+                    ) : (
+                      <PlugZap size={23} />
+                    )}
+                  </span>
+                  <div>
+                    <strong>
+                      {values.kind === "preventive"
+                        ? "Une visite préventive, rattachée à son dossier SAV"
+                        : "Une mise en service documentée, de l’installation aux essais"}
+                    </strong>
+                    <p>
+                      {values.kind === "preventive"
+                        ? "Planifiez chaque visite séparément. Terminer la fiche met à jour la progression du dossier ; les contrôles cochés et le compte rendu restent propres à cette visite."
+                        : "Renseignez le site, le matériel et le contact, puis les contrôles réalisés. Pour terminer la fiche, indiquez la date réelle de l’opération."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            {modal.resource === "requests" && editing && (
+              <PreventiveProgress record={modal.record!} />
+            )}
+            {modal.resource === "interventions" &&
+              values.kind === "preventive" &&
+              sourceRequest && <PreventiveProgress record={sourceRequest} />}
             <div className="form-grid">
               {config.fields
                 .filter(
                   (field) =>
                     field.section !== "reception" &&
                     (!readonly || field.name !== "password") &&
+                    (!field.managerOnly ||
+                      user.role === "admin" ||
+                      user.role === "manager") &&
                     (user.role !== "client" ||
-                      field.name !== "internal_notes") &&
+                      (field.name !== "internal_notes" &&
+                        !(
+                          modal.resource === "clients" && field.name === "notes"
+                        ))) &&
                     (!field.when ||
                       values[field.when.field] === field.when.value),
                 )
                 .map((field) => (
                   <Fragment key={field.name}>
+                    {modal.resource === "interventions" &&
+                      operationFormSections[field.name] && (
+                        <div className="operation-form-section span-2">
+                          <h3>{operationFormSections[field.name]}</h3>
+                        </div>
+                      )}
                     <div className={`form-field ${field.wide ? "span-2" : ""}`}>
                       <label htmlFor={`${formId}-${field.name}`}>
                         {field.label}
@@ -770,6 +829,7 @@ function EditForm({
                               user.role === "technician")
                           }
                           required={field.required}
+                          maxLength={field.maxLength}
                           value={values[field.name]}
                           placeholder={field.placeholder}
                           onChange={(e) =>
@@ -788,7 +848,8 @@ function EditForm({
                           disabled={readonly}
                           type={field.type || "text"}
                           step={
-                            field.type === "number"
+                            field.step ??
+                            (field.type === "number"
                               ? [
                                   "quantity",
                                   "duration_minutes",
@@ -797,8 +858,11 @@ function EditForm({
                                 ].includes(field.name)
                                 ? "1"
                                 : "any"
-                              : undefined
+                              : undefined)
                           }
+                          min={field.min}
+                          max={field.max}
+                          maxLength={field.maxLength}
                           required={
                             field.required ||
                             (!editing && field.name === "password")
@@ -1072,6 +1136,7 @@ function RecordTable({
   onIntervention,
   user,
   compact = false,
+  kind,
 }: {
   resource: string;
   rows: RecordData[];
@@ -1079,9 +1144,28 @@ function RecordTable({
   onIntervention: (r: RecordData) => void;
   user: User;
   compact?: boolean;
+  kind?: string;
 }) {
   const config = resources[resource];
-  const columns = compact ? config.columns.slice(0, 5) : config.columns;
+  const baseColumns = compact ? config.columns.slice(0, 5) : config.columns;
+  const columns: Column[] =
+    kind === "preventive"
+      ? [
+          ...baseColumns.filter((column) => column.key !== "kind"),
+          {
+            key: "preventive_progress",
+            label: "Visites préventives du dossier",
+          },
+        ]
+      : kind === "commissioning"
+        ? [
+            ...baseColumns.filter(
+              (column) => !["scheduled_at", "kind"].includes(column.key),
+            ),
+            { key: "performed_on", label: "Date réalisée", type: "date" },
+            { key: "site", label: "Site / contact", secondary: "contact_name" },
+          ]
+        : baseColumns;
   return (
     <div className="table-scroll">
       <table>
@@ -1112,9 +1196,11 @@ function RecordTable({
                 const val = row[c.key];
                 return (
                   <td key={c.key}>
-                    {c.key === "call_number" &&
-                    (resource === "requests" ||
-                      resource === "interventions") ? (
+                    {c.key === "preventive_progress" ? (
+                      <PreventiveProgress record={row} compact />
+                    ) : c.key === "call_number" &&
+                      (resource === "requests" ||
+                        resource === "interventions") ? (
                       <CallReference
                         record={row}
                         role={user.role}
@@ -1267,13 +1353,19 @@ function ResourcePage({
   const [search, setSearch] = useState(externalSearch),
     [status, setStatus] = useState("all");
   useEffect(() => setSearch(externalSearch), [externalSearch]);
-  const rows = (data[resource] || []).filter(
-    (row) =>
-      JSON.stringify(row)
+  const rows = (data[resource] || []).filter((row) => {
+    const relatedClientName =
+      resource === "users"
+        ? data.clients?.find((client) => client.id === row.client)?.name || ""
+        : "";
+    return (
+      [JSON.stringify(row), relatedClientName]
+        .join(" ")
         .toLocaleLowerCase("fr")
         .includes(search.toLocaleLowerCase("fr")) &&
-      (status === "all" || row.status === status),
-  );
+      (status === "all" || row.status === status)
+    );
+  });
   const statOptions = Array.from(
     new Set((data[resource] || []).map((r) => r.status).filter(Boolean)),
   );
@@ -1304,6 +1396,38 @@ function ResourcePage({
           </button>
         )}
       </div>
+      {kind && ["preventive", "commissioning"].includes(kind) && (
+        <div
+          className="operation-list-summary"
+          aria-label={`Synthèse ${kindLabel?.toLowerCase()}`}
+        >
+          <div>
+            <span>
+              {kind === "preventive"
+                ? "Visites enregistrées"
+                : "Fiches enregistrées"}
+            </span>
+            <strong>{rows.length}</strong>
+          </div>
+          <div>
+            <span>Terminées</span>
+            <strong>
+              {rows.filter((row) => row.status === "completed").length}
+            </strong>
+          </div>
+          <div>
+            <span>Dossiers concernés</span>
+            <strong>
+              {new Set(rows.map((row) => row.service_request)).size}
+            </strong>
+          </div>
+          <p>
+            {kind === "preventive"
+              ? "L’objectif de visites se définit sur le dossier SAV. Chaque fiche correspond à une visite ; les visites annulées restent visibles dans la liste."
+              : "Consultez la date réelle de mise en service, le site, les contrôles et le rapport PDF de chaque opération."}
+          </p>
+        </div>
+      )}
       <section className="card resource-card">
         <div className="resource-toolbar">
           <div className="search-field">
@@ -1359,6 +1483,7 @@ function ResourcePage({
               readonly && resource === "stock-movements" ? () => {} : onEdit
             }
             onIntervention={onIntervention}
+            kind={kind}
           />
         ) : (
           <Empty
@@ -1918,6 +2043,7 @@ function InterventionDetail({
             </div>
           </div>
         </div>
+        {record.kind === "preventive" && <PreventiveProgress record={record} />}
         <div className="tabs">
           <button
             className={tab === "suivi" ? "active" : ""}
@@ -1925,6 +2051,14 @@ function InterventionDetail({
           >
             Suivi & diagnostic
           </button>
+          {["preventive", "commissioning"].includes(record.kind) && (
+            <button
+              className={tab === "fiche" ? "active" : ""}
+              onClick={() => setTab("fiche")}
+            >
+              Fiche de l’opération
+            </button>
+          )}
           <button
             className={tab === "documents" ? "active" : ""}
             onClick={() => setTab("documents")}
@@ -2032,6 +2166,76 @@ function InterventionDetail({
               Télécharger
             </a>
           </div>
+        )}
+        {tab === "fiche" && (
+          <section className="operation-detail-sheet">
+            <h3>
+              {record.kind === "preventive"
+                ? "Visite de maintenance préventive"
+                : "Mise en service de l’onduleur"}
+            </h3>
+            <dl className="request-dossier-facts">
+              <div>
+                <dt>Date réelle de l’opération</dt>
+                <dd>
+                  {record.performed_on
+                    ? dateFR(record.performed_on)
+                    : "Non renseignée"}
+                </dd>
+              </div>
+              <div>
+                <dt>Site de l’opération</dt>
+                <dd>{record.site || "Non renseigné"}</dd>
+              </div>
+              <div>
+                <dt>Client final</dt>
+                <dd>{record.end_customer || "Non renseigné"}</dd>
+              </div>
+              <div>
+                <dt>Contact sur site</dt>
+                <dd>{record.contact_name || "Non renseigné"}</dd>
+              </div>
+              <div>
+                <dt>Téléphone du contact</dt>
+                <dd>{record.contact_phone || "Non renseigné"}</dd>
+              </div>
+              <div>
+                <dt>Armoire batteries</dt>
+                <dd>{record.cabinet_serial || "Non renseignée"}</dd>
+              </div>
+              <div>
+                <dt>Nombre de batteries</dt>
+                <dd>{record.battery_count ?? "Non renseigné"}</dd>
+              </div>
+              <div>
+                <dt>Contrat lié</dt>
+                <dd>{record.contract_number || "Aucun contrat lié"}</dd>
+              </div>
+            </dl>
+            <InterventionWorksheet
+              kind={record.kind}
+              value={record.structured_data || {}}
+              onChange={() => {}}
+              readonly
+            />
+            <div className="operation-detail-conclusion">
+              <h3>Synthèse et conclusion</h3>
+              <p>{record.summary || "Aucune synthèse renseignée."}</p>
+              <strong>
+                {statuses[record.conclusion] || "Conclusion non renseignée"}
+              </strong>
+              {record.conclusion_notes && <p>{record.conclusion_notes}</p>}
+            </div>
+            <a
+              className="button secondary small"
+              href={`/api/interventions/${record.id}/report/`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download size={16} />
+              Télécharger le rapport PDF
+            </a>
+          </section>
         )}
         {tab === "pieces" && (
           <section>
@@ -2947,8 +3151,8 @@ export default function App() {
           <div className="demo-banner">
             <span>
               <CircleDot size={14} />
-              <strong>Environnement de démonstration</strong> · Données
-              fictives, enregistrées sur le serveur.
+              <strong>Environnement de démonstration</strong> · Les
+              modifications sont enregistrées sur le serveur.
             </span>
             <span>TVM / PowerCare</span>
           </div>
@@ -2970,6 +3174,18 @@ export default function App() {
               {...common}
               dashboard={dashboard}
               onNavigate={navigate}
+            />
+          ) : allowedPage === "clients" ? (
+            <ClientsDirectory
+              key={`${user.id}:${user.role}`}
+              user={user}
+              clients={data.clients || []}
+              refreshKey={data.clients}
+              initialSearch={externalSearch}
+              onEdit={openModal}
+              onChanged={saved}
+              onNavigate={navigate}
+              Dialog={Modal}
             />
           ) : allowedPage === "requests" ? (
             <RequestsWorkspace

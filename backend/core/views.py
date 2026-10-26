@@ -25,6 +25,7 @@ from .serializers import AuditSerializer, ClientSerializer, ContractSerializer, 
 from .workflow import CATEGORIES, overdue_filter
 from .workflow_api import timeline_response
 from .request_numbering import reference_query_value
+from .preventive_visits import with_preventive_counts
 
 User = get_user_model()
 
@@ -133,6 +134,16 @@ class ClientViewSet(BusinessViewSet):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
     owner_path = 'id'
+    def get_queryset(self):
+        qs = super().get_queryset().annotate(
+            equipment_count=Count('equipment', distinct=True),
+            open_requests_count=Count('equipment__service_requests', filter=~Q(equipment__service_requests__status='closed'), distinct=True),
+            portal_users_count=Count('portal_users', filter=Q(portal_users__is_active=True), distinct=True),
+        )
+        query = reference_query_value(self.request.query_params, 'q')
+        if query:
+            qs = qs.filter(Q(name__icontains=query) | Q(contact_name__icontains=query) | Q(tax_id__icontains=query) | Q(email__icontains=query) | Q(phone__icontains=query) | Q(city__icontains=query))
+        return qs
 
 
 class EquipmentViewSet(BusinessViewSet):
@@ -157,7 +168,7 @@ class EquipmentViewSet(BusinessViewSet):
 
 
 class ServiceRequestViewSet(BusinessViewSet):
-    queryset = ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all()
+    queryset = with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all())
     serializer_class = ServiceRequestSerializer
     owner_path = 'equipment__client_id'
     def get_queryset(self):
@@ -198,7 +209,7 @@ class ServiceRequestViewSet(BusinessViewSet):
     @action(detail=False, methods=['get'])
     def categories(self, request):
         qs = self.get_queryset()
-        counts = dict(qs.values('status').annotate(total=Count('id')).values_list('status', 'total'))
+        counts = dict(qs.values('status').annotate(total=Count('id', distinct=True)).values_list('status', 'total'))
         total = sum(counts.values())
         items = []
         for key, label, states in CATEGORIES:
@@ -220,7 +231,7 @@ class ServiceRequestViewSet(BusinessViewSet):
 
 
 class InterventionViewSet(BusinessViewSet):
-    queryset = Intervention.objects.select_related('service_request__equipment__client', 'technician').all()
+    queryset = with_preventive_counts(Intervention.objects.select_related('service_request__equipment__client', 'technician').all(), 'service_request__interventions')
     serializer_class = InterventionSerializer
     owner_path = 'service_request__equipment__client_id'
     def get_queryset(self):
@@ -377,7 +388,7 @@ def search_view(request):
         ctx = {'request': request}
         return Response({'equipment': [], 'clients': [], 'requests': ServiceRequestSerializer(requests, many=True, context=ctx).data, 'interventions': InterventionSerializer(interventions, many=True, context=ctx).data})
     equipment = scope_queryset(Equipment.objects.select_related('client'), user, 'client_id').filter(Q(serial_number__icontains=q) | Q(model__icontains=q) | Q(client__name__icontains=q))[:20]
-    clients = scope_queryset(Client.objects.all(), user, 'id').filter(Q(name__icontains=q) | Q(contact_name__icontains=q))[:20]
+    clients = scope_queryset(Client.objects.all(), user, 'id').filter(Q(name__icontains=q) | Q(contact_name__icontains=q) | Q(tax_id__icontains=q) | Q(email__icontains=q) | Q(phone__icontains=q) | Q(city__icontains=q))[:20]
     requests = scope_queryset(ServiceRequest.objects.select_related('equipment__client'), user, 'equipment__client_id').filter(Q(reference__icontains=q) | Q(client_reference__icontains=q) | Q(subject__icontains=q) | Q(equipment__serial_number__icontains=q) | Q(equipment__client__name__icontains=q))[:20]
     interventions = scope_queryset(Intervention.objects.select_related('service_request__equipment__client', 'technician'), user, 'service_request__equipment__client_id').filter(Q(reference__icontains=q) | Q(service_request__reference__icontains=q) | Q(service_request__client_reference__icontains=q) | Q(service_request__subject__icontains=q) | Q(service_request__equipment__serial_number__icontains=q) | Q(service_request__equipment__client__name__icontains=q))[:20]
     ctx = {'request': request}

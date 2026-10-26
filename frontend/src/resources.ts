@@ -12,6 +12,11 @@ export type Field = {
   wide?: boolean;
   help?: string;
   default?: any;
+  min?: number;
+  max?: number;
+  step?: number;
+  maxLength?: number;
+  managerOnly?: boolean;
   when?: { field: string; value: string };
   section?: "reception";
 };
@@ -230,15 +235,25 @@ export const resources: Record<string, Resource> = {
         name: "name",
         label: "Raison sociale",
         required: true,
-        placeholder: "Ex. Centre Hospitalier Lyon",
+        placeholder: "Nom de la société",
+        maxLength: 200,
       },
       { name: "contact_name", label: "Contact principal" },
+      { name: "tax_id", label: "Matricule fiscal", maxLength: 80 },
       { name: "email", label: "Adresse e-mail", type: "email" },
       { name: "phone", label: "Téléphone", type: "tel" },
       { name: "address", label: "Adresse", wide: true },
       { name: "city", label: "Ville" },
       { name: "postal_code", label: "Code postal" },
-      { name: "country", label: "Pays", default: "France" },
+      { name: "country", label: "Pays", default: "" },
+      {
+        name: "notes",
+        label: "Notes internes client",
+        type: "textarea",
+        wide: true,
+        maxLength: 4000,
+        help: "Réservées à votre équipe ; absentes du portail client.",
+      },
     ],
   },
   equipment: {
@@ -329,7 +344,7 @@ export const resources: Record<string, Resource> = {
         label: "Description de la panne",
         type: "textarea",
         wide: true,
-        required: true,
+        help: "Facultative pour un dossier existant, notamment une visite préventive ou une mise en service.",
       },
       {
         name: "priority",
@@ -353,6 +368,16 @@ export const resources: Record<string, Resource> = {
         help: "Lors d’une affectation, choisissez explicitement un état En attente, En entretien ou En test ; Non affecté ne peut pas conserver un technicien.",
       },
       { name: "due_on", label: "Échéance de traitement", type: "date" },
+      {
+        name: "planned_visit_count",
+        label: "Nombre de visites préventives prévues",
+        type: "number",
+        min: 1,
+        max: 1000,
+        step: 1,
+        managerOnly: true,
+        help: "Objectif facultatif pour ce dossier, de 1 à 1 000 visites. Laissez vide si non défini. Les visites sont créées et planifiées séparément.",
+      },
       ...requestReceptionFields,
     ],
   },

@@ -82,6 +82,17 @@ Si ces éléments ne sont pas visibles, ouvrez l’Explorateur Windows et active
 
 Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs utilisent un nom de projet Docker Compose fixe et retrouvent le volume PostgreSQL existant. La mise à jour ne demande ni suppression de volume, ni réinitialisation de la base. Gardez les fichiers de configuration et leur copie de sauvegarde sur votre PC ; ils ne doivent pas être partagés.
 
+## Importer son annuaire clients après la mise à jour
+
+Le ZIP public contient les sources génériques, pas les noms et contacts réels issus des captures. Le CSV des clients est un fichier privé fourni séparément ; ne le publier ni avec les sources ni avec d'anciens identifiants de connexion.
+
+1. Mettre à jour l'installation avec la procédure ci-dessus, en conservant `.env`, `.local` et les volumes, puis relancer `INSTALLER_TVM.cmd` pour appliquer les migrations.
+2. Se connecter comme administrateur ou responsable, ouvrir **Clients → Importer des clients** et sélectionner le fichier privé UTF-8.
+3. Cliquer sur **Prévisualiser l'import**, examiner les erreurs ou conflits et les valeurs marquées à vérifier, puis **Appliquer l'import** des lignes saines.
+4. Contrôler le bilan et retrouver les fiches dans l'annuaire. Les anciens comptes et mots de passe ne sont pas importés ; l'administrateur gère les accès séparément.
+
+Un import effectué dans le cloud ne signifie pas que la base de votre PC est déjà alimentée. Cette opération doit être faite dans votre instance Windows. Voir [le format CSV et les règles de conservation](GUIDE_SUIVI_SAV.md#annuaire-clients-et-import-csv).
+
 ## Si quelque chose bloque
 
 | Message ou symptôme | Action |

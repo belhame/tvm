@@ -10,6 +10,10 @@ Chaque dossier possède un **N° d'intervention / appel TVM** commun à ses visi
 
 Le suivi SAV ajoute des catégories de demandes avec compteurs, des fiches d'échange, de mise en service et de prévention, ainsi qu'une chronologie des événements enregistrés. [Le guide de suivi](docs/GUIDE_SUIVI_SAV.md) distingue cet historique web de l'ancien journal HFSQL, qui n'est pas repris automatiquement.
 
+L'annuaire clients propose un import CSV avec prévisualisation, sans écraser les fiches ni reprendre d'anciens comptes. Les données réelles et le CSV privé restent séparés du ZIP public ; [la procédure d'import](docs/GUIDE_SUIVI_SAV.md#annuaire-clients-et-import-csv) explique comment les charger dans sa propre instance.
+
+Pour la prévention, l'objectif de visites du dossier reste distinct du nombre calculé de fiches réellement terminées. Les visites conservent le même appel TVM et leurs références secondaires ; la mise en service dispose de sa fiche et de son PDF dédiés.
+
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 
 ## Essayer la version de démonstration

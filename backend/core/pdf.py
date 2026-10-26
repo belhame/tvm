@@ -15,6 +15,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Flowable, LongTable, Paragraph, SimpleDocTemplate, Spacer, TableStyle
 
 from .intervention_workflow import CHECKLISTS, CONCLUSIONS, INTERVENTION_KINDS, report_checklists
+from .preventive_visits import preventive_visit_progress
 
 BLUE = colors.HexColor('#117cbb')
 INK = colors.HexColor('#182c40')
@@ -140,6 +141,18 @@ def _brief(value, limit=400):
     return value if len(value or '') <= limit else 'Texte intégral dans les informations complémentaires.'
 
 
+def _preventive_summary(service_request, styles, *, counts_source=None):
+    progress = preventive_visit_progress(service_request, counts_source=counts_source)
+    target = progress['planned_visit_count']
+    completed = progress['preventive_completed_visit_count']
+    total = progress['preventive_total_visit_count']
+    return _fields([
+        ('Visites réalisées', f'{completed} / {target} prévues' if target is not None else f'{completed} · prévision non renseignée'),
+        ('Visites enregistrées', f'{total} visite(s) préventive(s), hors annulées'),
+        ('Visites restant à réaliser', progress['preventive_remaining_visit_count'] if target is not None else 'Prévision non renseignée'),
+    ], styles)
+
+
 def intervention_report(intervention):
     """TVM reference form rebuilt from public database fields."""
     styles = _styles()
@@ -155,6 +168,16 @@ def intervention_report(intervention):
     ], [24 * mm, 75 * mm, 27 * mm, 60 * mm])
     company.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, -1), BLUE), ('BACKGROUND', (2, 0), (2, -1), BLUE)]))
     story += [company, Spacer(1, 6)]
+    if intervention.kind == 'preventive':
+        story += [_bar('SUIVI DES VISITES PRÉVENTIVES DU DOSSIER', styles), _preventive_summary(request, styles, counts_source=intervention), Spacer(1, 6)]
+    elif intervention.kind == 'commissioning':
+        story += [_bar('FICHE DE MISE EN SERVICE', styles), _fields([
+            ('Date de réalisation', _date(intervention.performed_on)),
+            ('Lieu de mise en service', intervention.site or equipment.location),
+            ('Client final', intervention.end_customer or request.end_customer),
+            ('Téléphone du contact', intervention.contact_phone or request.contact_phone or client.phone),
+            ('Armoire SN', intervention.cabinet_serial),
+        ], styles), Spacer(1, 6)]
     types = _table([
         [_check('Extension de garantie', bool(intervention.extension_warranty_id), styles), _check('Maintenance', intervention.kind == 'maintenance', styles)],
         [_check('Mise en service', intervention.kind == 'commissioning', styles), _check('Préventive', intervention.kind == 'preventive', styles)],
@@ -234,6 +257,9 @@ def service_request_report(request, *, now=None):
         ('Traitement déclaré', warranty_labels.get(request.warranty_status, 'Non précisé')), ('Contact', request.contact_name or client.contact_name), ('Téléphone', request.contact_phone or client.phone), ('E-mail', request.contact_email or client.email),
     ], styles))
     story += [Spacer(1, 7), _bar('SIGNALEMENT', styles), _p(request.subject, styles), _p(request.description, styles)]
+    progress = preventive_visit_progress(request)
+    if progress['planned_visit_count'] is not None or progress['preventive_total_visit_count']:
+        story += [Spacer(1, 7), _bar('SUIVI DES VISITES PRÉVENTIVES DU DOSSIER', styles), _preventive_summary(request, styles)]
     if timing['warning']:
         story += [_p('Information sur le compteur', styles), _p(timing['warning'], styles)]
     story += [Spacer(1, 7), _bar('SUIVI CHRONOLOGIQUE PUBLIC', styles)]

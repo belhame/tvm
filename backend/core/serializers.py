@@ -9,6 +9,7 @@ from .models import AuditLog, Client, Contract, DeliveryLine, DeliveryNote, Equi
 from .workflow import is_due_overdue, request_category, technician_can_write
 from .request_timing import request_timing
 from .request_followup import FOLLOWUP_FIELD_NAMES, validate_followup
+from .preventive_visits import preventive_visit_progress
 
 User = get_user_model()
 
@@ -19,9 +20,21 @@ class LegacySerializer(serializers.ModelSerializer):
 
 
 class ClientSerializer(LegacySerializer):
+    equipment_count = serializers.IntegerField(read_only=True)
+    open_requests_count = serializers.IntegerField(read_only=True)
+    portal_users_count = serializers.IntegerField(read_only=True)
+    notes = serializers.CharField(max_length=4000, allow_blank=True, required=False)
     class Meta:
         model = Client
-        fields = ['id', 'name', 'contact_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country', 'legacy_id']
+        fields = ['id', 'name', 'contact_name', 'tax_id', 'email', 'phone', 'address', 'city', 'postal_code', 'country', 'notes', 'legacy_id', 'created_at', 'equipment_count', 'open_requests_count', 'portal_users_count']
+        read_only_fields = ['created_at']
+    def get_fields(self):
+        fields = super().get_fields()
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.is_authenticated and user.effective_role == 'client':
+            for key in ('notes', 'portal_users_count'):
+                fields.pop(key, None)
+        return fields
 
 
 class EquipmentSerializer(LegacySerializer):
@@ -65,9 +78,13 @@ class ServiceRequestSerializer(LegacySerializer):
     is_due_overdue = serializers.SerializerMethodField()
     timing = serializers.SerializerMethodField()
     accessories = serializers.CharField(max_length=4000, allow_blank=True, required=False)
+    planned_visit_count = serializers.IntegerField(min_value=1, max_value=1000, allow_null=True, required=False)
+    preventive_completed_visit_count = serializers.SerializerMethodField()
+    preventive_total_visit_count = serializers.SerializerMethodField()
+    preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -80,8 +97,8 @@ class ServiceRequestSerializer(LegacySerializer):
         if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and (self.instance.interventions.exists() or self.instance.operation_events.exists()):
             raise serializers.ValidationError({'equipment': 'Un dossier ayant des interventions ne peut pas changer d’équipement.'})
         user = getattr(self.context.get('request'), 'user', None)
-        if user and user.effective_role == 'technician' and any(field in attrs for field in ('assigned_technician', 'due_on')):
-            raise serializers.ValidationError('Le responsable gère les affectations et les échéances.')
+        if user and user.effective_role == 'technician' and any(field in attrs for field in ('assigned_technician', 'due_on', 'planned_visit_count')):
+            raise serializers.ValidationError('Le responsable gère les affectations, les échéances et le nombre de visites prévues.')
         assigned = attrs.get('assigned_technician', getattr(self.instance, 'assigned_technician', None))
         state = attrs.get('status', getattr(self.instance, 'status', 'new'))
         if assigned is not None and state == 'new':
@@ -103,6 +120,17 @@ class ServiceRequestSerializer(LegacySerializer):
         if key not in cache:
             cache[key] = request_timing(obj.arrived_at, obj.closed_at, obj.status, now=now)
         return cache[key]
+    def _preventive_progress(self, obj):
+        cache = self.context.setdefault('_preventive_progress', {})
+        if obj.pk not in cache:
+            cache[obj.pk] = preventive_visit_progress(obj)
+        return cache[obj.pk]
+    def get_preventive_completed_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_completed_visit_count']
+    def get_preventive_total_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_total_visit_count']
+    def get_preventive_remaining_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_remaining_visit_count']
     @transaction.atomic
     def update(self, instance, validated_data):
         instance = ServiceRequest.objects.select_for_update().get(pk=instance.pk)
@@ -127,12 +155,27 @@ class InterventionSerializer(LegacySerializer):
     extension_starts_on = serializers.DateField(source='extension_warranty.starts_on', read_only=True, default=None)
     extension_ends_on = serializers.DateField(source='extension_warranty.ends_on', read_only=True, default=None)
     extension_scope = serializers.CharField(source='extension_warranty.scope', read_only=True, default=None)
+    planned_visit_count = serializers.IntegerField(source='service_request.planned_visit_count', read_only=True, allow_null=True)
+    preventive_completed_visit_count = serializers.SerializerMethodField()
+    preventive_total_visit_count = serializers.SerializerMethodField()
+    preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = Intervention
-        fields = ['id', 'reference', 'call_number', 'client_reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'kind', 'performed_on', 'replacement_equipment', 'replacement_equipment_serial', 'contract', 'contract_number', 'contract_starts_on', 'contract_ends_on', 'extension_warranty', 'extension_starts_on', 'extension_ends_on', 'extension_scope', 'cabinet_serial', 'battery_count', 'site', 'end_customer', 'contact_name', 'contact_phone', 'summary', 'conclusion', 'conclusion_notes', 'structured_data', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'legacy_id']
+        fields = ['id', 'reference', 'call_number', 'client_reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'kind', 'performed_on', 'replacement_equipment', 'replacement_equipment_serial', 'contract', 'contract_number', 'contract_starts_on', 'contract_ends_on', 'extension_warranty', 'extension_starts_on', 'extension_ends_on', 'extension_scope', 'cabinet_serial', 'battery_count', 'site', 'end_customer', 'contact_name', 'contact_phone', 'summary', 'conclusion', 'conclusion_notes', 'structured_data', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'legacy_id']
         read_only_fields = ['reference', 'completed_at', 'created_at']
     def get_technician_name(self, obj):
         return (obj.technician.get_full_name() or obj.technician.username) if obj.technician else 'Non affecté'
+    def _preventive_progress(self, obj):
+        cache = self.context.setdefault('_preventive_progress', {})
+        if obj.service_request_id not in cache:
+            cache[obj.service_request_id] = preventive_visit_progress(obj.service_request, counts_source=obj)
+        return cache[obj.service_request_id]
+    def get_preventive_completed_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_completed_visit_count']
+    def get_preventive_total_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_total_visit_count']
+    def get_preventive_remaining_visit_count(self, obj):
+        return self._preventive_progress(obj)['preventive_remaining_visit_count']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
@@ -182,6 +225,11 @@ class InterventionSerializer(LegacySerializer):
             else:
                 service_request.status = 'new'
             service_request.save(update_fields=['status', 'updated_at'])
+        # The detail queryset carries aggregate counts for efficient reads.
+        # A status/kind change invalidates those annotations before responding.
+        for name in ('_preventive_completed_visit_count', '_preventive_total_visit_count'):
+            instance.__dict__.pop(name, None)
+        self.context.get('_preventive_progress', {}).pop(service_request.pk, None)
         return instance
     @transaction.atomic
     def create(self, validated_data):

@@ -1,7 +1,7 @@
 import secrets
 
 from django.contrib.auth.models import AbstractUser, UserManager
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -16,12 +16,14 @@ class LegacyModel(models.Model):
 class Client(LegacyModel):
     name = models.CharField(max_length=200)
     contact_name = models.CharField(max_length=150, blank=True)
+    tax_id = models.CharField(max_length=80, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=40, blank=True)
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
-    country = models.CharField(max_length=80, default='France')
+    country = models.CharField(max_length=80, default='France', blank=True)
+    notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering = ['name', 'id']
@@ -137,6 +139,7 @@ class ServiceRequest(ReferencedModel):
     requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     assigned_technician = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='assigned_requests')
     due_on = models.DateField(null=True, blank=True)
+    planned_visit_count = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(1000)])
     arrived_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     client_reference = models.CharField(max_length=120, blank=True)
@@ -160,6 +163,7 @@ class ServiceRequest(ReferencedModel):
         constraints = [
             models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(status='closed'), name='request_closure_status_consistent'),
             models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(arrived_at__isnull=True) | models.Q(closed_at__gte=models.F('arrived_at')), name='request_arrival_before_closure'),
+            models.CheckConstraint(condition=models.Q(planned_visit_count__isnull=True) | models.Q(planned_visit_count__gte=1, planned_visit_count__lte=1000), name='request_planned_visits_range'),
         ]
     def __str__(self):
         return self.reference

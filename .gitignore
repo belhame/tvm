@@ -25,6 +25,12 @@ tests/browser/test-results/
 *.MMO
 *.zip
 legacy-exports/
+# Real client imports are delivered separately from the public source archive.
+private-imports/
+**/private-imports/
+clients_tvm*.[cC][sS][vV]
+*clients-reels*
+*clients_reels*
 # Uploaded catalogues stay private; only the fictional test workbook is public.
 *.[xX][lL][sS]
 *.[xX][lL][sS][xX]

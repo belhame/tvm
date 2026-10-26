@@ -34,6 +34,7 @@ class IntakeInputSerializer(serializers.Serializer):
     subject = serializers.CharField(max_length=200)
     description = serializers.CharField(max_length=20_000, required=False, allow_blank=True, default='')
     priority = serializers.ChoiceField(choices=ServiceRequest.Priority.choices, default=ServiceRequest.Priority.NORMAL)
+    planned_visit_count = serializers.IntegerField(min_value=1, max_value=1000, allow_null=True, required=False)
     equipment = serializers.IntegerField(min_value=1, max_value=MAX_ID, required=False, allow_null=True)
     client = serializers.IntegerField(min_value=1, max_value=MAX_ID, required=False, allow_null=True)
     profile = serializers.ChoiceField(choices=['Eaton', 'Pulsar', 'Powerware', 'NV DX'], required=False, allow_null=True)
@@ -63,6 +64,9 @@ class IntakeInputSerializer(serializers.Serializer):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
             raise ValidationError({'detail': 'Le formulaire contient un champ non pris en charge.'})
+        actor = self.context.get('actor')
+        if 'planned_visit_count' in attrs and actor and actor.effective_role not in ('admin', 'manager'):
+            raise ValidationError({'planned_visit_count': 'Le responsable définit le nombre de visites prévues.'})
         manual = bool(attrs.get('manual_model')) or any(
             attrs.get(field) is not None
             for field in ('manufactured_on_override', 'duration_months_override', 'warranty_start_override')
@@ -340,6 +344,7 @@ def _perform_intake(data, *, actor, fingerprint):
     saved = ServiceRequest.objects.create(
         equipment=equipment, subject=data['subject'], description=data['description'], priority=data['priority'],
         requested_by=actor, intake_key=data['request_key'],
+        planned_visit_count=data.get('planned_visit_count'),
         intake_data={'actor_id': actor.pk, 'payload_hash': fingerprint, 'input': _canonical_input(data), 'summary': summary},
         **{field: data[field] for field in FOLLOWUP_FIELD_NAMES if field in data},
     )
