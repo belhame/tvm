@@ -12,21 +12,33 @@ PRIVATE = {'internal_notes'}
 
 
 @receiver(pre_save, dispatch_uid='workflow_previous_values')
-def remember_previous(sender, instance, raw=False, **kwargs):
+def remember_previous(sender, instance, raw=False, update_fields=None, **kwargs):
     if raw or sender not in TRACKED_MODELS:
         return
     instance._operation_previous = sender.objects.filter(pk=instance.pk).values().first() if instance.pk else None
+    if sender is ServiceRequest:
+        previous = instance._operation_previous or {}
+        persisted_status = instance.status if update_fields is None or 'status' in update_fields else previous.get('status', instance.status)
+        if persisted_status == 'closed':
+            if previous.get('status') != 'closed':
+                from django.utils import timezone
+                instance.closed_at = timezone.now()
+            elif previous.get('closed_at') is not None:
+                instance.closed_at = previous['closed_at']
+        else:
+            instance.closed_at = None
 
 
 @receiver(post_save, dispatch_uid='workflow_record_future_change')
-def record_change(sender, instance, created, raw=False, **kwargs):
+def record_change(sender, instance, created, raw=False, update_fields=None, **kwargs):
     if raw or sender not in TRACKED_MODELS:
         return
     if getattr(instance, '_operation_manual_event', False):
         return
     old = getattr(instance, '_operation_previous', None) or {}
     changed = {field.name for field in instance._meta.concrete_fields
-               if field.name not in IGNORED and (created or old.get(field.attname) != getattr(instance, field.attname))}
+               if field.name not in IGNORED and (update_fields is None or field.name in update_fields or field.attname in update_fields)
+               and (created or old.get(field.attname) != getattr(instance, field.attname))}
     if not changed:
         return
     service_request = instance if sender is ServiceRequest else getattr(instance, 'service_request', None)
@@ -109,6 +121,9 @@ def record_change(sender, instance, created, raw=False, **kwargs):
                 details.append(f'Affectation : {assigned_name}.')
             if 'due_on' in changed:
                 details.append(f'Échéance : {old.get("due_on") or "non renseignée"} → {instance.due_on or "non renseignée"}.')
+            for field, title in [('arrived_at', 'Arrivée réelle'), ('closed_at', 'Clôture réelle')]:
+                if field in changed:
+                    details.append(f'{title} : {old.get(field) or "non renseignée"} → {getattr(instance, field) or "non renseignée"}.')
         summary = ' '.join([summary, *details])
         append_event(**common, kind=kind, status_before=old.get('status', ''),
                      status_after=getattr(instance, 'status', ''), observation=observation, summary=summary)

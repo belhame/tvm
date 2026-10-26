@@ -17,6 +17,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from .catalogue_models import CatalogueProduct, CatalogueWarranty
 from .catalogue_service import usable_code
 from .models import AuditLog, Client, Equipment, ServiceRequest, Warranty
+from .request_followup import FOLLOWUP_FIELD_NAMES, validate_followup
 
 
 MAX_ID = 9_223_372_036_854_775_807
@@ -44,6 +45,19 @@ class IntakeInputSerializer(serializers.Serializer):
     duration_months_override = serializers.IntegerField(min_value=0, max_value=1200, required=False, allow_null=True)
     warranty_start_override = serializers.DateField(required=False, allow_null=True)
     manual_reason = serializers.CharField(max_length=2000, required=False, allow_blank=True, default='')
+    arrived_at = serializers.DateTimeField(required=False, allow_null=True)
+    client_reference = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    end_customer = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    return_flag = serializers.BooleanField(required=False)
+    packaging = serializers.CharField(max_length=250, required=False, allow_blank=True)
+    service_location = serializers.ChoiceField(choices=ServiceRequest.ServiceLocation.choices, required=False)
+    delivered_by = serializers.ChoiceField(choices=ServiceRequest.DeliveredBy.choices, required=False)
+    courier_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    accessories = serializers.CharField(max_length=4000, required=False, allow_blank=True)
+    warranty_status = serializers.ChoiceField(choices=ServiceRequest.WarrantyStatus.choices, required=False)
+    contact_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    contact_phone = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    contact_email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         unknown = set(self.initial_data) - set(self.fields)
@@ -55,7 +69,7 @@ class IntakeInputSerializer(serializers.Serializer):
         )
         if manual and not attrs.get('manual_reason', '').strip():
             raise ValidationError({'manual_reason': 'Expliquez la correction ou la saisie manuelle avant de l’enregistrer.'})
-        return attrs
+        return validate_followup(attrs, user=self.context.get('actor'), initial_data=self.initial_data)
 
 
 @dataclass(frozen=True)
@@ -325,6 +339,7 @@ def _perform_intake(data, *, actor, fingerprint):
         equipment=equipment, subject=data['subject'], description=data['description'], priority=data['priority'],
         requested_by=actor, intake_key=data['request_key'],
         intake_data={'actor_id': actor.pk, 'payload_hash': fingerprint, 'input': _canonical_input(data), 'summary': summary},
+        **{field: data[field] for field in FOLLOWUP_FIELD_NAMES if field in data},
     )
     for resource, instance in [('equipment', equipment)] if creating_equipment else []:
         AuditLog.objects.create(actor=actor, action='create_intake', resource=resource, resource_id=str(instance.pk))
@@ -337,7 +352,7 @@ def _perform_intake(data, *, actor, fingerprint):
 def create_intake(payload, *, actor):
     if not actor or not getattr(actor, 'pk', None) or not actor.is_active or actor.effective_role not in ('admin', 'manager', 'technician'):
         raise PermissionDenied('Cette opération est réservée aux utilisateurs internes actifs.')
-    serializer = IntakeInputSerializer(data=payload)
+    serializer = IntakeInputSerializer(data=payload, context={'actor': actor})
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     fingerprint = _fingerprint(data)

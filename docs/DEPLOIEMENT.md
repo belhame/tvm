@@ -4,7 +4,7 @@
 
 Installer l'application une seule fois sur un serveur de l'entreprise ou un serveur hébergé. Les postes internes et les clients accèdent à cette même adresse avec leur navigateur. Ne pas installer une base séparée sur chaque ordinateur : cela empêcherait le partage des dossiers.
 
-Le dimensionnement livré utilise trois workers Gunicorn et PostgreSQL 16. Il constitue un point de départ pour cette petite équipe ; aucun test de charge de production ne doit être déduit du nombre de workers. Choisir le stockage, les sauvegardes et la mémoire selon les volumes réels, notamment les pièces jointes futures.
+Le dimensionnement livré utilise trois workers Gunicorn et PostgreSQL 16. Il constitue un point de départ pour cette petite équipe ; aucun test de charge de production ne doit être déduit du nombre de workers. Choisir le stockage, les sauvegardes et la mémoire selon les volumes réels, notamment les pièces jointes enregistrées.
 
 ## Créer une installation sans démo
 
@@ -38,6 +38,7 @@ Le fichier `.env` local est généré avec des secrets aléatoires et n'est pas 
 | `DJANGO_SSL_REDIRECT` | `1` pour forcer HTTPS une fois le proxy de confiance correctement configuré |
 | `DJANGO_DEBUG` | `0` sur le serveur partagé |
 | `TVM_TIMEZONE` | Fuseau métier IANA confirmé, par défaut `Africa/Lagos` |
+| `TVM_MEDIA_ROOT` | Stockage privé des pièces jointes ; conserver le chemin livré, ou adapter aussi les montages et sauvegardes si votre administrateur le modifie |
 | `TVM_DEMO_MODE` | `0` sur l'installation réelle |
 | `TVM_DEMO_PASSWORD` | Vide hors démonstration |
 
@@ -47,7 +48,7 @@ Changer une valeur d'environnement n'est pas une rotation automatique des identi
 
 Placer un reverse proxy avec certificat TLS devant le serveur web, sur un nom DNS contrôlé. Il transmet le nom d'hôte d'origine à Django et les requêtes au port web en boucle locale. Définir les hôtes et origines HTTPS exacts dans `.env`, puis activer les cookies sécurisés. Vérifier connexion, déconnexion, écriture et téléchargement PDF avec cette configuration.
 
-L'import du catalogue accepte un fichier XLS de 8 Mio au maximum. Le proxy doit laisser passer ce fichier et l'enveloppe multipart : par exemple `client_max_body_size 9m;` dans le contexte Nginx concerné. Vérifier un import de la taille du fichier réel fourni (environ 3,8 Mo) après déploiement ; un refus HTTP 413 du proxy intervient avant les contrôles de Django.
+L'import du catalogue accepte un fichier XLS de 8 Mio au maximum ; une pièce jointe de dossier peut atteindre 10 Mio. Le proxy doit laisser passer le fichier et l'enveloppe multipart : par exemple `client_max_body_size 11m;` dans le contexte Nginx concerné. Vérifier un import et un téléversement représentatifs après déploiement ; un refus HTTP 413 du proxy intervient avant les contrôles de Django.
 
 L'application ne fournit pas de certificat ni de nom de domaine. L'accès HTTPS est aussi nécessaire à la caméra d'un téléphone distant. Les options `DJANGO_TRUST_PROXY_HEADERS=1` et `DJANGO_SSL_REDIRECT=1` sont à activer après configuration du proxy : celui-ci doit écraser l'en-tête `X-Forwarded-Proto` et empêcher l'accès direct au backend depuis les clients. Vérifier la redirection et l'absence de boucle avant ouverture. HSTS et la politique de certificat restent à définir dans l'infrastructure retenue ; ne pas supposer leur activation par le seul lancement de Gunicorn.
 
@@ -82,19 +83,48 @@ bash scripts/backup.sh
 
 La commande crée un dump PostgreSQL au format personnalisé dans `.local/backups/`, avec des permissions restrictives, puis vérifie que `pg_restore` peut lire son catalogue. Ce contrôle de lisibilité ne remplace pas un essai de restauration.
 
-Planifier les sauvegardes selon la perte de données acceptable et conserver une copie chiffrée hors du serveur. Sauvegarder aussi la configuration nécessaire au redémarrage via un canal sécurisé. Les pièces jointes ajoutées ultérieurement devront faire partie de cette politique.
+Elle produit un ensemble portant le même préfixe `tvm-<horodatage UTC>-<suffixe>` :
+
+| Fichier | Contenu |
+|---|---|
+| `.dump` | Base PostgreSQL |
+| `-media.tar.gz` | Volume Docker média, s'il existe |
+| `-media-host.tar.gz` | Dossier `backend/media/` du mode hors conteneur, s'il existe |
+| `.env` | Copie de la configuration locale, si elle existe |
+| `.sha256` | Empreintes des fichiers de cet ensemble |
+
+Le script vérifie la lecture du dump, le catalogue des archives média et les empreintes. Il arrête brièvement le service web Compose s'il était actif et le relance à la fin, y compris après une erreur. **Un serveur Gunicorn lancé hors Docker doit être arrêté avant la commande**, ainsi que toute autre source d'écriture ; le script ne peut pas arrêter ces processus à votre place. PostgreSQL doit être démarré.
+
+Conserver les fichiers de même préfixe ensemble. Ne pas remplacer seulement `.env` avec une configuration provenant d'une autre base : les accès et fichiers doivent correspondre à la même installation sauvegardée. Le fichier `.env` copié et le contenu métier sont privés.
+
+Planifier les sauvegardes selon la perte de données acceptable et conserver une copie chiffrée hors du serveur. Sauvegarder aussi la configuration nécessaire au redémarrage via un canal sécurisé. **La base et les pièces jointes doivent être sauvegardées de façon cohérente** : un dump seul ne contient pas les fichiers média.
+
+En mode Docker, les fichiers sont dans `tvm-powercare_tvm_media`, monté sur `/app/backend/media` ; PostgreSQL utilise `tvm-powercare_tvm_postgres`. Hors conteneur, le stockage média par défaut est `backend/media/`. Suspendre les écritures pendant la capture coordonnée de la base et des fichiers. À la restauration, utiliser le même ensemble de sauvegarde, conserver les chemins attendus et attribuer les fichiers à l'UID `10001` du service web conteneurisé.
 
 ## Tester une restauration sans remplacer la base active
 
-Utiliser d'abord une base distincte sur une machine de test ou le PostgreSQL de développement. Les commandes suivantes supposent le nom de base temporaire `tvm_restore_check`, encore inexistant, et un dump choisi explicitement :
+Utiliser d'abord une base **et un volume média neufs**, sur une machine de test ou le PostgreSQL de développement. Les commandes suivantes supposent que `tvm_restore_check` et `tvm_media_restore_check` n'existent pas. Choisir explicitement un ensemble créé par le script et remplacer le préfixe d'exemple :
 
 ```bash
+set -e
+tvm_restore_prefix='.local/backups/tvm-REMPLACER_PAR_LE_PREFIXE_REEL'
+sha256sum --check "$tvm_restore_prefix.sha256"
+if docker volume inspect tvm_media_restore_check > /dev/null 2>&1; then
+  printf 'Ce volume de test existe déjà : choisir un nom neuf avant de poursuivre.\n' >&2
+  exit 1
+fi
 docker compose exec -T db sh -c 'createdb -U "$POSTGRES_USER" tvm_restore_check'
-docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" --exit-on-error --no-owner -d tvm_restore_check' < .local/backups/NOM_DU_DUMP.dump
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" --exit-on-error --no-owner -d tvm_restore_check' < "$tvm_restore_prefix.dump"
 docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d tvm_restore_check -c "SELECT COUNT(*) FROM core_client;"'
+if [[ -f "$tvm_restore_prefix-media.tar.gz" ]]; then
+  docker volume create tvm_media_restore_check
+  docker run --rm -i --mount type=volume,src=tvm_media_restore_check,dst=/restore postgres:16-alpine sh -c 'cd /restore && tar -xzf - && chown -R 10001:10001 /restore' < "$tvm_restore_prefix-media.tar.gz"
+fi
 ```
 
-Vérifier aussi les relations, le nombre de dossiers et un parcours dans une instance web de test configurée sur cette base. Ces commandes ne redirigent pas l'application active vers la copie. Ne supprimer une base de test qu'après avoir vérifié son nom et conservé les résultats utiles. Une restauration de production demande une fenêtre de maintenance et un plan de retour séparés.
+La restauration du volume média ne s'effectue que si cet ensemble contient un fichier `-media.tar.gz`. En mode hors conteneur, restaurer l'archive `-media-host.tar.gz` dans un dossier de test distinct, sans écraser le dossier actif.
+
+Vérifier les relations, le nombre de dossiers et les téléchargements d'un échantillon de pièces jointes depuis une instance web de test configurée sur **cette base et ce volume de test**. Vérifier aussi les refus d'accès client. Les commandes ci-dessus ne redirigent pas l'application active vers la copie. Ne supprimer une base ou un volume de test qu'après avoir vérifié son nom et conservé les résultats utiles. Une restauration de production demande une fenêtre de maintenance et un plan de retour séparés ; aucune commande de remplacement destructif de la base active n'est fournie ici.
 
 ## Vérifications avant ouverture aux utilisateurs
 

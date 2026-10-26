@@ -64,6 +64,8 @@ const kindLabels: Record<string, string> = {
   delivery_created: "Bon de livraison créé",
   delivery_updated: "Bon de livraison mis à jour",
   part_used: "Pièce utilisée",
+  attachment_added: "Pièce jointe ajoutée",
+  attachment_deleted: "Pièce jointe supprimée",
   observation: "Observation",
   summary: "Synthèse",
 };

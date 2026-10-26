@@ -4,6 +4,8 @@ Application de gestion du SAV des onduleurs : **React / TypeScript**, API **Djan
 
 Le premier parcours fonctionnel est **client → onduleur / numéro de série → demande SAV → intervention → rapport PDF**. L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.
 
+Le compteur de prise en charge utilise la date d’arrivée réelle et passe en retard après deux jours ouvrés, samedi et dimanche exclus. Il se fige à la clôture. Les fiches de réception, les pièces jointes privées ou explicitement partagées et les PDF reprennent les dossiers enregistrés.
+
 Le suivi SAV ajoute des catégories de demandes avec compteurs, des fiches d'échange, de mise en service et de prévention, ainsi qu'une chronologie des événements enregistrés. [Le guide de suivi](docs/GUIDE_SUIVI_SAV.md) distingue cet historique web de l'ancien journal HFSQL, qui n'est pas repris automatiquement.
 
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
@@ -48,11 +50,12 @@ Les comptes fictifs sont `admin`, `responsable`, `technicien` et `client`. Leur 
 | Importer le catalogue Eaton BN dans sa propre instance TVM | [Import du catalogue Eaton](docs/IMPORT_CATALOGUE_EATON.md) |
 | Retrouver modèle et garantie depuis la série pendant une nouvelle demande | [Parcours de demande SAV par numéro de série](docs/PARCOURS_DEMANDE_SERIE.md) |
 | Suivre les dossiers, opérations et événements enregistrés | [Guide du suivi SAV et de l'historique](docs/GUIDE_SUIVI_SAV.md) |
+| Voir deux fiches PDF entièrement fictives | [Exemples de fiches](docs/exemples/README.md) |
 | Contrat HTTP des ressources | [API](docs/API_CONTRACT.md) |
 | Résultats des tests et limites vérifiées | [Validation](docs/VALIDATION.md) |
 | Exécuter les contrôles backend et la compilation frontend | `bash scripts/test.sh` |
 | Tester le parcours dans Chromium sur une base distincte | `bash scripts/e2e.sh` |
-| Sauvegarder PostgreSQL | `bash scripts/backup.sh` |
+| Sauvegarder PostgreSQL, les pièces jointes et la configuration | `bash scripts/backup.sh` |
 
 ## Installation sans données fictives
 

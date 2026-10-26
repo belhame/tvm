@@ -49,11 +49,11 @@ test('les sous-catégories et la recherche retrouvent les états réels, y compr
   const states = ['new', 'maintenance', 'testing', 'resolved', 'quotation', 'pending', 'approved', 'rejected', 'exchange', 'closed', 'scheduled', 'in_progress'];
   const records = [];
   for (const status of states) records.push(await api(page, 'requests/', 'POST', {
-    equipment: equipment.id, subject: `${marker} ${status}`, status, due_on: yesterday.toISOString().slice(0, 10),
+    equipment: equipment.id, subject: `${marker} ${status}`, status, arrived_at: new Date(Date.now() - 7 * 86400_000).toISOString(), due_on: yesterday.toISOString().slice(0, 10),
   }));
   const mapping = {
     unassigned: ['new'], maintenance: ['maintenance', 'in_progress'], testing: ['testing'],
-    overdue: states.filter(status => !['resolved', 'rejected', 'closed'].includes(status)),
+    overdue: states.filter(status => status !== 'closed'),
     processed: ['resolved'], quotation: ['quotation'], pending: ['pending', 'scheduled'],
     approved: ['approved'], rejected: ['rejected'], exchange: ['exchange'], closed: ['closed'], all: states,
   };

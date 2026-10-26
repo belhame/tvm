@@ -1,9 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
 from threading import Barrier
 from types import SimpleNamespace
 from unittest import skipUnless
+from unittest.mock import patch
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
@@ -122,21 +123,25 @@ class RequestOperationTests(TestCase):
         self.assertEqual(self.api.post(f'/api/equipment/{self.equipment.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed'}, format='json').status_code, 400)
 
     def test_categories_legacy_aliases_overdue_and_client_counts(self):
-        yesterday = timezone.localdate() - timedelta(days=1)
+        now = datetime(2026, 10, 27, 9, 1, tzinfo=datetime_timezone.utc)
+        arrival = datetime(2026, 10, 23, 9, tzinfo=datetime_timezone.utc)
+        yesterday = now.date() - timedelta(days=1)
         states = ['maintenance', 'in_progress', 'testing', 'scheduled', 'pending', 'quotation', 'approved', 'rejected', 'exchange', 'resolved', 'closed']
         for state in states:
-            ServiceRequest.objects.create(equipment=self.equipment, subject=f'Fictif {state}', status=state, due_on=yesterday)
-        counts = {item['key']: item['count'] for item in self.api.get('/api/requests/categories/').data['categories']}
-        self.assertEqual(counts['maintenance'], 2)
-        self.assertEqual(counts['pending'], 2)
-        self.assertEqual(counts['overdue'], 8)
-        self.assertEqual(len(self.api.get('/api/requests/?category=overdue').data), 8)
-        self.assertEqual(self.api.get('/api/requests/?category=invalid').status_code, 400)
-        self.api.force_authenticate(self.customer)
-        response = self.api.get('/api/requests/categories/')
-        self.assertEqual(response.data['total'], 12)
-        self.assertEqual(len(self.api.get('/api/requests/?category=all').data), 12)
-        self.assertEqual(len(self.api.get('/api/requests/?q=OTHER-SECRET').data), 0)
+            with patch('django.utils.timezone.now', return_value=now):
+                ServiceRequest.objects.create(equipment=self.equipment, subject=f'Fictif {state}', status=state, due_on=yesterday, arrived_at=arrival)
+        with patch('django.utils.timezone.now', return_value=now):
+            counts = {item['key']: item['count'] for item in self.api.get('/api/requests/categories/').data['categories']}
+            self.assertEqual(counts['maintenance'], 2)
+            self.assertEqual(counts['pending'], 2)
+            self.assertEqual(counts['overdue'], 10)  # Resolved/rejected remain received until explicit closure.
+            self.assertEqual(len(self.api.get('/api/requests/?category=overdue').data), 10)
+            self.assertEqual(self.api.get('/api/requests/?category=invalid').status_code, 400)
+            self.api.force_authenticate(self.customer)
+            response = self.api.get('/api/requests/categories/')
+            self.assertEqual(response.data['total'], 12)
+            self.assertEqual(len(self.api.get('/api/requests/?category=all').data), 12)
+            self.assertEqual(len(self.api.get('/api/requests/?q=OTHER-SECRET').data), 0)
 
     def test_new_status_assignment_consistency_on_both_write_routes(self):
         response = self.api.patch(f'/api/requests/{self.request.pk}/', {'assigned_technician': self.tech.pk}, format='json')

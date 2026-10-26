@@ -6,7 +6,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import AuditLog, Client, Contract, DeliveryLine, DeliveryNote, Equipment, Intervention, Part, ServiceRequest, StockMovement, Warranty
-from .workflow import is_overdue, request_category, technician_can_write
+from .workflow import is_due_overdue, request_category, technician_can_write
+from .request_timing import request_timing
+from .request_followup import FOLLOWUP_FIELD_NAMES, validate_followup
 
 User = get_user_model()
 
@@ -59,9 +61,12 @@ class ServiceRequestSerializer(LegacySerializer):
     assigned_technician_name = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
+    is_due_overdue = serializers.SerializerMethodField()
+    timing = serializers.SerializerMethodField()
+    accessories = serializers.CharField(max_length=4000, allow_blank=True, required=False)
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data']
+        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -80,16 +85,28 @@ class ServiceRequestSerializer(LegacySerializer):
         state = attrs.get('status', getattr(self.instance, 'status', 'new'))
         if assigned is not None and state == 'new':
             raise serializers.ValidationError({'status': 'Un dossier affecté doit quitter l’état Non affecté. Choisissez par exemple En attente.'})
-        return attrs
+        return validate_followup(attrs, instance=self.instance, user=user, initial_data=self.initial_data)
     def get_assigned_technician_name(self, obj):
         return (obj.assigned_technician.get_full_name() or obj.assigned_technician.username) if obj.assigned_technician else 'Non affecté'
     def get_category(self, obj):
         return request_category(obj)
     def get_is_overdue(self, obj):
-        return is_overdue(obj)
+        timing = self.get_timing(obj)
+        return timing['timer_state'] == 'running' and timing['is_overdue_48h']
+    def get_is_due_overdue(self, obj):
+        return is_due_overdue(obj)
+    def get_timing(self, obj):
+        cache = self.context.setdefault('_request_timing', {})
+        now = self.context.setdefault('_request_timing_now', timezone.now())
+        key = (obj.pk, obj.arrived_at, obj.closed_at, obj.status)
+        if key not in cache:
+            cache[key] = request_timing(obj.arrived_at, obj.closed_at, obj.status, now=now)
+        return cache[key]
     @transaction.atomic
     def update(self, instance, validated_data):
         instance = ServiceRequest.objects.select_for_update().get(pk=instance.pk)
+        self.instance = instance
+        validated_data = self.validate(validated_data)
         return super().update(instance, validated_data)
 
 

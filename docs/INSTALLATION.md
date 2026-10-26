@@ -55,7 +55,15 @@ Pour arrêter Gunicorn, utiliser `Ctrl+C` dans son terminal. PostgreSQL peut res
 docker compose stop
 ```
 
-Les données sont dans le volume Docker `tvm_postgres` du projet Compose. Ne pas supprimer ce volume pour « redémarrer » l'application. Ne pas utiliser `docker compose down -v` sur une installation contenant des données à conserver.
+Les données relationnelles sont dans le volume Docker `tvm_postgres` du projet Compose. Les pièces jointes du service web conteneurisé sont dans le volume persistant `tvm_media`, monté sur `/app/backend/media`. Ne pas supprimer ces volumes pour « redémarrer » l'application. Ne pas utiliser `docker compose down -v` sur une installation contenant des données à conserver.
+
+## Fichiers privés et sauvegardes
+
+Les pièces jointes sont conservées côté serveur, séparément des sources et des fichiers statiques de l'interface. Hors conteneur, le stockage par défaut est `backend/media/` ; dans le mode Docker livré, il utilise le volume média. Le téléchargement passe par l'API authentifiée, pas par une publication du dossier média sur le Web.
+
+Avec le nom de projet Compose livré, les volumes sont `tvm-powercare_tvm_postgres` et `tvm-powercare_tvm_media`. Le service web utilise l'UID `10001` ; les fichiers restaurés doivent rester lisibles par cet utilisateur. Conserver les noms et montages de l'installation existante lors d'une mise à jour.
+
+Une sauvegarde exploitable doit réunir **la base PostgreSQL et les fichiers média d'un même état**, ainsi que la configuration locale conservée de façon sécurisée. Prévoir cette sauvegarde avant d'appliquer des migrations ou de déplacer une installation. Copier le dépôt ou `.local` ne sauvegarde pas à lui seul les volumes Docker. Voir [la sauvegarde et la restauration](DEPLOIEMENT.md#sauvegarder).
 
 ## Tester le parcours métier
 
@@ -64,6 +72,8 @@ Avec le compte administrateur ou responsable, créer un client puis un équipeme
 Ouvrir un deuxième navigateur ou une fenêtre privée et se connecter au portail client. Le dossier du client doit être visible, les dossiers des autres sociétés et les notes internes doivent rester inaccessibles. Les modifications sont lues depuis la même base serveur ; changer d'ordinateur ne crée pas une base locale distincte.
 
 Le rapport PDF est un document généré depuis le dossier actuel. Sa disponibilité ne signifie ni signature du client, ni envoi automatique, ni archivage d'une version immuable.
+
+Renseigner une arrivée réelle et vérifier le compteur de jours ouvrés ; une ancienne fiche sans arrivée doit rester inconnue. Ajouter ensuite une pièce jointe interne et une autre explicitement partagée. Depuis la session client, vérifier que seule la pièce partagée de sa société est consultable et que le téléchargement d'un document tiers est refusé. La fiche PDF de suivi et le rapport d'intervention doivent utiliser les données du dossier sans notes internes.
 
 ## Contrôles automatisés
 

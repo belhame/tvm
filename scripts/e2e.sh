@@ -8,6 +8,7 @@ source .env
 set +a
 export npm_config_cache="$task_root/.local/npm-cache"
 export TVM_DEMO_MODE=1
+export TVM_MEDIA_ROOT="$task_root/.local/e2e-media"
 TVM_DEMO_PASSWORD="$("$task_root/.venv/bin/python" - <<'PY'
 import os, secrets
 from pathlib import Path

@@ -88,6 +88,21 @@ class ReferencedModel(LegacyModel):
 
 
 class ServiceRequest(ReferencedModel):
+    class ServiceLocation(models.TextChoices):
+        UNKNOWN = '', 'Non renseigné'
+        WORKSHOP = 'workshop', 'Atelier'
+        DEPOT = 'depot', 'Dépôt'
+        ONSITE = 'onsite', 'Sur site'
+    class DeliveredBy(models.TextChoices):
+        UNKNOWN = '', 'Non renseigné'
+        COURIER = 'courier', 'Transporteur'
+        CLIENT = 'client', 'Client'
+    class WarrantyStatus(models.TextChoices):
+        UNSPECIFIED = 'unspecified', 'À vérifier'
+        WARRANTY = 'warranty', 'Garantie'
+        QUOTATION = 'quotation', 'Devis'
+        CONTRACT = 'contract', 'Contrat'
+        BILLABLE = 'billable', 'Hors garantie / facturable'
     class Priority(models.TextChoices):
         LOW = 'low', 'Basse'
         NORMAL = 'normal', 'Normale'
@@ -115,14 +130,38 @@ class ServiceRequest(ReferencedModel):
     requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     assigned_technician = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='assigned_requests')
     due_on = models.DateField(null=True, blank=True)
+    arrived_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    client_reference = models.CharField(max_length=120, blank=True)
+    end_customer = models.CharField(max_length=200, blank=True)
+    return_flag = models.BooleanField(default=False)
+    packaging = models.CharField(max_length=250, blank=True)
+    service_location = models.CharField(max_length=20, choices=ServiceLocation.choices, default='', blank=True)
+    delivered_by = models.CharField(max_length=20, choices=DeliveredBy.choices, default='', blank=True)
+    courier_name = models.CharField(max_length=150, blank=True)
+    accessories = models.TextField(blank=True)
+    warranty_status = models.CharField(max_length=20, choices=WarrantyStatus.choices, default=WarrantyStatus.UNSPECIFIED)
+    contact_name = models.CharField(max_length=150, blank=True)
+    contact_phone = models.CharField(max_length=40, blank=True)
+    contact_email = models.EmailField(blank=True)
     intake_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     intake_data = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
         ordering = ['-created_at', '-id']
+        constraints = [
+            models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(status='closed'), name='request_closure_status_consistent'),
+            models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(arrived_at__isnull=True) | models.Q(closed_at__gte=models.F('arrived_at')), name='request_arrival_before_closure'),
+        ]
     def __str__(self):
         return self.reference
+    def save(self, *args, **kwargs):
+        # The pre-save lifecycle handler must persist its closure timestamp even
+        # when a status-only workflow update supplies update_fields.
+        if kwargs.get('update_fields'):
+            kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
+        return super().save(*args, **kwargs)
 
 
 class Intervention(ReferencedModel):
@@ -308,3 +347,4 @@ class DemoInitialization(models.Model):
 # Keep catalogue models separately while registering them with the core app.
 from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueState, CatalogueWarranty  # noqa: E402,F401
 from .workflow_models import OperationEvent  # noqa: E402,F401
+from .attachment_models import RequestAttachment  # noqa: E402,F401

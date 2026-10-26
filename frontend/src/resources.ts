@@ -12,7 +12,99 @@ export type Field = {
   help?: string;
   default?: any;
   when?: { field: string; value: string };
+  section?: "reception";
 };
+export const requestReceptionFields: Field[] = [
+  {
+    name: "arrived_at",
+    label: "Date d’arrivée",
+    type: "datetime-local",
+    section: "reception",
+  },
+  {
+    name: "closed_at",
+    label: "Date de clôture",
+    type: "datetime-local",
+    section: "reception",
+  },
+  {
+    name: "client_reference",
+    label: "N° d’appel client / référence client",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "end_customer",
+    label: "Client final",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "return_flag",
+    label: "Retour de matériel",
+    type: "select",
+    options: [
+      ["false", "Non"],
+      ["true", "Oui"],
+    ],
+    section: "reception",
+    default: false,
+  },
+  {
+    name: "packaging",
+    label: "Emballage reçu",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "service_location",
+    label: "Lieu de prise en charge",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "delivered_by",
+    label: "Matériel livré par",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "courier_name",
+    label: "Nom du livreur",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "accessories",
+    label: "Accessoires reçus",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "warranty_status",
+    label: "Situation de garantie du dossier",
+    section: "reception",
+    default: "unspecified",
+  },
+  {
+    name: "contact_name",
+    label: "Nom du contact",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "contact_phone",
+    label: "Téléphone du contact",
+    section: "reception",
+    default: "",
+  },
+  {
+    name: "contact_email",
+    label: "E-mail du contact",
+    section: "reception",
+    default: "",
+  },
+];
 export type Column = {
   key: string;
   label: string;
@@ -260,6 +352,7 @@ export const resources: Record<string, Resource> = {
         help: "Lors d’une affectation, choisissez explicitement un état En attente, En entretien ou En test ; Non affecté ne peut pas conserver un technicien.",
       },
       { name: "due_on", label: "Échéance de traitement", type: "date" },
+      ...requestReceptionFields,
     ],
   },
   interventions: {

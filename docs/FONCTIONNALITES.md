@@ -15,10 +15,12 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
 | Demande à partir d'une série | Recherche interne du modèle et de la garantie, puis création transactionnelle de la demande et, si nécessaire, de l'équipement et de sa garantie | Création d'équipement administrateur/responsable ; données existantes prioritaires ; cas ambigus ou dates imprécises à compléter explicitement |
 | Suivi et classement SAV | Vues par type d'opération et état, avec compteurs calculés depuis les dossiers accessibles | Les états web ne constituent pas une conversion automatique de tous les anciens codes WINDEV |
+| Arrivée et durée de suivi | Arrivée explicite, jours cumulés du lundi au vendredi, alerte après 48 heures et compteur figé à la clôture | Samedi/dimanche exclus ; ni calendrier de jours fériés ni plages d'heures de bureau ; arrivée ancienne inconnue conservée comme telle |
 | Historique métier | Suivi des événements réellement enregistrés autour des demandes et des équipements, avec observations et synthèse du dossier | État de référence des anciennes fiches distinct d'un changement utilisateur ; aucun ancien journal HFSQL importé automatiquement |
 | Interventions | Affectation, dates, durée, diagnostic, travaux, recommandations, état et fiches de maintenance, échange, mise en service ou préventive | Cases et conclusions déclaratives ; aucun mouvement de stock, décision de garantie ou facturation déclenchés par une case |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
-| Rapports | Téléchargement PDF par intervention, soumis aux mêmes droits que le dossier | Pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
+| Rapports | Rapport PDF d'intervention structuré d'après le modèle fourni et fiche PDF de suivi du dossier, soumis aux droits d'accès | Documents générés depuis la base ; pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
+| Pièces jointes SAV | Fichiers privés côté serveur, liés aux dossiers et partagés au client uniquement de façon explicite | Formats autorisés et limite de taille ; contrôle de format, sans prétendre fournir un antivirus |
 | Contrats | Fiche de contrat liée au client et éventuellement à un équipement, dates et couverture | Pas de facturation ni de génération automatique d'échéanciers |
 | Garanties | Périodes et conditions par équipement ; nouveau parcours appliquant le début de garantie à fabrication + six mois calendaires lorsque la date est connue | La prise en charge reste à valider ; aucune garantie existante écrasée et aucun contrôle direct via une API Eaton |
 | Pièces et stock | Catalogue, seuils et mouvements d'entrée/sortie ; contrôle du stock négatif ; rattachement possible à une intervention | Module nouveau : aucune table de stock n'a été identifiée avec certitude dans l'archive WINDEV |
@@ -42,7 +44,7 @@ Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, �
 
 ## Catégories et historique SAV
 
-Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés ou clôturés. **En retard** est calculé depuis l'échéance et peut recouper un autre état. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
+Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés ou clôturés. Le dépassement en cours est calculé depuis l'arrivée au-delà de **48 heures cumulées du lundi au vendredi** et peut recouper un autre état. L'échéance manuelle reste distincte. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
 
 La chronologie d'une demande ou d'un onduleur expose les événements enregistrés, leur date et leur auteur, les changements d'état, les observations et les synthèses ajoutées. Les notes sont internes par défaut ; le portail client ne voit que les événements publics de ses propres dossiers. Une synthèse est un événement conservé, pas une réponse de l'assistant IA.
 

@@ -9,6 +9,8 @@
 **/*.tsbuildinfo
 frontend/dist
 backend/staticfiles
+backend/media
+**/privateuploads
 docs
 legacy-exports
 *.zip

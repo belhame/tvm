@@ -339,7 +339,7 @@ test('nouvelle demande depuis une série : modèle court, garantie plus six mois
   await expect(dialog).toContainText('04/06/2026');
   expect(await api(page, `equipment/?serial=${serial}`)).toEqual([]);
   const clients = await api(page, 'clients/');
-  await dialog.getByLabel(/^Client\s/).selectOption(String(clients[0].id));
+  await dialog.getByRole('combobox', { name: /^Client\s/ }).selectOption(String(clients[0].id));
   const subject = `Série complète ${Date.now()}`;
   await dialog.getByLabel(/Objet du signalement/).fill(subject);
   await dialog.getByLabel(/Description de la panne/).fill('Alarme de test du parcours numéro de série et garantie.');

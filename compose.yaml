@@ -23,8 +23,11 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tvm}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tvm}
+      TVM_MEDIA_ROOT: /app/backend/media
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - tvm_media:/app/backend/media
     depends_on:
       db:
         condition: service_healthy
@@ -47,3 +50,4 @@ services:
     command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --no-control-socket --bind 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile -"]
 volumes:
   tvm_postgres:
+  tvm_media:

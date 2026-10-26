@@ -183,7 +183,7 @@ class ServiceRequestViewSet(BusinessViewSet):
             raise ValidationError({'category': 'Sous-catégorie inconnue.'})
         if getattr(self, 'action', '') != 'categories':
             if category == 'overdue':
-                qs = qs.filter(overdue_filter())
+                qs = qs.filter(overdue_filter(qs))
             elif category != 'all':
                 states = next(item[2] for item in CATEGORIES if item[0] == category)
                 qs = qs.filter(status__in=states)
@@ -199,12 +199,21 @@ class ServiceRequestViewSet(BusinessViewSet):
         total = sum(counts.values())
         items = []
         for key, label, states in CATEGORIES:
-            count = total if key == 'all' else (qs.filter(overdue_filter()).count() if key == 'overdue' else sum(counts.get(state, 0) for state in states))
+            count = total if key == 'all' else (qs.filter(overdue_filter(qs)).count() if key == 'overdue' else sum(counts.get(state, 0) for state in states))
             items.append({'key': key, 'label': label, 'count': count})
         return Response({'categories': items, 'total': total, 'as_of': timezone.localdate().isoformat()})
     @action(detail=True, methods=['get', 'post'], permission_classes=[IsAuthenticated])
     def timeline(self, request, pk=None):
         return timeline_response(request, service_request=self.get_object())
+    @action(detail=True, methods=['get'])
+    def report(self, request, pk=None):
+        from .pdf import service_request_report
+        instance = self.get_object()
+        response = HttpResponse(service_request_report(instance), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Rapport-suivi-{instance.reference}.pdf"'
+        response['Cache-Control'] = 'private, no-store'
+        self.audit(instance, 'download_report')
+        return response
 
 
 class InterventionViewSet(BusinessViewSet):

@@ -15,7 +15,7 @@ RUN --mount=type=secret,id=build_ca \
 COPY backend/ ./backend/
 COPY scripts/check_database_connection.py ./scripts/check_database_connection.py
 COPY --from=frontend /build/frontend/dist ./frontend/dist/
-RUN useradd --create-home --uid 10001 tvm && chown -R tvm:tvm /app
+RUN useradd --create-home --uid 10001 tvm && mkdir -p /app/backend/media && chown -R tvm:tvm /app && chmod 0700 /app/backend/media
 USER tvm
 WORKDIR /app/backend
 EXPOSE 8000

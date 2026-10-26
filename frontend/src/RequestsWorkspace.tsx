@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   ChevronRight,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import { requestCategories, requestStatusLabels, statuses } from "./resources";
+import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 
 export type RequestCategoryCount = {
   key: string;
@@ -56,6 +57,9 @@ export default function RequestsWorkspace({
   const [error, setError] = useState("");
   const [countsError, setCountsError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [timingRefresh, setTimingRefresh] = useState(0);
+  const currentScope = useRef(JSON.stringify([category, submittedSearch]));
+  useServerTimingRefresh(() => setTimingRefresh((value) => value + 1));
 
   useEffect(() => {
     setSearch(initialSearch);
@@ -78,7 +82,7 @@ export default function RequestsWorkspace({
         if (!controller.signal.aborted) setCountsError(failure.message);
       });
     return () => controller.abort();
-  }, [refreshKey, onCountsChange, retry]);
+  }, [refreshKey, onCountsChange, retry, timingRefresh]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,7 +90,11 @@ export default function RequestsWorkspace({
     if (submittedSearch.trim()) parameters.set("q", submittedSearch.trim());
     setLoading(true);
     setError("");
-    setRows([]);
+    const scope = JSON.stringify([category, submittedSearch]);
+    if (scope !== currentScope.current) {
+      currentScope.current = scope;
+      setRows([]);
+    }
     api(`requests/?${parameters}`, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted) setRows(listResult(result));
@@ -98,7 +106,7 @@ export default function RequestsWorkspace({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [category, submittedSearch, refreshKey, retry]);
+  }, [category, submittedSearch, refreshKey, retry, timingRefresh]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -195,7 +203,7 @@ export default function RequestsWorkspace({
             </button>
           </div>
         )}
-        {loading ? (
+        {loading && !rows.length ? (
           <div className="loading-state">
             <LoaderCircle size={18} className="spin" />
             Chargement des demandes…
@@ -208,6 +216,8 @@ export default function RequestsWorkspace({
                   <th>N° de dossier / objet</th>
                   <th>Client</th>
                   <th>Équipement</th>
+                  <th>Date d’arrivée</th>
+                  <th>Nbr de jours ouvrés</th>
                   <th>État</th>
                   <th>Affectation</th>
                   <th>Échéance</th>
@@ -240,6 +250,14 @@ export default function RequestsWorkspace({
                       </div>
                     </td>
                     <td>
+                      {row.arrived_at
+                        ? dateFR(row.arrived_at, true)
+                        : "Non renseignée"}
+                    </td>
+                    <td>
+                      <RequestTimer timing={row.timing} compact />
+                    </td>
+                    <td>
                       <span className={`badge status-${row.status}`}>
                         <span className="badge-dot" />
                         {requestStatusLabels[row.status] || row.status}
@@ -248,12 +266,14 @@ export default function RequestsWorkspace({
                     <td>{row.assigned_technician_name || "Non affecté"}</td>
                     <td>
                       <span
-                        className={`request-deadline ${row.is_overdue ? "request-overdue" : ""}`}
+                        className={`request-deadline ${row.is_due_overdue ? "request-overdue" : ""}`}
                       >
-                        {row.is_overdue && <Clock3 size={13} />}
+                        {row.is_due_overdue && <Clock3 size={13} />}
                         {day(row.due_on)}
                       </span>
-                      {row.is_overdue && <small>En dépassement délai</small>}
+                      {row.is_due_overdue && (
+                        <small>En dépassement délai</small>
+                      )}
                     </td>
                     <td>
                       <span className={`badge status-${row.priority}`}>

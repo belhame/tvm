@@ -6,6 +6,7 @@ from core import views
 from core import catalogue_views
 from core import intake_views
 from core.serial_lookup_views import serial_lookup_view
+from core import attachment_views
 
 router = DefaultRouter()
 router.register('clients', views.ClientViewSet, basename='client')
@@ -31,6 +32,9 @@ urlpatterns = [
     path('api/catalogue/warranties/', catalogue_views.catalogue_warranties),
     path('api/catalogue/import/', catalogue_views.catalogue_import),
     path('api/requests/intake/', intake_views.request_intake),
+    path('api/requests/<int:request_id>/documents/', attachment_views.request_documents),
+    path('api/documents/<int:document_id>/download/', attachment_views.document_download),
+    path('api/documents/<int:document_id>/', attachment_views.document_delete),
     path('api/', include(router.urls)),
     re_path(r'^api(?:/.*)?$', views.api_not_found),
     re_path(r'^(?P<path>.*)$', views.spa_view),

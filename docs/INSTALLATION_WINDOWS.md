@@ -67,7 +67,14 @@ Les scripts laissent leur fenêtre ouverte jusqu’à l’appui sur une touche, 
 
 ## Mettre à jour l’application sans perdre la configuration
 
-Le plus simple est de conserver le dossier TVM qui fonctionnait déjà. Arrêtez l’application avec `ARRETER_TVM.cmd`, puis remplacez ses fichiers sources par ceux de la nouvelle archive. **Conservez son fichier `.env`, son dossier `.local` et les données Docker.** Relancez ensuite `INSTALLER_TVM.cmd` depuis ce dossier pour reconstruire et démarrer l’application.
+Le plus simple est de conserver le dossier TVM qui fonctionnait déjà. Avant de remplacer les sources :
+
+1. Arrêtez l’application avec `ARRETER_TVM.cmd`.
+2. Sauvegardez ensemble **la base, les pièces jointes déjà présentes et la configuration locale**, selon [la procédure ci-dessous](#sauvegarder-la-base-et-les-pièces-jointes-sur-windows).
+3. Remplacez les fichiers sources par ceux de la nouvelle archive en conservant **`.env`, `.local` et les données Docker**.
+4. Relancez `INSTALLER_TVM.cmd` depuis ce même dossier pour reconstruire et démarrer l’application avec ses migrations.
+
+Les fichiers joints utilisent le volume Docker persistant `tvm-powercare_tvm_media` ; la base utilise `tvm-powercare_tvm_postgres`. Garder `.env` et `.local` est nécessaire, mais ne copie pas automatiquement ces volumes. Ne les supprimez pas pour mettre à jour l’application.
 
 Si vous préférez utiliser un nouveau dossier extrait, copiez-y d’abord **le fichier `.env` et le dossier `.local` de l’ancienne installation**. Si le nouveau dossier possède déjà ces éléments, conservez-en une copie dans un dossier de sauvegarde local avant de les remplacer par ceux de l’ancienne installation. Relancez ensuite `INSTALLER_TVM.cmd` dans le dossier que vous utiliserez désormais.
 
@@ -154,7 +161,35 @@ Le mot de passe est saisi de manière interactive et ne s’affiche pas. Créez 
 
 `localhost` désigne toujours l’ordinateur sur lequel le navigateur est ouvert. L’installation livrée lie le serveur au PC local ; ouvrir `localhost:8000` sur un autre ordinateur ne se connectera pas à votre PC. Un accès partagé pour les 5–15 utilisateurs demande une installation serveur commune avec une adresse réseau, HTTPS et les réglages décrits dans [DEPLOIEMENT.md](DEPLOIEMENT.md).
 
-Les données sont conservées dans le volume PostgreSQL Docker de cette installation. Gardez le dossier du projet et sa configuration, et prévoyez une sauvegarde de la base avant toute réinstallation de Docker ou migration vers un autre PC. Le script de sauvegarde actuel est en Bash ; faites préparer une procédure de sauvegarde Windows ou utilisez un environnement d’administration compatible avec [la procédure documentée](DEPLOIEMENT.md#sauvegarder).
+Les données sont conservées dans le volume PostgreSQL Docker de cette installation. Gardez le dossier du projet et sa configuration, et prévoyez une sauvegarde de la base avant toute réinstallation de Docker ou migration vers un autre PC.
+
+Les pièces jointes sont stockées dans un **second volume**, `tvm-powercare_tvm_media`, et non dans le ZIP des sources. Une sauvegarde et une restauration doivent conserver ensemble le contenu de ce volume et la base qui référence les fichiers. Les droits du volume média doivent permettre l'accès au serveur web, exécuté avec l'UID `10001`.
+
+### Sauvegarder la base et les pièces jointes sur Windows
+
+Le script `scripts/backup.sh` prépare l'ensemble de sauvegarde en environnement Bash compatible ; il n'est pas un lanceur Windows à double-clic. Avec Docker Desktop, la procédure d'administration suivante permet de garder les écritures arrêtées pendant la copie :
+
+1. Fermez l'application avec **`ARRETER_TVM.cmd`** et ne la redémarrez pas pendant la capture. Cela empêche les ajouts et suppressions de fichiers entre les deux sauvegardes.
+2. Ouvrez **l'Invite de commandes Windows (`cmd.exe`) dans le dossier TVM** : depuis l'Explorateur, saisir `cmd` dans sa barre d'adresse puis appuyer sur Entrée. Pour les redirections de fichiers binaires ci-dessous, **ne pas utiliser PowerShell 5**.
+3. Exécutez les commandes suivantes. Elles correspondent à la configuration livrée, avec une base et un rôle nommés `tvm` ; si votre support les a changés, il doit adapter ces deux noms.
+
+```bat
+set "TVM_BACKUP_DIR=.local\backups\avant-mise-a-jour-%RANDOM%-%RANDOM%"
+mkdir "%TVM_BACKUP_DIR%"
+docker compose up -d --wait db
+docker compose exec -T db pg_dump -U tvm -d tvm -Fc > "%TVM_BACKUP_DIR%\database.dump"
+docker compose exec -T db pg_restore --list < "%TVM_BACKUP_DIR%\database.dump" > NUL
+copy /b ".env" "%TVM_BACKUP_DIR%\.env"
+echo Dossier de sauvegarde : %TVM_BACKUP_DIR%
+```
+
+Une erreur à l'une de ces étapes doit être examinée avant de poursuivre. Le catalogue lisible du dump ne remplace pas un test de restauration.
+
+4. Sans redémarrer le service web, ouvrez la vue **Volumes** de Docker Desktop et sélectionnez **`tvm-powercare_tvm_media`**. Utilisez son export/sauvegarde vers **un fichier local**, dans le dossier de sauvegarde affiché par l'Invite de commandes. Ne choisissez pas une publication vers un registre ou un cloud. Conservez cette archive avec `database.dump` et `.env` du même instant.
+5. Si ce volume n'existe pas encore, il n'y a pas de volume média à exporter. Si un ancien dossier `backend\media` contient déjà des fichiers, faites-en également une copie pendant l'arrêt. Si l'export local n'est pas proposé par votre version de Docker Desktop, utilisez le script Bash documenté avec votre support plutôt que de copier seulement la base.
+6. Une fois la base et les fichiers conservés ensemble, relancez **`DEMARRER_TVM.cmd`**, ou **`INSTALLER_TVM.cmd`** si vous appliquez la mise à jour des sources.
+
+Conservez ces sauvegardes dans un emplacement privé et gardez une copie hors du PC selon votre organisation. Ne partagez pas `.env`, le dump ou les pièces jointes. Pour vérifier une restauration, utiliser d'abord **une base et un volume média neufs**, conformément à [la procédure de restauration de test](DEPLOIEMENT.md#tester-une-restauration-sans-remplacer-la-base-active) ; ne pas écraser la base active pour essayer.
 
 ## Périmètre de validation
 

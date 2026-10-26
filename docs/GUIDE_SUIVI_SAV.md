@@ -10,7 +10,7 @@ Les catégories de demandes correspondent aux états suivants :
 
 | Catégorie | Dossiers présentés |
 |---|---|
-| Non affecté | État `new` ; le technicien affecté est une information distincte |
+| Non affecté | État `new`, sans technicien affecté ; choisir un autre état lors de l'affectation |
 | En entretien | États `maintenance` et ancien `in_progress` |
 | En test | État `testing` |
 | Traité | État `resolved` |
@@ -20,14 +20,36 @@ Les catégories de demandes correspondent aux états suivants :
 | Refusé | État `rejected` |
 | Échange | État `exchange` |
 | Clôturé | État `closed` |
-| En dépassement délai | Échéance passée, sauf dossiers traités, rejetés ou clôturés |
+| En dépassement délai | Chronomètre en cours dépassant 48 heures cumulées du lundi au vendredi, avec une arrivée connue |
 | Tous | Tous les dossiers accessibles |
 
-**En dépassement délai** est un indicateur calculé depuis l'échéance, pas un état enregistré. Il peut recouper une autre catégorie : additionner tous les compteurs ne donne donc pas nécessairement le total des demandes. Un administrateur ou responsable peut renseigner l'échéance et le technicien affecté dans la fiche.
+**En dépassement délai** est un indicateur calculé depuis l'arrivée, pas un état enregistré. Il peut recouper une autre catégorie : additionner tous les compteurs ne donne donc pas nécessairement le total des demandes. L'échéance manuelle et le technicien affecté sont des informations distinctes, renseignées par un administrateur ou responsable.
+
+## Compter les jours depuis l'arrivée
+
+La date et l'heure d'arrivée sont une donnée du formulaire. Lors d'une nouvelle saisie, l'interface propose l'heure courante ; il faut la vérifier, la corriger ou la laisser vide si elle est inconnue. Le serveur ne remplace pas une arrivée absente par la date de création de la fiche. Pour une ancienne demande sans arrivée connue, le compteur affiche **Durée inconnue / Dates à compléter** jusqu'à ce que la donnée soit complétée.
+
+La règle confirmée est **deux jours ouvrés, samedi et dimanche exclus**, soit 48 heures cumulées du lundi au vendredi dans le fuseau de l'application. Un jour affiché correspond à 24 heures ainsi cumulées. Les jours fériés et les horaires de bureau ne sont pas exclus : aucun calendrier de cette nature n'est configuré.
+
+Le compteur devient rouge lorsque la durée dépasse **strictement 48 heures**. Par exemple, une arrivée un vendredi à 10 h atteint 24 heures cumulées le lundi à 10 h, puis 48 heures le mardi à 10 h ; le seuil est dépassé après cet instant, pas à 48 heures exactement. Le samedi et le dimanche n'ajoutent aucune heure.
+
+L'affichage utilise les valeurs du serveur et les actualise périodiquement, ainsi qu'au retour sur l'onglet. Il ne calcule pas une autre durée à partir de l'horloge du PC.
+
+La liste présente **Date d'arrivée** et **Nbr de jours ouvrés**. Le libellé indique **Dans le délai de 2 jours ouvrés** ou **Délai de 2 jours ouvrés dépassé** ; un dossier clôturé précise **Durée figée à la clôture**.
+
+Passer la demande à **Clôturé** enregistre sa clôture et fige le compteur. Une durée déjà supérieure au seuil peut rester rouge à titre historique, mais une demande dont le compteur est arrêté ne figure plus dans le dépassement en cours. Réouvrir la demande enlève la clôture automatique. L'échéance manuelle reste un autre indicateur ; elle ne remplace pas le calcul depuis l'arrivée.
+
+Les états **Traité** et **Refusé** n'arrêtent pas ce compteur : il continue jusqu'à la clôture du dossier. Terminer une intervention ne clôture donc pas implicitement la demande.
+
+Pour une ancienne fiche clôturée dont l'heure de clôture manque, un administrateur ou responsable peut compléter cette information connue, sans inventer une date passée. La date doit être passée et ne pas précéder l'arrivée. Modifier une autre information du dossier ne décale pas la clôture déjà enregistrée.
+
+La mise à jour ne remplit ni l'arrivée ni la clôture des anciennes fiches. Il faut connaître ces deux dates réelles pour calculer une durée fiable d'un ancien dossier clôturé.
 
 ## Lire une fiche et sa chronologie
 
-La fiche d'une demande regroupe son équipement, le client, l'état du dossier et les informations de traitement. L'historique de l'onduleur permet de retrouver les demandes et interventions rattachées au même matériel.
+Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Conclusion** et **Documents**. Un administrateur ou responsable dispose de **Modifier le dossier** pour régler notamment son état, son affectation et son échéance. L'état **Non affecté** n'accepte pas de technicien affecté : sélectionner l'état approprié lors de l'affectation.
+
+La fiche d'une demande regroupe son équipement, le client, l'état du dossier et les informations de traitement. L'historique de l'onduleur permet de retrouver les demandes et interventions rattachées au même matériel. La fiche équipement propose les onglets **Matériel** et **Historique des opérations** ; le dossier distingue **Historique du dossier** et **Historique de l'onduleur**.
 
 La chronologie distingue les changements réellement enregistrés, leurs dates et leur auteur, ainsi que les observations ajoutées au suivi. Un changement d'état indique l'état précédent et le nouvel état lorsqu'ils sont connus. Une entrée ne représente pas une étape effectuée simplement parce qu'elle figure dans un déroulé type.
 
@@ -51,6 +73,8 @@ Une baseline doit être distinguée d'un événement utilisateur : elle ne prouv
 
 Les opérations de maintenance, d'échange, de mise en service et de prévention peuvent nécessiter des informations différentes. Les fiches structurées permettent d'enregistrer les contrôles et observations correspondant au type choisi, puis de les retrouver dans le dossier et son rapport.
 
+Les menus **Échange**, **Mise en service** et **Préventive** filtrent les fiches du type correspondant et préparent ce type lors d'une création. Le dossier SAV conserve son propre état, distinct du type de fiche.
+
 L'état d'une demande et le type d'une fiche d'intervention sont deux informations distinctes. Classer une demande dans **Échange** ne crée pas automatiquement une fiche d'échange remplie. Une demande peut être liée à plusieurs interventions ; ouvrir ou créer la fiche correspondant à l'opération réellement effectuée.
 
 | Type de fiche | Informations principales |
@@ -68,13 +92,34 @@ Pour un échange terminé, le nouvel équipement doit être différent de l'anci
 
 Les cases enregistrent ce que l'utilisateur déclare. Elles ne déclenchent pas à elles seules un mouvement de stock, une modification des équipements, une nouvelle garantie ou une facturation. Si le remplacement des batteries est déclaré sur une intervention terminée, leur nombre doit être précisé.
 
+Créer une intervention ou changer réellement son état peut actualiser l'état de suivi de la demande en tenant compte des autres interventions. Modifier uniquement le diagnostic ne change pas cet état. Les états de gestion Devis, En attente, Validé, Refusé, Échange et Clôturé sont conservés par cette synchronisation.
+
 La fiche comporte une **Synthèse de l'opération** et une **Conclusion de la fiche** : à suivre, terminée ou non applicable / facturable. Ce dernier choix exige une justification ; il n'est jamais déduit automatiquement de la date de garantie. La synthèse de la fiche est son texte courant, distinct des événements de synthèse ajoutés à l'historique.
 
 La synthèse et la conclusion de la fiche sont destinées au suivi et au rapport. Pour une information réservée à l'équipe interne, utiliser les **Notes internes** ou une observation explicitement interne dans l'historique.
 
 Un contrôle non renseigné n'est pas présenté comme réalisé. L'absence d'une valeur reste distincte d'une case explicitement enregistrée comme non cochée ; les anciennes fiches ne reçoivent pas de résultats de contrôle inventés. Le rapport PDF reprend les données enregistrées au moment de sa génération ; il ne remplace pas une signature client et ne constitue pas une archive immuable des versions antérieures. Le téléchargement reste soumis aux droits d'accès au dossier.
 
-Le PDF inclut les champs connus de la fiche, les contrôles renseignés, la synthèse et la conclusion, ainsi que les références liées disponibles. Les notes internes sont exclues du rapport.
+Le PDF utilise les cadres et rubriques du modèle fourni, avec une identité typographique TVM neutre, sans reprendre les coordonnées privées d'un exemple. Il distingue les cases **[X]** cochées, **[ ]** non cochées et **[-]** non renseignées. Les visas et signatures non recueillis sont explicitement indiqués comme tels. Les textes longs peuvent se poursuivre en annexes pour éviter une perte de contenu. Les notes internes sont exclues du rapport.
+
+## Fiche de suivi et documents du dossier
+
+L'onglet **Suivi** rassemble aussi les informations d'accueil du dossier : **N° d'appel client / référence client**, client final, arrivée et clôture, retour, emballage, lieu Atelier / Dépôt / Sur site, livraison par Livreur / Client, nom du livreur, accessoires et contact. La référence client est un identifiant externe ; elle ne déclenche pas un appel téléphonique ou une notification.
+
+L'appréciation Garantie / Devis / Contrat / Hors garantie est une information de suivi renseignée par l'équipe. Elle ne déclenche pas une décision automatique de prise en charge ou de facturation. Les données manquantes restent à compléter ; les informations d'un dossier ou d'un modèle privé ne sont pas recopiées comme valeurs par défaut.
+
+Deux PDF ont des rôles distincts : le **rapport d'intervention** décrit l'opération choisie et ses contrôles, tandis que le bouton **PDF de suivi du dossier** récapitule la réception, le compteur, l'historique public, les synthèses et les références d'intervention autorisés. Ils sont générés depuis la base ; le document privé fourni sert de modèle de structure, pas de fond contenant un client réel ou des coordonnées figées.
+
+Pour une demande déjà enregistrée, l'onglet **Documents** et sa zone **Documents du dossier** permettent d'ajouter les photos et justificatifs :
+
+1. Cliquer sur **Ajouter un document**, sélectionner le fichier et, si utile, renseigner un libellé.
+2. Laisser le document interne, ou cocher explicitement **Partager ce document avec le client du dossier**.
+3. Cliquer sur **Enregistrer le fichier** et attendre la confirmation du serveur.
+4. Utiliser **Télécharger** pour retrouver le fichier depuis les postes autorisés. La suppression, lorsqu'elle est permise au compte, demande une confirmation.
+
+Formats acceptés : **PDF, JPEG, PNG, DOCX, XLSX et TXT**, avec une limite de **10 Mio par fichier**. Un fichier est envoyé à la fois. La taille et le format sont contrôlés ; ce contrôle n'est pas une analyse antivirus. Les fichiers restent privés côté serveur : un client ne voit que ceux qui ont été partagés explicitement dans ses propres dossiers.
+
+Les pièces jointes ne sont pas intégrées automatiquement dans le PDF comme des pages supplémentaires. Leur conservation demande une sauvegarde des fichiers média **et** de la base qui les référence ; sauvegarder seulement les sources ne suffit pas.
 
 ## Conserver les dossiers historisés
 

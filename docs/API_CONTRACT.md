@@ -11,7 +11,7 @@ Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (ba
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
 - `/api/clients/` : `id,name,contact_name,email,phone,address,city,postal_code,country,legacy_id`.
 - `/api/equipment/` : `id,client,client_name,serial_number,brand,model,power_kva,location,commissioned_on,manufactured_on,catalogue_product,warranty_until,status,legacy_id`. Statuts `active,maintenance,inactive`. `manufactured_on` et `catalogue_product` sont en lecture seule dans ce CRUD ; leur création contrôlée passe par le parcours d'admission SAV. `catalogue_product` est absent des réponses du portail client.
-- `/api/requests/` : `id,reference,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,category,is_overdue,created_at,legacy_id,intake_key,intake_data`. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `assigned_technician_name`, `category` et `is_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
+- `/api/requests/` : `id,reference,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,created_at,legacy_id,intake_key,intake_data`. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `assigned_technician_name`, `timing`, `category`, `is_overdue` et `is_due_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
 - `/api/interventions/` : `id,reference,service_request,request_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
 - `/api/users/` : admin CRUD `id,username,first_name,last_name,email,role,client,is_active,password` (password écriture seulement). Autres internes : lecture liste limitée aux employés actifs pour affectation, aucun compte client. Client : interdit.
 - `/api/parts/` : `id,sku,name,category,unit_price,stock_quantity,min_stock,legacy_id`. Quantité initiale zéro ; le stock s'ajuste via mouvements. Catégories `battery,board,ventilation,other`.
@@ -75,6 +75,7 @@ Le modèle peut être sélectionné automatiquement si le produit est unique pou
 | `subject` | Objet obligatoire, au plus 200 caractères |
 | `description` | Texte facultatif |
 | `priority` | `low`, `normal`, `high` ou `urgent` ; `normal` par défaut |
+| `arrived_at` | Horodatage d'arrivée ISO ou `null`, renseigné explicitement ; aucune déduction depuis la création de la fiche |
 | `equipment` | Identifiant facultatif d'un équipement existant ; doit correspondre à la série |
 | `client` | Identifiant client obligatoire pour un nouvel équipement ; doit correspondre au client d'un équipement existant s'il est fourni |
 | `profile`, `catalogue_import_id`, `product_id`, `warranty_reference_id` | Contexte et choix de catalogue contrôlés à nouveau côté serveur |
@@ -96,9 +97,46 @@ Voir [le parcours utilisateur, la règle des six mois et les limites par profil]
 
 `GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans la référence, le sujet, la série et le client.
 
-`GET /api/requests/categories/` retourne `{categories: [{key,label,count}], total, as_of}` dans le périmètre autorisé. `overdue` est calculé avec `due_on < date_du_serveur` en excluant `resolved`, `rejected` et `closed` ; ce n'est pas une valeur de `status`. Ce compteur peut recouper d'autres catégories. `assigned_technician` et `due_on` sont modifiables par administrateur ou responsable via le CRUD des demandes.
+`GET /api/requests/categories/` retourne `{categories: [{key,label,count}], total, as_of}` dans le périmètre autorisé. `overdue` et `is_overdue` correspondent au chronomètre en cours dépassant strictement 48 heures cumulées du lundi au vendredi ; ce n'est pas une valeur de `status`. Ce compteur peut recouper d'autres catégories. `is_due_overdue` décrit séparément le dépassement d'une échéance `due_on` manuelle. `assigned_technician` et `due_on` sont modifiables par administrateur ou responsable via le CRUD des demandes.
+
+La combinaison `status: "new"` et `assigned_technician` non nul est refusée, y compris lors d'une transition d'état par la chronologie : une demande affectée ne peut pas rester classée Non affecté.
 
 Le parcours `POST /api/requests/intake/` conserve son contrat de création par série ; les nouveaux états, l'affectation et l'échéance se règlent ensuite via la modification du dossier par un rôle autorisé. Ces nouveaux champs ne sont pas ajoutés implicitement au contenu idempotent de l'admission.
+
+### Arrivée, clôture et durée
+
+`arrived_at` est un horodatage ISO explicite ou `null`, accepté lors de l'admission et du POST/PATCH des demandes. Il n'est jamais rempli avec `created_at` par défaut. Les anciennes fiches sans arrivée restent inconnues pour le calcul.
+
+La réponse des listes et détails comporte `timing: {timer_state,elapsed_hours,elapsed_days,is_overdue_48h,threshold_hours,clock_basis,timezone,as_of,warning}`. `timer_state` vaut `unknown`, `running` ou `closed` ; les durées sont `null` si elles ne sont pas connues. `elapsed_days` compte les blocs complets de 24 heures cumulées. `threshold_hours` vaut `48` et `clock_basis` vaut `business_hours_excluding_weekends`.
+
+Le calcul utilise le fuseau `TVM_TIMEZONE` et exclut samedi/dimanche. Les jours fériés et les plages d'heures de bureau ne sont pas retirés. Le seuil est strict : 48 heures exactes ne constituent pas un dépassement. Une arrivée vendredi 10 h atteint 24 heures lundi 10 h, 48 heures mardi 10 h, puis dépasse le seuil après mardi 10 h.
+
+`closed_at` est automatiquement enregistré lors du passage à `closed`, conservé lors d'une simple édition et effacé en cas de réouverture. Un administrateur ou responsable peut compléter une ancienne clôture manquante avec une date passée, postérieure ou égale à l'arrivée. Le compteur s'arrête à la clôture ; son indicateur rouge historique peut rester vrai, sans inclure cette demande dans le dépassement en cours.
+
+Seul `closed` arrête le chronomètre. Les demandes `resolved` ou `rejected` restent en cours pour ce calcul jusqu'à leur clôture. Après une clôture tardive, `timing.is_overdue_48h` peut rester `true` tandis que `is_overdue` est `false`. La migration ne renseigne aucune arrivée ni clôture historique supposée.
+
+### Champs de la fiche de suivi
+
+Les demandes et leur admission acceptent les champs de suivi ci-dessous, en plus de `arrived_at` :
+
+| Champ | Type et limite |
+|---|---|
+| `client_reference` | Texte, 120 caractères |
+| `end_customer` | Texte, 200 caractères |
+| `return_flag` | Booléen JSON strict |
+| `packaging` | Texte, 250 caractères |
+| `service_location` | Vide, `workshop`, `depot` ou `onsite` |
+| `delivered_by` | Vide, `courier` ou `client` |
+| `courier_name` | Texte, 150 caractères |
+| `accessories` | Texte, 4 000 caractères |
+| `warranty_status` | `unspecified`, `warranty`, `quotation`, `contract` ou `billable` |
+| `contact_name` | Texte, 150 caractères |
+| `contact_phone` | Texte, 40 caractères |
+| `contact_email` | Adresse email valide, 254 caractères maximum |
+
+Ces données sont saisies pour le dossier ; `warranty_status` n'est pas une décision automatique de garantie ou une facturation. Une arrivée future est refusée. Une arrivée ou clôture absente reste inconnue pour le compteur.
+
+`GET /api/requests/{id}/report/` génère la fiche de suivi PDF du dossier autorisé, avec réception, arrivée/clôture, durée calculée, historique public, synthèses et références d'intervention. Cette route est distincte du rapport d'intervention `GET /api/interventions/{id}/report/` ; les informations internes ne sont pas imprimées dans le document partagé. Les deux PDF sont privés et servis avec `Cache-Control: private, no-store`.
 
 ### Chronologies
 
@@ -126,6 +164,8 @@ Les valeurs liées sont également exposées en lecture seule : `replacement_equ
 
 Un technicien ne crée une intervention que dans son périmètre d'affectation au dossier et ne l'affecte qu'à lui-même. Une première intervention exige donc l'affectation préalable du dossier par le responsable ; la création n'accorde pas automatiquement des droits sur un dossier tiers.
 
+La création d'une intervention ou un changement réel de son `status` peut recalculer l'état agrégé de la demande. Une simple modification de diagnostic ne le fait pas. Les états de gestion `quotation`, `pending`, `approved`, `rejected`, `exchange` et `closed` sont conservés. La compatibilité des anciens états `new`, `scheduled`, `in_progress` et `resolved` reste distincte des demandes passées explicitement dans les états canoniques `maintenance` ou `testing`.
+
 `kind` vaut `maintenance`, `exchange`, `commissioning` ou `preventive`. `performed_on` est une date réelle, jamais future ; la planification demeure `scheduled_at`. Une fiche non maintenance terminée exige `performed_on`. Un échange terminé exige aussi un `replacement_equipment` différent du matériel d'origine et rattaché au même client. Ce champ est interdit pour les autres types. Le dossier reste lié à l'équipement d'origine.
 
 `contract` doit concerner le client et l'équipement d'origine, ou être global à ce client. `extension_warranty` doit concerner l'équipement d'origine. `battery_count` est un entier de 0 à 100 000. `summary` est limité à 10 000 caractères ; `conclusion_notes` à 4 000. La conclusion est vide ou vaut `follow_up`, `completed`, `not_applicable_billable` ; ce dernier choix impose une justification dans `conclusion_notes`. Il n'entraîne pas de facturation automatique.
@@ -142,7 +182,23 @@ Chaque section accepte aussi un `comment` texte de 4 000 caractères maximum. `m
 
 Une case absente signifie « non renseignée » ; une valeur booléenne `false` signifie « explicitement non cochée ». Les fiches existantes ne sont pas remplies avec des contrôles ou conclusions supposés.
 
-`GET /api/interventions/{id}/report/` reprend les champs structurés connus, les cases effectivement renseignées, les références liées, les séries ancien/nouveau matériel, la synthèse et la conclusion. Les notes internes et les clés JSON inconnues ne sont pas imprimées. Une case ne modifie pas automatiquement le stock, les contrats, les garanties ou les fiches équipements.
+`GET /api/interventions/{id}/report/` reprend les champs structurés connus, les références liées, les séries ancien/nouveau matériel, la synthèse et la conclusion. Les cases connues distinguent `[X]` / `[ ]` / `[-]` pour cochée / non cochée / non renseignée. Les visas ou signatures non recueillis ne sont pas présentés comme acquis. Les textes longs sont conservés dans le document, au besoin en annexes. Les notes internes et les clés JSON inconnues ne sont pas imprimées. Une case ne modifie pas automatiquement le stock, les contrats, les garanties ou les fiches équipements.
+
+### Pièces jointes privées des demandes
+
+`GET /api/requests/{id}/documents/` retourne `{results,can_upload,max_file_size,allowed_extensions,virus_scanned}`. Chaque document contient `{id,service_request,label,original_name,mime_type,size_bytes,sha256,client_visible,uploaded_by_name,created_at,can_delete,download_url}`. Les clients ne reçoivent que les documents partagés de leurs propres dossiers ; leur libellé d'auteur est « Équipe SAV ». Les chemins de stockage privés ne sont pas exposés.
+
+`POST /api/requests/{id}/documents/` accepte un formulaire multipart avec exactement un champ `file`, `label` facultatif de 200 caractères maximum et `client_visible` valant exactement la chaîne `true` ou `false` (`false` par défaut). Administrateurs, responsables et techniciens affectés au dossier ou à l'une de ses interventions peuvent ajouter un document. Les comptes clients n'ont pas ce droit.
+
+Le fichier doit être non vide, limité à **10 Mio**, dans les formats PDF, JPEG, PNG, DOCX, XLSX ou TXT. Le serveur contrôle la taille et le format ; `virus_scanned` reste `false`, sans garantie antivirus. La réponse est HTTP `201` avec les métadonnées du document. Un dépassement renvoie `413`, une validation de contenu `400`, un rôle interdit `403` et une ressource inaccessible `404`.
+
+Des bornes de contenu complètent la limite d'octets : PDF de 1 à 500 pages, images de 25 millions de pixels au plus, fichiers Office sans macros avec au plus 2 000 entrées ZIP et 40 Mio de contenu décompressé. La validation Office n'extrait pas les documents sur le serveur.
+
+`GET /api/documents/{id}/download/` vérifie à nouveau les droits et transmet le fichier en téléchargement, avec les protections de cache privé et `nosniff`. Aucun accès direct public à `MEDIA_ROOT` n'est fourni. Les fichiers sont nommés par UUID côté stockage, distinctement de leur nom original.
+
+`DELETE /api/documents/{id}/` est réservé aux mêmes rôles d'écriture sur le dossier. Le document est retiré immédiatement de la consultation et la suppression est tracée. HTTP `204` confirme également la suppression physique ; HTTP `202` indique que cette dernière est en attente de reprise. La commande d'administration `python manage.py purge_request_documents` reprend les suppressions physiques déjà demandées. Les événements historiques de ces opérations restent conservés.
+
+Les fichiers sont conservés dans `MEDIA_ROOT` (`backend/media` par défaut, volume Docker `tvm_media` dans l'installation conteneurisée). Sauvegarder et restaurer la base et les fichiers ensemble : voir [le déploiement](DEPLOIEMENT.md#sauvegarder).
 
 ## Exécution
 Backend `backend/manage.py`, réglages `config.settings`, application `core`. Serveur 8000, Vite 5173. Fichiers compilés `frontend/dist`, servis par Django via WhiteNoise. Base depuis `DATABASE_URL`, SQLite seulement avec `TVM_ALLOW_SQLITE=1` explicite pour tests isolés. Démo activée explicitement par `python manage.py seed_demo`; identités fictives signalées dans l'interface via `GET /api/session/` champ `demo_mode` issu de `TVM_DEMO_MODE`. Aucun identifiant HFSQL réel n'est inventé.

@@ -11,7 +11,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { api, type RecordData, type User } from "./api";
-import { optionLabel } from "./resources";
+import { optionLabel, requestReceptionFields } from "./resources";
+import RequestReceptionFields, {
+  defaultArrivalLocal,
+} from "./RequestReceptionFields";
 import SerialLookupSummary, {
   type SerialLookupResult,
 } from "./SerialLookupSummary";
@@ -63,6 +66,18 @@ export default function RequestIntake({
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("normal");
+  const [reception, setReception] = useState<RecordData>(() =>
+    Object.fromEntries(
+      requestReceptionFields
+        .filter((field) => field.name !== "closed_at")
+        .map((field) => [
+          field.name,
+          field.name === "arrived_at"
+            ? defaultArrivalLocal()
+            : (field.default ?? ""),
+        ]),
+    ),
+  );
   const [lookup, setLookup] = useState<SerialLookupResult | null>(null);
   const [profileOptions, setProfileOptions] = useState<string[]>([]);
   const [lookupBusy, setLookupBusy] = useState(false);
@@ -254,6 +269,21 @@ export default function RequestIntake({
       subject: subject.trim(),
       description: description.trim(),
       priority,
+      ...Object.fromEntries(
+        requestReceptionFields
+          .filter((field) => field.name !== "closed_at")
+          .map((field) => [
+            field.name,
+            field.name === "arrived_at"
+              ? reception.arrived_at
+                ? new Date(reception.arrived_at).toISOString()
+                : null
+              : field.name === "return_flag"
+                ? reception.return_flag === true ||
+                  reception.return_flag === "true"
+                : (reception[field.name] ?? field.default ?? ""),
+          ]),
+      ),
       ...(existing
         ? { equipment: existing.id, client: existing.client }
         : { client: Number(clientId) }),
@@ -732,6 +762,15 @@ export default function RequestIntake({
             )}
           </section>
 
+          <section className="request-intake-section">
+            <RequestReceptionFields
+              value={reception}
+              onChange={(name, entry) => {
+                edited();
+                setReception((previous) => ({ ...previous, [name]: entry }));
+              }}
+            />
+          </section>
           <section className="request-intake-section">
             <div className="request-intake-section-title">
               <span>3</span>

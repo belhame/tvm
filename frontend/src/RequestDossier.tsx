@@ -1,11 +1,14 @@
-import { useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { FileText, Pencil, Plus, ShieldCheck, Wrench } from "lucide-react";
-import { dateFR, type RecordData, type User } from "./api";
+import { api, dateFR, type RecordData, type User } from "./api";
 import { interventionKinds, requestStatusLabels, statuses } from "./resources";
 import InterventionWorksheet from "./InterventionWorksheet";
 import OperationTimeline, { type OperationEvent } from "./OperationTimeline";
+import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
+import RequestDocuments from "./RequestDocuments";
 
 const tabs = [
+  ["followup", "Suivi"],
   ["equipment", "Matériel"],
   ["contracts", "Contrat"],
   ["maintenance", "Maintenance"],
@@ -13,6 +16,7 @@ const tabs = [
   ["preventive", "Préventive"],
   ["exchange", "Échange"],
   ["conclusion", "Conclusion"],
+  ["documents", "Documents"],
 ] as const;
 
 function day(value?: string | null) {
@@ -34,7 +38,7 @@ function Fact({ label, value }: { label: string; value: unknown }) {
 }
 
 export default function RequestDossier({
-  record,
+  record: initialRecord,
   data,
   user,
   onEditRequest,
@@ -46,14 +50,53 @@ export default function RequestDossier({
   record: RecordData;
   data: Record<string, RecordData[]>;
   user: User;
-  onEditRequest: () => void;
+  onEditRequest: (record: RecordData) => void;
   onCreateIntervention: (kind: string) => void;
   onOpenIntervention: (record: RecordData) => void;
   onEditIntervention: (record: RecordData) => void;
   onChanged: () => Promise<void>;
 }) {
   const tabId = useId();
-  const [tab, setTab] = useState<string>("equipment");
+  const [record, setRecord] = useState<RecordData>(initialRecord);
+  const [timingError, setTimingError] = useState("");
+  const controller = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  async function refreshRecord() {
+    controller.current?.abort();
+    const request = new AbortController();
+    controller.current = request;
+    try {
+      const fresh = await api<RecordData>(`requests/${initialRecord.id}/`, {
+        signal: request.signal,
+      });
+      if (!request.signal.aborted && mounted.current) {
+        setRecord(fresh);
+        setTimingError("");
+      }
+    } catch (error) {
+      if (!request.signal.aborted && mounted.current)
+        setTimingError(
+          error instanceof Error
+            ? error.message
+            : "L’actualisation du dossier n’a pas abouti.",
+        );
+    }
+  }
+  useEffect(() => {
+    controller.current?.abort();
+    setRecord(initialRecord);
+    setTimingError("");
+  }, [initialRecord]);
+  useEffect(() => {
+    mounted.current = true;
+    void refreshRecord();
+    return () => {
+      mounted.current = false;
+      controller.current?.abort();
+    };
+  }, [initialRecord.id]);
+  useServerTimingRefresh(refreshRecord);
+  const [tab, setTab] = useState<string>("followup");
   function handleTabKey(event: KeyboardEvent<HTMLDivElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -148,10 +191,23 @@ export default function RequestDossier({
               ? `Affecté à ${record.assigned_technician_name}`
               : "Non affecté"}
           </span>
-          <span className={record.is_overdue ? "request-overdue" : ""}>
+          <span className={record.is_due_overdue ? "request-overdue" : ""}>
             Échéance : {day(record.due_on)}
           </span>
         </div>
+        <RequestTimer timing={record.timing} />
+        {timingError && (
+          <div className="error-box" role="alert">
+            <span>Le dossier n’a pas pu être actualisé : {timingError}</span>
+            <button
+              className="button secondary small"
+              type="button"
+              onClick={() => void refreshRecord()}
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
         <div
           className="request-dossier-tabs page-tabs"
           role="tablist"
@@ -189,6 +245,97 @@ export default function RequestDossier({
           id={`${tabId}-panel`}
           aria-labelledby={`${tabId}-${tab}`}
         >
+          {tab === "followup" && (
+            <section className="request-dossier-card">
+              <h3>Fiche de suivi du dossier</h3>
+              <dl className="request-dossier-facts">
+                <Fact
+                  label="Date d’arrivée"
+                  value={
+                    record.arrived_at
+                      ? dateFR(record.arrived_at, true)
+                      : "Non renseignée"
+                  }
+                />
+                <Fact
+                  label="Date de clôture"
+                  value={
+                    record.closed_at
+                      ? dateFR(record.closed_at, true)
+                      : "Non renseignée"
+                  }
+                />
+                <Fact
+                  label="N° d’appel client / référence client"
+                  value={record.client_reference}
+                />
+                <Fact label="Client final" value={record.end_customer} />
+                <Fact label="Nom du contact" value={record.contact_name} />
+                <Fact
+                  label="Téléphone du contact"
+                  value={record.contact_phone}
+                />
+                <Fact label="E-mail du contact" value={record.contact_email} />
+                <Fact
+                  label="Retour de matériel"
+                  value={record.return_flag ? "Oui" : "Non"}
+                />
+                <Fact label="Emballage reçu" value={record.packaging} />
+                <Fact
+                  label="Lieu de prise en charge"
+                  value={
+                    (
+                      {
+                        workshop: "Atelier",
+                        depot: "Dépôt",
+                        onsite: "Sur site",
+                      } as Record<string, string>
+                    )[record.service_location]
+                  }
+                />
+                <Fact
+                  label="Matériel livré par"
+                  value={
+                    (
+                      { courier: "Livreur", client: "Client" } as Record<
+                        string,
+                        string
+                      >
+                    )[record.delivered_by]
+                  }
+                />
+                <Fact label="Nom du livreur" value={record.courier_name} />
+                <Fact
+                  label="Situation de garantie du dossier"
+                  value={
+                    (
+                      {
+                        unspecified: "Non précisée",
+                        warranty: "Garantie",
+                        quotation: "Devis",
+                        contract: "Contrat",
+                        billable: "Facturable",
+                      } as Record<string, string>
+                    )[record.warranty_status]
+                  }
+                />
+              </dl>
+              <h4>Accessoires reçus</h4>
+              <p>{record.accessories || "Non renseignés"}</p>
+              <p className="request-followup-note">
+                Les informations de réception et la situation du dossier sont
+                saisies par l’équipe. Le compteur reste inconnu tant qu’aucune
+                arrivée réelle n’est renseignée.
+              </p>
+            </section>
+          )}
+          {tab === "documents" && (
+            <RequestDocuments
+              requestId={record.id}
+              user={user}
+              onChanged={onChanged}
+            />
+          )}
           {tab === "equipment" && (
             <>
               <section className="request-dossier-card">
@@ -543,6 +690,15 @@ export default function RequestDossier({
         />
       </div>
       <div className="modal-footer">
+        <a
+          className="button secondary"
+          href={`/api/requests/${record.id}/report/`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <FileText size={16} />
+          PDF de suivi du dossier
+        </a>
         <span className="form-secure">
           Dossier partagé · {record.reference}
         </span>
@@ -550,7 +706,7 @@ export default function RequestDossier({
           <button
             type="button"
             className="button primary"
-            onClick={onEditRequest}
+            onClick={() => onEditRequest(record)}
           >
             <Pencil size={16} />
             Modifier le dossier

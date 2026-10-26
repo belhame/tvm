@@ -88,6 +88,7 @@ import RequestsWorkspace, {
 import RequestDossier from "./RequestDossier";
 import OperationTimeline from "./OperationTimeline";
 import InterventionWorksheet from "./InterventionWorksheet";
+import RequestReceptionFields from "./RequestReceptionFields";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -465,6 +466,7 @@ function EditForm({
       }),
     ),
   );
+  const originalValues = useRef(values);
   const [lines, setLines] = useState<RecordData[]>(
     modal.record?.lines?.map((x: RecordData) => ({
       part: x.part || "",
@@ -498,7 +500,13 @@ function EditForm({
             equipmentRequestIds.has(row.service_request) &&
             row.technician === user.id,
         )));
-  function updateField(name: string, entry: string) {
+  const canBackfillClosure =
+    modal.resource === "requests" &&
+    modal.record?.status === "closed" &&
+    values.status === "closed" &&
+    !modal.record.closed_at &&
+    (user.role === "admin" || user.role === "manager");
+  function updateField(name: string, entry: string | boolean) {
     setValues((previous) => ({
       ...previous,
       [name]: entry,
@@ -580,14 +588,24 @@ function EditForm({
       for (const field of config.fields) {
         let value = values[field.name];
         if (field.name === "password" && !value) continue;
+        if (field.name === "closed_at" && (!canBackfillClosure || !value))
+          continue;
         if (field.type === "select" && field.resource)
           value = value === "" ? null : Number(value);
         else if (field.type === "number")
           value = value === "" ? (field.default ?? null) : Number(value);
         else if (field.type === "datetime-local")
-          value = value ? new Date(value).toISOString() : null;
+          value =
+            value &&
+            modal.record?.[field.name] &&
+            value === originalValues.current[field.name]
+              ? modal.record[field.name]
+              : value
+                ? new Date(value).toISOString()
+                : null;
         else if (field.type === "date") value = value || null;
-        else if (field.name === "is_active") value = value === "true";
+        else if (field.name === "is_active" || field.name === "return_flag")
+          value = value === true || value === "true";
         payload[field.name] = value;
       }
       if (modal.resource === "interventions") {
@@ -677,6 +695,7 @@ function EditForm({
               {config.fields
                 .filter(
                   (field) =>
+                    field.section !== "reception" &&
                     (!readonly || field.name !== "password") &&
                     (user.role !== "client" ||
                       field.name !== "internal_notes") &&
@@ -830,6 +849,15 @@ function EditForm({
                   </Fragment>
                 ))}
             </div>
+            {modal.resource === "requests" && (
+              <RequestReceptionFields
+                value={values}
+                onChange={updateField}
+                readonly={readonly}
+                includeClosure
+                canBackfillClosure={canBackfillClosure}
+              />
+            )}
             {modal.resource === "interventions" && (
               <>
                 {sourceEquipment && (
@@ -3078,9 +3106,9 @@ export default function App() {
             data={data}
             user={user}
             onChanged={reload}
-            onEditRequest={() => {
+            onEditRequest={(freshRecord) => {
               setRequestDetail(null);
-              setModal({ resource: "requests", record: currentRequestDetail });
+              setModal({ resource: "requests", record: freshRecord });
             }}
             onCreateIntervention={(kind) => {
               setRequestDetail(null);
