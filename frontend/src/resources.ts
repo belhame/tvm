@@ -11,6 +11,7 @@ export type Field = {
   wide?: boolean;
   help?: string;
   default?: any;
+  when?: { field: string; value: string };
 };
 export type Column = {
   key: string;
@@ -37,7 +38,7 @@ export type Resource = {
 export const statuses: Record<string, string> = {
   active: "Actif",
   maintenance: "En maintenance",
-  inactive: "Inactif",
+  inactive: "Hors service",
   new: "Nouvelle",
   scheduled: "Planifiée",
   in_progress: "En cours",
@@ -67,7 +68,50 @@ export const statuses: Record<string, string> = {
   client: "Client",
   true: "Actif",
   false: "Désactivé",
+  quotation: "Devis",
+  pending: "En attente",
+  approved: "Validé",
+  rejected: "Refusé",
+  exchange: "Échange",
+  commissioning: "Mise en service",
+  preventive: "Préventive",
+  follow_up: "À suivre",
+  not_applicable_billable: "Non applicable / facturable",
 };
+export const requestStatusLabels: Record<string, string> = {
+  new: "Non affecté",
+  maintenance: "En entretien",
+  testing: "En test",
+  resolved: "Traité",
+  quotation: "Devis",
+  pending: "En attente",
+  approved: "Validé",
+  rejected: "Refusé",
+  exchange: "Échange",
+  closed: "Clôturé",
+  scheduled: "En attente (ancien état)",
+  in_progress: "En entretien (ancien état)",
+};
+export const requestCategories = [
+  { key: "unassigned", label: "Non affecté" },
+  { key: "maintenance", label: "En entretien" },
+  { key: "testing", label: "En test" },
+  { key: "overdue", label: "En dépassement délai" },
+  { key: "processed", label: "Traité" },
+  { key: "quotation", label: "Devis" },
+  { key: "pending", label: "En attente" },
+  { key: "approved", label: "Validé" },
+  { key: "rejected", label: "Refusé" },
+  { key: "exchange", label: "Échange" },
+  { key: "closed", label: "Clôturé" },
+  { key: "all", label: "Tous" },
+];
+export const interventionKinds: [string, string][] = [
+  ["maintenance", "Maintenance"],
+  ["exchange", "Échange"],
+  ["commissioning", "Mise en service"],
+  ["preventive", "Préventive"],
+];
 const choice = (...keys: string[]): [string, string][] =>
   keys.map((x) => [x, statuses[x] || x]);
 export const resources: Record<string, Resource> = {
@@ -205,15 +249,17 @@ export const resources: Record<string, Resource> = {
         name: "status",
         label: "Statut",
         type: "select",
-        options: choice(
-          "new",
-          "scheduled",
-          "in_progress",
-          "resolved",
-          "closed",
-        ),
+        options: Object.entries(requestStatusLabels),
         default: "new",
       },
+      {
+        name: "assigned_technician",
+        label: "Technicien affecté",
+        type: "select",
+        resource: "users",
+        help: "Lors d’une affectation, choisissez explicitement un état En attente, En entretien ou En test ; Non affecté ne peut pas conserver un technicien.",
+      },
+      { name: "due_on", label: "Échéance de traitement", type: "date" },
     ],
   },
   interventions: {
@@ -233,8 +279,17 @@ export const resources: Record<string, Resource> = {
       { key: "status", label: "Statut", type: "status" },
       { key: "technician_name", label: "Technicien", type: "user" },
       { key: "scheduled_at", label: "Planification", type: "datetime" },
+      { key: "kind", label: "Type de fiche", type: "status" },
     ],
     fields: [
+      {
+        name: "kind",
+        label: "Type de fiche",
+        type: "select",
+        options: interventionKinds,
+        default: "maintenance",
+        required: true,
+      },
       {
         name: "service_request",
         label: "Demande SAV",
@@ -249,6 +304,39 @@ export const resources: Record<string, Resource> = {
         resource: "users",
       },
       { name: "scheduled_at", label: "Date et heure", type: "datetime-local" },
+      {
+        name: "performed_on",
+        label: "Date de l’opération",
+        type: "date",
+        help: "Obligatoire pour terminer une fiche d’échange, de mise en service ou préventive. Une date future n’est pas acceptée.",
+      },
+      {
+        name: "replacement_equipment",
+        label: "Nouvel onduleur de remplacement",
+        type: "select",
+        resource: "equipment",
+        when: { field: "kind", value: "exchange" },
+        help: "Choisissez un équipement distinct appartenant au même client. L’ancien numéro de série reste attaché au dossier.",
+      },
+      {
+        name: "contract",
+        label: "Contrat lié à la fiche",
+        type: "select",
+        resource: "contracts",
+      },
+      {
+        name: "extension_warranty",
+        label: "Extension de garantie liée",
+        type: "select",
+        resource: "warranties",
+        help: "Garantie de l’équipement d’origine, sans transfert implicite au remplacement.",
+      },
+      { name: "cabinet_serial", label: "N° de série de l’armoire batteries" },
+      { name: "battery_count", label: "Nombre de batteries", type: "number" },
+      { name: "site", label: "Site de l’opération" },
+      { name: "end_customer", label: "Client final" },
+      { name: "contact_name", label: "Contact sur site" },
+      { name: "contact_phone", label: "Téléphone du contact", type: "tel" },
       {
         name: "duration_minutes",
         label: "Durée prévue (minutes)",
@@ -285,6 +373,30 @@ export const resources: Record<string, Resource> = {
         label: "Recommandations client",
         type: "textarea",
         wide: true,
+      },
+      {
+        name: "summary",
+        label: "Synthèse de l’opération",
+        type: "textarea",
+        wide: true,
+      },
+      {
+        name: "conclusion",
+        label: "Conclusion de la fiche",
+        type: "select",
+        options: [
+          ["", "Non renseignée"],
+          ["follow_up", "À suivre"],
+          ["completed", "Terminée"],
+          ["not_applicable_billable", "Non applicable / facturable"],
+        ],
+      },
+      {
+        name: "conclusion_notes",
+        label: "Précisions et justification de conclusion",
+        type: "textarea",
+        wide: true,
+        help: "Une conclusion non applicable ou facturable exige une justification explicite. Elle n’est jamais déduite des dates de garantie.",
       },
       {
         name: "internal_notes",

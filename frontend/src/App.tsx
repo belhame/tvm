@@ -2,6 +2,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -66,13 +67,27 @@ import {
   type RecordData,
   type User,
 } from "./api";
-import { resources, statuses, optionLabel, type Resource } from "./resources";
+import {
+  resources,
+  statuses,
+  optionLabel,
+  requestCategories,
+  requestStatusLabels,
+  interventionKinds,
+  type Resource,
+} from "./resources";
 import Scanner from "./Scanner";
 import SerialAnalysis from "./SerialAnalysis";
 import Integrations from "./Integrations";
 import EatonCatalogue from "./EatonCatalogue";
 import CatalogueModelPicker from "./CatalogueModelPicker";
 import RequestIntake from "./RequestIntake";
+import RequestsWorkspace, {
+  type RequestCategoryCount,
+} from "./RequestsWorkspace";
+import RequestDossier from "./RequestDossier";
+import OperationTimeline from "./OperationTimeline";
+import InterventionWorksheet from "./InterventionWorksheet";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -96,6 +111,9 @@ const navGroups = [
       { id: "clients", label: "Clients", icon: Users },
       { id: "equipment", label: "Équipements", icon: Zap },
       { id: "requests", label: "Demandes SAV", icon: ClipboardList },
+      { id: "exchange", label: "Échange", icon: Truck },
+      { id: "commissioning", label: "Mise en service", icon: CheckCircle2 },
+      { id: "preventive", label: "Préventive", icon: ShieldCheck },
       { id: "planning", label: "Planning", icon: CalendarDays },
     ],
   },
@@ -144,12 +162,12 @@ function Logo({ compact = false }: { compact?: boolean }) {
     </div>
   );
 }
-function Badge({ value }: { value: any }) {
+function Badge({ value, label }: { value: any; label?: string }) {
   const key = String(value);
   return (
     <span className={`badge status-${key}`}>
       <span className="badge-dot" />
-      {statuses[key] || key || "—"}
+      {label || statuses[key] || key || "—"}
     </span>
   );
 }
@@ -421,6 +439,7 @@ function EditForm({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const formId = useId();
   const config = resources[modal.resource],
     editing = Boolean(modal.record),
     readonly = modal.readonly;
@@ -455,6 +474,84 @@ function EditForm({
   );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [structuredData, setStructuredData] = useState<RecordData>(
+    modal.record?.structured_data || {},
+  );
+  const [equipmentSection, setEquipmentSection] = useState("record");
+  const sourceRequest = data.requests?.find(
+    (row) => row.id === Number(values.service_request),
+  );
+  const sourceEquipment = data.equipment?.find(
+    (row) => row.id === sourceRequest?.equipment,
+  );
+  const equipmentRequests = (data.requests || []).filter(
+    (row) => row.equipment === modal.record?.id,
+  );
+  const equipmentRequestIds = new Set(equipmentRequests.map((row) => row.id));
+  const canWriteEquipmentTimeline =
+    user.role === "admin" ||
+    user.role === "manager" ||
+    (user.role === "technician" &&
+      (equipmentRequests.some((row) => row.assigned_technician === user.id) ||
+        (data.interventions || []).some(
+          (row) =>
+            equipmentRequestIds.has(row.service_request) &&
+            row.technician === user.id,
+        )));
+  function updateField(name: string, entry: string) {
+    setValues((previous) => ({
+      ...previous,
+      [name]: entry,
+      ...(modal.resource === "interventions" && name === "service_request"
+        ? { replacement_equipment: "", contract: "", extension_warranty: "" }
+        : {}),
+      ...(modal.resource === "interventions" &&
+      name === "kind" &&
+      entry !== "exchange"
+        ? { replacement_equipment: "" }
+        : {}),
+    }));
+  }
+  function allowedOptions(name: string, resource: string) {
+    return (data[resource] || []).filter((row) => {
+      if (
+        resource === "users" &&
+        !["technician", "manager", "admin"].includes(row.role)
+      )
+        return false;
+      if (
+        resource === "equipment" &&
+        name === "equipment" &&
+        values.client &&
+        Number(row.client) !== Number(values.client)
+      )
+        return false;
+      if (modal.resource !== "interventions") return true;
+      if (resource === "requests" && user.role === "technician")
+        return (
+          row.assigned_technician === user.id ||
+          (data.interventions || []).some(
+            (entry) =>
+              entry.service_request === row.id && entry.technician === user.id,
+          )
+        );
+      if (name === "replacement_equipment")
+        return (
+          sourceEquipment &&
+          row.client === sourceEquipment.client &&
+          row.id !== sourceEquipment.id
+        );
+      if (name === "contract")
+        return (
+          sourceEquipment &&
+          row.client === sourceEquipment.client &&
+          (!row.equipment || row.equipment === sourceEquipment.id)
+        );
+      if (name === "extension_warranty")
+        return sourceEquipment && row.equipment === sourceEquipment.id;
+      return true;
+    });
+  }
   if (modal.resource === "requests" && !editing && !readonly) {
     return (
       <Modal
@@ -492,6 +589,10 @@ function EditForm({
         else if (field.type === "date") value = value || null;
         else if (field.name === "is_active") value = value === "true";
         payload[field.name] = value;
+      }
+      if (modal.resource === "interventions") {
+        payload.structured_data = structuredData;
+        if (payload.kind !== "exchange") payload.replacement_equipment = null;
       }
       if (modal.resource === "stock-movements") {
         if (payload.kind === "out")
@@ -537,256 +638,378 @@ function EditForm({
       onClose={onClose}
       wide
     >
-      <form onSubmit={submit}>
+      {modal.resource === "equipment" && editing && (
+        <div className="page-tabs" role="group" aria-label="Fiche équipement">
+          <button
+            type="button"
+            aria-pressed={equipmentSection === "record"}
+            className={equipmentSection === "record" ? "active" : ""}
+            onClick={() => setEquipmentSection("record")}
+          >
+            Matériel
+          </button>
+          <button
+            type="button"
+            aria-pressed={equipmentSection === "timeline"}
+            className={equipmentSection === "timeline" ? "active" : ""}
+            onClick={() => setEquipmentSection("timeline")}
+          >
+            Historique des opérations
+          </button>
+        </div>
+      )}
+      {modal.resource === "equipment" &&
+      editing &&
+      equipmentSection === "timeline" ? (
         <div className="modal-content">
-          {error && <ErrorBox>{error}</ErrorBox>}
-          <div className="form-grid">
-            {config.fields
-              .filter((f) => !readonly || f.name !== "password")
-              .map((field) => (
-                <Fragment key={field.name}>
-                  <label className={`form-field ${field.wide ? "span-2" : ""}`}>
-                    {field.label}
-                    {field.required && <span className="required"> *</span>}
-                    {field.type === "select" ? (
-                      <select
-                        className="input"
-                        disabled={
-                          readonly ||
-                          (field.name === "technician" &&
-                            user.role === "technician")
-                        }
-                        required={field.required}
-                        value={values[field.name]}
-                        onChange={(e) =>
-                          setValues({ ...values, [field.name]: e.target.value })
-                        }
-                      >
-                        <option value="">Sélectionner…</option>
-                        {field.options?.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                        {field.resource &&
-                          (data[field.resource] || [])
-                            .filter(
-                              (row) =>
-                                field.resource !== "users" ||
-                                ["technician", "manager", "admin"].includes(
-                                  row.role,
-                                ),
-                            )
-                            .filter(
-                              (row) =>
-                                field.name !== "equipment" ||
-                                !values.client ||
-                                Number(row.client) === Number(values.client),
-                            )
-                            .map((row) => (
-                              <option key={row.id} value={row.id}>
-                                {optionLabel(field.resource!, row)}
-                              </option>
-                            ))}
-                      </select>
-                    ) : field.type === "textarea" ? (
-                      <textarea
-                        className="input"
-                        rows={3}
-                        disabled={
-                          readonly ||
-                          (field.name === "technician" &&
-                            user.role === "technician")
-                        }
-                        required={field.required}
-                        value={values[field.name]}
-                        placeholder={field.placeholder}
-                        onChange={(e) =>
-                          setValues({ ...values, [field.name]: e.target.value })
-                        }
-                      />
-                    ) : (
-                      <input
-                        className="input"
-                        disabled={readonly}
-                        type={field.type || "text"}
-                        step={
-                          field.type === "number"
-                            ? [
-                                "quantity",
-                                "duration_minutes",
-                                "min_stock",
-                                "visits_per_year",
-                              ].includes(field.name)
-                              ? "1"
-                              : "any"
-                            : undefined
-                        }
-                        required={
-                          field.required ||
-                          (!editing && field.name === "password")
-                        }
-                        value={values[field.name]}
-                        placeholder={field.placeholder}
-                        autoComplete={
-                          field.type === "password" ? "new-password" : "off"
-                        }
-                        onChange={(e) =>
-                          setValues({ ...values, [field.name]: e.target.value })
-                        }
-                      />
-                    )}{" "}
-                    {field.help && <small>{field.help}</small>}
-                  </label>
-                  {modal.resource === "equipment" &&
-                    field.name === "serial_number" && (
-                      <div className="serial-analysis-field span-2">
-                        <SerialAnalysis
-                          serialNumber={String(values.serial_number || "")}
-                          brand={String(values.brand || "")}
-                        />
-                      </div>
-                    )}
-                  {modal.resource === "equipment" &&
-                    field.name === "model" &&
-                    !readonly &&
-                    (user.role === "admin" || user.role === "manager") && (
-                      <div className="catalogue-picker-field span-2">
-                        <CatalogueModelPicker
-                          onSelect={({ model, brand }) =>
-                            setValues((previous) => ({
-                              ...previous,
-                              model,
-                              brand,
-                            }))
+          <OperationTimeline
+            equipmentId={modal.record!.id}
+            user={user}
+            canWrite={canWriteEquipmentTimeline}
+            onChanged={onSaved}
+          />
+        </div>
+      ) : (
+        <form onSubmit={submit}>
+          <div className="modal-content">
+            {error && <ErrorBox>{error}</ErrorBox>}
+            <div className="form-grid">
+              {config.fields
+                .filter(
+                  (field) =>
+                    (!readonly || field.name !== "password") &&
+                    (user.role !== "client" ||
+                      field.name !== "internal_notes") &&
+                    (!field.when ||
+                      values[field.when.field] === field.when.value),
+                )
+                .map((field) => (
+                  <Fragment key={field.name}>
+                    <div className={`form-field ${field.wide ? "span-2" : ""}`}>
+                      <label htmlFor={`${formId}-${field.name}`}>
+                        {field.label}
+                        {field.required && (
+                          <span className="required" aria-hidden="true">
+                            {" "}
+                            *
+                          </span>
+                        )}
+                      </label>
+                      {field.type === "select" ? (
+                        <select
+                          id={`${formId}-${field.name}`}
+                          aria-describedby={
+                            field.help
+                              ? `${formId}-${field.name}-help`
+                              : undefined
+                          }
+                          className="input"
+                          disabled={
+                            readonly ||
+                            (field.name === "technician" &&
+                              user.role === "technician")
+                          }
+                          required={field.required}
+                          value={values[field.name]}
+                          onChange={(e) =>
+                            updateField(field.name, e.target.value)
+                          }
+                        >
+                          {!field.options?.some(([value]) => value === "") && (
+                            <option value="">Sélectionner…</option>
+                          )}
+                          {field.options?.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                          {field.resource &&
+                            allowedOptions(field.name, field.resource).map(
+                              (row) => (
+                                <option key={row.id} value={row.id}>
+                                  {optionLabel(field.resource!, row)}
+                                </option>
+                              ),
+                            )}
+                        </select>
+                      ) : field.type === "textarea" ? (
+                        <textarea
+                          id={`${formId}-${field.name}`}
+                          aria-describedby={
+                            field.help
+                              ? `${formId}-${field.name}-help`
+                              : undefined
+                          }
+                          className="input"
+                          rows={3}
+                          disabled={
+                            readonly ||
+                            (field.name === "technician" &&
+                              user.role === "technician")
+                          }
+                          required={field.required}
+                          value={values[field.name]}
+                          placeholder={field.placeholder}
+                          onChange={(e) =>
+                            updateField(field.name, e.target.value)
                           }
                         />
-                        <small>
-                          Le choix remplit uniquement le modèle et la marque.
-                          Enregistrez la fiche pour conserver ces modifications.
+                      ) : (
+                        <input
+                          id={`${formId}-${field.name}`}
+                          aria-describedby={
+                            field.help
+                              ? `${formId}-${field.name}-help`
+                              : undefined
+                          }
+                          className="input"
+                          disabled={readonly}
+                          type={field.type || "text"}
+                          step={
+                            field.type === "number"
+                              ? [
+                                  "quantity",
+                                  "duration_minutes",
+                                  "min_stock",
+                                  "visits_per_year",
+                                ].includes(field.name)
+                                ? "1"
+                                : "any"
+                              : undefined
+                          }
+                          required={
+                            field.required ||
+                            (!editing && field.name === "password")
+                          }
+                          value={values[field.name]}
+                          placeholder={field.placeholder}
+                          autoComplete={
+                            field.type === "password" ? "new-password" : "off"
+                          }
+                          onChange={(e) =>
+                            updateField(field.name, e.target.value)
+                          }
+                        />
+                      )}{" "}
+                      {field.help && (
+                        <small id={`${formId}-${field.name}-help`}>
+                          {field.help}
                         </small>
+                      )}
+                    </div>
+                    {modal.resource === "equipment" &&
+                      field.name === "serial_number" && (
+                        <div className="serial-analysis-field span-2">
+                          <SerialAnalysis
+                            serialNumber={String(values.serial_number || "")}
+                            brand={String(values.brand || "")}
+                          />
+                        </div>
+                      )}
+                    {modal.resource === "equipment" &&
+                      field.name === "model" &&
+                      !readonly &&
+                      (user.role === "admin" || user.role === "manager") && (
+                        <div className="catalogue-picker-field span-2">
+                          <CatalogueModelPicker
+                            onSelect={({ model, brand }) =>
+                              setValues((previous) => ({
+                                ...previous,
+                                model,
+                                brand,
+                              }))
+                            }
+                          />
+                          <small>
+                            Le choix remplit uniquement le modèle et la marque.
+                            Enregistrez la fiche pour conserver ces
+                            modifications.
+                          </small>
+                        </div>
+                      )}
+                  </Fragment>
+                ))}
+            </div>
+            {modal.resource === "interventions" && (
+              <>
+                {sourceEquipment && (
+                  <div className="request-dossier-card">
+                    <dl className="request-dossier-facts">
+                      <div>
+                        <dt>Ancien numéro de série</dt>
+                        <dd>{sourceEquipment.serial_number}</dd>
                       </div>
-                    )}
-                </Fragment>
-              ))}
-          </div>
-          {modal.resource === "delivery-notes" && (
-            <section className="delivery-lines">
-              <div className="section-title">
-                <h3>Articles livrés</h3>
-                {!readonly && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() =>
-                      setLines([
-                        ...lines,
-                        { part: "", description: "", quantity: 1 },
-                      ])
-                    }
-                  >
-                    <Plus size={15} /> Ajouter une ligne
-                  </button>
+                      <div>
+                        <dt>Client propriétaire</dt>
+                        <dd>{sourceEquipment.client_name}</dd>
+                      </div>
+                      <div>
+                        <dt>Période du contrat lié</dt>
+                        <dd>
+                          {data.contracts?.find(
+                            (row) => row.id === Number(values.contract),
+                          )
+                            ? `${dateFR(data.contracts.find((row) => row.id === Number(values.contract))?.starts_on)} → ${dateFR(data.contracts.find((row) => row.id === Number(values.contract))?.ends_on)}`
+                            : "Aucun contrat lié"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Période de l’extension liée</dt>
+                        <dd>
+                          {data.warranties?.find(
+                            (row) =>
+                              row.id === Number(values.extension_warranty),
+                          )
+                            ? `${dateFR(data.warranties.find((row) => row.id === Number(values.extension_warranty))?.starts_on)} → ${dateFR(data.warranties.find((row) => row.id === Number(values.extension_warranty))?.ends_on)}`
+                            : "Aucune extension liée"}
+                        </dd>
+                      </div>
+                      {values.kind === "exchange" && (
+                        <div>
+                          <dt>Nouveau numéro de série</dt>
+                          <dd>
+                            {data.equipment?.find(
+                              (row) =>
+                                row.id === Number(values.replacement_equipment),
+                            )?.serial_number || "À sélectionner"}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
                 )}
-              </div>
-              {lines.map((line, index) => (
-                <div className="delivery-line" key={index}>
-                  <select
-                    aria-label="Pièce du bon"
-                    className="input"
-                    disabled={readonly}
-                    value={line.part}
-                    onChange={(e) => {
-                      const part = data.parts?.find(
-                        (p) => p.id === Number(e.target.value),
-                      );
-                      setLines(
-                        lines.map((l, i) =>
-                          i === index
-                            ? {
-                                ...l,
-                                part: e.target.value,
-                                description: part?.name || l.description,
-                              }
-                            : l,
-                        ),
-                      );
-                    }}
-                  >
-                    <option value="">Article libre</option>
-                    {data.parts?.map((p) => (
-                      <option value={p.id} key={p.id}>
-                        {p.sku}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    aria-label="Désignation"
-                    className="input"
-                    disabled={readonly}
-                    placeholder="Désignation de l’article"
-                    value={line.description}
-                    onChange={(e) =>
-                      setLines(
-                        lines.map((l, i) =>
-                          i === index
-                            ? { ...l, description: e.target.value }
-                            : l,
-                        ),
-                      )
-                    }
-                  />
-                  <input
-                    aria-label="Quantité"
-                    className="input"
-                    disabled={readonly}
-                    type="number"
-                    min="1"
-                    value={line.quantity}
-                    onChange={(e) =>
-                      setLines(
-                        lines.map((l, i) =>
-                          i === index ? { ...l, quantity: e.target.value } : l,
-                        ),
-                      )
-                    }
-                  />
+                <InterventionWorksheet
+                  kind={values.kind || "maintenance"}
+                  value={structuredData}
+                  onChange={setStructuredData}
+                  readonly={readonly}
+                />
+              </>
+            )}
+            {modal.resource === "delivery-notes" && (
+              <section className="delivery-lines">
+                <div className="section-title">
+                  <h3>Articles livrés</h3>
                   {!readonly && (
                     <button
                       type="button"
-                      className="icon-button"
-                      aria-label="Retirer la ligne"
+                      className="text-button"
                       onClick={() =>
-                        setLines(lines.filter((_, i) => i !== index))
+                        setLines([
+                          ...lines,
+                          { part: "", description: "", quantity: 1 },
+                        ])
                       }
                     >
-                      <X size={15} />
+                      <Plus size={15} /> Ajouter une ligne
                     </button>
                   )}
                 </div>
-              ))}
-              <small className="muted">
-                Le bon documente la livraison. Enregistrez séparément le
-                mouvement de stock pour éviter tout double débit.
-              </small>
-            </section>
-          )}
-        </div>
-        <div className="modal-footer">
-          <span className="form-secure">
-            <Server size={14} /> Base serveur partagée
-          </span>
-          <button type="button" className="button secondary" onClick={onClose}>
-            {readonly ? "Fermer" : "Annuler"}
-          </button>
-          {!readonly && (
-            <button className="button primary" disabled={busy}>
-              {busy ? <Spinner /> : <Check size={17} />}{" "}
-              {editing ? "Enregistrer les modifications" : "Enregistrer"}
+                {lines.map((line, index) => (
+                  <div className="delivery-line" key={index}>
+                    <select
+                      aria-label="Pièce du bon"
+                      className="input"
+                      disabled={readonly}
+                      value={line.part}
+                      onChange={(e) => {
+                        const part = data.parts?.find(
+                          (p) => p.id === Number(e.target.value),
+                        );
+                        setLines(
+                          lines.map((l, i) =>
+                            i === index
+                              ? {
+                                  ...l,
+                                  part: e.target.value,
+                                  description: part?.name || l.description,
+                                }
+                              : l,
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="">Article libre</option>
+                      {data.parts?.map((p) => (
+                        <option value={p.id} key={p.id}>
+                          {p.sku}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label="Désignation"
+                      className="input"
+                      disabled={readonly}
+                      placeholder="Désignation de l’article"
+                      value={line.description}
+                      onChange={(e) =>
+                        setLines(
+                          lines.map((l, i) =>
+                            i === index
+                              ? { ...l, description: e.target.value }
+                              : l,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      aria-label="Quantité"
+                      className="input"
+                      disabled={readonly}
+                      type="number"
+                      min="1"
+                      value={line.quantity}
+                      onChange={(e) =>
+                        setLines(
+                          lines.map((l, i) =>
+                            i === index
+                              ? { ...l, quantity: e.target.value }
+                              : l,
+                          ),
+                        )
+                      }
+                    />
+                    {!readonly && (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Retirer la ligne"
+                        onClick={() =>
+                          setLines(lines.filter((_, i) => i !== index))
+                        }
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <small className="muted">
+                  Le bon documente la livraison. Enregistrez séparément le
+                  mouvement de stock pour éviter tout double débit.
+                </small>
+              </section>
+            )}
+          </div>
+          <div className="modal-footer">
+            <span className="form-secure">
+              <Server size={14} /> Base serveur partagée
+            </span>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={onClose}
+            >
+              {readonly ? "Fermer" : "Annuler"}
             </button>
-          )}
-        </div>
-      </form>
+            {!readonly && (
+              <button className="button primary" disabled={busy}>
+                {busy ? <Spinner /> : <Check size={17} />}{" "}
+                {editing ? "Enregistrer les modifications" : "Enregistrer"}
+              </button>
+            )}
+          </div>
+        </form>
+      )}
     </Modal>
   );
 }
@@ -835,7 +1058,18 @@ function RecordTable({
                 return (
                   <td key={c.key}>
                     {c.type === "status" ? (
-                      <Badge value={val} />
+                      <Badge
+                        value={val}
+                        label={
+                          c.key === "kind"
+                            ? interventionKinds.find(
+                                ([key]) => key === val,
+                              )?.[1]
+                            : resource === "requests" && c.key === "status"
+                              ? requestStatusLabels[val]
+                              : undefined
+                        }
+                      />
                     ) : c.type === "date" || c.type === "datetime" ? (
                       <span className="date-cell">
                         {dateFR(val, c.type === "datetime")}
@@ -848,7 +1082,7 @@ function RecordTable({
                           className="avatar avatar-small"
                           style={{
                             background: `hsl(${(row.technician || 0) * 65 + 210} 65% 93%)`,
-                            color: `hsl(${(row.technician || 0) * 65 + 210} 50% 35%)`,
+                            color: `hsl(${(row.technician || 0) * 65 + 210} 50% 25%)`,
                           }}
                         >
                           {initials(val || "NA")}
@@ -945,6 +1179,7 @@ function ResourcePage({
   loading,
   hideHeading = false,
   externalSearch = "",
+  kind,
 }: {
   resource: string;
   data: DataMap;
@@ -954,8 +1189,17 @@ function ResourcePage({
   loading: boolean;
   hideHeading?: boolean;
   externalSearch?: string;
+  kind?: string;
 }) {
-  const config = resources[resource];
+  const kindLabel = interventionKinds.find(([key]) => key === kind)?.[1];
+  const config = kindLabel
+    ? {
+        ...resources[resource],
+        title: kind === "exchange" ? "Échanges d’onduleurs" : kindLabel,
+        description: `Les fiches ${kindLabel.toLowerCase()} enregistrées pour vos dossiers SAV.`,
+        button: `Nouvelle fiche ${kindLabel.toLowerCase()}`,
+      }
+    : resources[resource];
   const [search, setSearch] = useState(externalSearch),
     [status, setStatus] = useState("all");
   useEffect(() => setSearch(externalSearch), [externalSearch]);
@@ -987,7 +1231,9 @@ function ResourcePage({
         {canManage(user, resource) && (
           <button
             className="button primary"
-            onClick={() => onEdit({ resource })}
+            onClick={() =>
+              onEdit({ resource, values: kind ? { kind } : undefined })
+            }
           >
             <Plus size={18} />
             {config.button}
@@ -1066,7 +1312,9 @@ function ResourcePage({
               canManage(user, resource) && !search ? (
                 <button
                   className="button secondary"
-                  onClick={() => onEdit({ resource })}
+                  onClick={() =>
+                    onEdit({ resource, values: kind ? { kind } : undefined })
+                  }
                 >
                   <Plus size={16} />
                   {config.button}
@@ -2211,6 +2459,10 @@ export default function App() {
     [loadError, setLoadError] = useState(""),
     [modal, setModal] = useState<ModalState | null>(null),
     [detail, setDetail] = useState<RecordData | null>(null),
+    [requestDetail, setRequestDetail] = useState<RecordData | null>(null),
+    [requestCounts, setRequestCounts] = useState<RequestCategoryCount[] | null>(
+      null,
+    ),
     [query, setQuery] = useState(""),
     [searchQuery, setSearchQuery] = useState(""),
     [externalSearch, setExternalSearch] = useState(""),
@@ -2308,7 +2560,7 @@ export default function App() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
   function navigate(target: string, search = "") {
-    if (user?.role === "client" && !clientPages.has(target))
+    if (user?.role === "client" && !clientPages.has(target.split("/")[0]))
       target = "dashboard";
     if (target === "users" && user?.role !== "admin") target = "dashboard";
     setPage(target);
@@ -2324,6 +2576,8 @@ export default function App() {
     setData({});
     setDashboard({});
     setDetail(null);
+    setRequestDetail(null);
+    setRequestCounts(null);
     setModal(null);
     setSearchQuery("");
     setQuery("");
@@ -2354,10 +2608,15 @@ export default function App() {
     }
   }
   function openModal(value: ModalState) {
+    if (value.resource === "requests" && value.record) {
+      setRequestDetail(value.record);
+      return;
+    }
     setModal(value);
   }
   const closeModal = useCallback(() => setModal(null), []),
     closeDetail = useCallback(() => setDetail(null), []),
+    closeRequestDetail = useCallback(() => setRequestDetail(null), []),
     closeSearch = useCallback(() => setSearchQuery(""), []);
   if (!initialized)
     return (
@@ -2385,11 +2644,17 @@ export default function App() {
         />
       </>
     );
+  const basePage = page.startsWith("requests/") ? "requests" : page;
+  const requestCategory = requestCategories.some(
+    (entry) => entry.key === page.split("/")[1],
+  )
+    ? page.split("/")[1]
+    : "all";
   const allowedPage =
-    (user.role === "client" && !clientPages.has(page)) ||
-    (page === "users" && user.role !== "admin")
+    (user.role === "client" && !clientPages.has(basePage)) ||
+    (basePage === "users" && user.role !== "admin")
       ? "dashboard"
-      : page;
+      : basePage;
   const common = {
     data,
     onEdit: openModal,
@@ -2399,6 +2664,9 @@ export default function App() {
   };
   const currentDetail = detail
     ? data.interventions?.find((r) => r.id === detail.id) || detail
+    : null;
+  const currentRequestDetail = requestDetail
+    ? data.requests?.find((row) => row.id === requestDetail.id) || requestDetail
     : null;
   return (
     <div className="app-shell">
@@ -2427,21 +2695,53 @@ export default function App() {
               <div className="nav-group" key={group.label}>
                 <div className="nav-label">{group.label}</div>
                 {items.map((item) => (
-                  <button
-                    className={`nav-item ${allowedPage === item.id ? "active" : ""}`}
-                    key={item.id}
-                    onClick={() => navigate(item.id)}
-                  >
-                    <item.icon size={18} />
-                    <span>{item.label}</span>
-                    {item.id === "requests" &&
-                      Number(dashboard.metrics?.open_requests) > 0 && (
-                        <b>{dashboard.metrics.open_requests}</b>
+                  <Fragment key={item.id}>
+                    <button
+                      className={`nav-item ${allowedPage === item.id ? "active" : ""}`}
+                      aria-label={
+                        item.id === "exchange" ? "Fiches d’échange" : item.label
+                      }
+                      aria-expanded={
+                        item.id === "requests"
+                          ? allowedPage === "requests"
+                          : undefined
+                      }
+                      onClick={() => navigate(item.id)}
+                    >
+                      <item.icon size={18} />
+                      <span>{item.label}</span>
+                      {item.id === "requests" &&
+                        Number(dashboard.metrics?.open_requests) > 0 && (
+                          <b>{dashboard.metrics.open_requests}</b>
+                        )}
+                      {allowedPage === item.id && (
+                        <span className="nav-active-dot" />
                       )}
-                    {allowedPage === item.id && (
-                      <span className="nav-active-dot" />
+                    </button>
+                    {item.id === "requests" && allowedPage === "requests" && (
+                      <div
+                        className="nav-submenu"
+                        aria-label="Catégories des demandes"
+                      >
+                        {requestCategories.map((entry) => (
+                          <button
+                            type="button"
+                            key={entry.key}
+                            aria-label={`Demandes : ${entry.label}`}
+                            className={`nav-subitem ${requestCategory === entry.key ? "active" : ""}`}
+                            onClick={() => navigate(`requests/${entry.key}`)}
+                          >
+                            <span>{entry.label}</span>
+                            <span className="nav-subcount">
+                              {requestCounts?.find(
+                                (row) => row.key === entry.key,
+                              )?.count ?? "—"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  </button>
+                  </Fragment>
                 ))}
               </div>
             ) : null;
@@ -2572,6 +2872,31 @@ export default function App() {
               {...common}
               dashboard={dashboard}
               onNavigate={navigate}
+            />
+          ) : allowedPage === "requests" ? (
+            <RequestsWorkspace
+              category={requestCategory}
+              user={user}
+              onCategoryChange={(key) => navigate(`requests/${key}`)}
+              onOpen={setRequestDetail}
+              onCreate={() => openModal({ resource: "requests" })}
+              onCountsChange={setRequestCounts}
+              refreshKey={data.requests}
+              initialSearch={externalSearch}
+            />
+          ) : ["exchange", "commissioning", "preventive"].includes(
+              allowedPage,
+            ) ? (
+            <ResourcePage
+              {...common}
+              resource="interventions"
+              kind={allowedPage}
+              data={{
+                ...data,
+                interventions: (data.interventions || []).filter(
+                  (row) => row.kind === allowedPage,
+                ),
+              }}
             />
           ) : allowedPage === "planning" ? (
             <Planning {...common} />
@@ -2740,6 +3065,41 @@ export default function App() {
           </footer>
         </main>
       </div>
+      {currentRequestDetail && (
+        <Modal
+          title="Dossier SAV"
+          subtitle={currentRequestDetail.reference}
+          onClose={closeRequestDetail}
+          wide
+        >
+          <RequestDossier
+            key={currentRequestDetail.id}
+            record={currentRequestDetail}
+            data={data}
+            user={user}
+            onChanged={reload}
+            onEditRequest={() => {
+              setRequestDetail(null);
+              setModal({ resource: "requests", record: currentRequestDetail });
+            }}
+            onCreateIntervention={(kind) => {
+              setRequestDetail(null);
+              setModal({
+                resource: "interventions",
+                values: { service_request: currentRequestDetail.id, kind },
+              });
+            }}
+            onOpenIntervention={(entry) => {
+              setRequestDetail(null);
+              setDetail(entry);
+            }}
+            onEditIntervention={(entry) => {
+              setRequestDetail(null);
+              setModal({ resource: "interventions", record: entry });
+            }}
+          />
+        </Modal>
+      )}
       {modal && (
         <EditForm
           modal={modal}

@@ -14,7 +14,9 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
 | Demande à partir d'une série | Recherche interne du modèle et de la garantie, puis création transactionnelle de la demande et, si nécessaire, de l'équipement et de sa garantie | Création d'équipement administrateur/responsable ; données existantes prioritaires ; cas ambigus ou dates imprécises à compléter explicitement |
-| Interventions | Affectation, date, durée, diagnostic, travaux, recommandations et état | Pas d'optimisation automatique des tournées |
+| Suivi et classement SAV | Vues par type d'opération et état, avec compteurs calculés depuis les dossiers accessibles | Les états web ne constituent pas une conversion automatique de tous les anciens codes WINDEV |
+| Historique métier | Suivi des événements réellement enregistrés autour des demandes et des équipements, avec observations et synthèse du dossier | État de référence des anciennes fiches distinct d'un changement utilisateur ; aucun ancien journal HFSQL importé automatiquement |
+| Interventions | Affectation, dates, durée, diagnostic, travaux, recommandations, état et fiches de maintenance, échange, mise en service ou préventive | Cases et conclusions déclaratives ; aucun mouvement de stock, décision de garantie ou facturation déclenchés par une case |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
 | Rapports | Téléchargement PDF par intervention, soumis aux mêmes droits que le dossier | Pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
 | Contrats | Fiche de contrat liée au client et éventuellement à un équipement, dates et couverture | Pas de facturation ni de génération automatique d'échéanciers |
@@ -33,10 +35,22 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 |---|---|
 | Administrateur | Création et modification des données métier ; gestion des comptes et de leurs rôles |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
-| Technicien | Lecture des données métier internes ; création de demandes ; création d'interventions affectées à lui-même et modification de ses interventions ; consommation de pièces pour ses interventions |
+| Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
 | Client | Lecture seule des ressources de sa société ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
+
+## Catégories et historique SAV
+
+Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés ou clôturés. **En retard** est calculé depuis l'échéance et peut recouper un autre état. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
+
+La chronologie d'une demande ou d'un onduleur expose les événements enregistrés, leur date et leur auteur, les changements d'état, les observations et les synthèses ajoutées. Les notes sont internes par défaut ; le portail client ne voit que les événements publics de ses propres dossiers. Une synthèse est un événement conservé, pas une réponse de l'assistant IA.
+
+Les fiches préexistantes disposent d'un état de référence distinct des nouveaux événements. Cet état ne reconstitue pas les étapes passées : **l'ancien historique HFSQL n'est pas importé dans la chronologie par cette mise à jour**. Voir [le guide du suivi SAV](GUIDE_SUIVI_SAV.md).
+
+La conservation des événements protège aussi leurs liens : supprimer un compte auteur, un équipement ou un dossier historisé peut être refusé. Désactiver le compte ou utiliser les états Hors service / Clôturé permet d'arrêter leur utilisation en conservant le suivi.
+
+Les fiches d'intervention structurées enregistrent les vérifications propres au type d'opération, le matériel de remplacement pour un échange, les références de contrat ou d'extension et une synthèse/conclusion. Le PDF reprend ces données connues sans notes internes. Une conclusion « non applicable / facturable » exige une justification humaine ; elle ne résulte pas d'une déduction automatique depuis la garantie.
 
 ## Scan sur téléphone
 

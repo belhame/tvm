@@ -60,4 +60,4 @@ else:
     raise SystemExit('Le serveur E2E ne répond pas. Voir .local/e2e-server.log.')
 PY
 cd "$task_root/tests/browser"
-npm test
+npm test -- "$@"

@@ -1,0 +1,562 @@
+import { useId, useState, type KeyboardEvent } from "react";
+import { FileText, Pencil, Plus, ShieldCheck, Wrench } from "lucide-react";
+import { dateFR, type RecordData, type User } from "./api";
+import { interventionKinds, requestStatusLabels, statuses } from "./resources";
+import InterventionWorksheet from "./InterventionWorksheet";
+import OperationTimeline, { type OperationEvent } from "./OperationTimeline";
+
+const tabs = [
+  ["equipment", "Matériel"],
+  ["contracts", "Contrat"],
+  ["maintenance", "Maintenance"],
+  ["commissioning", "Mise en service"],
+  ["preventive", "Préventive"],
+  ["exchange", "Échange"],
+  ["conclusion", "Conclusion"],
+] as const;
+
+function day(value?: string | null) {
+  if (!value) return "Non renseignée";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : dateFR(value);
+}
+function Fact({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>
+        {value === null || value === undefined || value === ""
+          ? "Non renseigné"
+          : String(value)}
+      </dd>
+    </div>
+  );
+}
+
+export default function RequestDossier({
+  record,
+  data,
+  user,
+  onEditRequest,
+  onCreateIntervention,
+  onOpenIntervention,
+  onEditIntervention,
+  onChanged,
+}: {
+  record: RecordData;
+  data: Record<string, RecordData[]>;
+  user: User;
+  onEditRequest: () => void;
+  onCreateIntervention: (kind: string) => void;
+  onOpenIntervention: (record: RecordData) => void;
+  onEditIntervention: (record: RecordData) => void;
+  onChanged: () => Promise<void>;
+}) {
+  const tabId = useId();
+  const [tab, setTab] = useState<string>("equipment");
+  function handleTabKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const current = tabs.findIndex(([key]) => key === tab);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+            tabs.length;
+    setTab(tabs[next][0]);
+    event.currentTarget
+      .querySelectorAll<HTMLButtonElement>("button[role=tab]")
+      [next]?.focus();
+  }
+  const [timelineScope, setTimelineScope] = useState<"request" | "equipment">(
+    "request",
+  );
+  const [timelineEvents, setTimelineEvents] = useState<OperationEvent[]>([]);
+  const equipment = data.equipment?.find((row) => row.id === record.equipment);
+  const client = data.clients?.find((row) => row.id === equipment?.client);
+  const interventions = (data.interventions || []).filter(
+    (row) => row.service_request === record.id,
+  );
+  const contracts = (data.contracts || []).filter(
+    (row) =>
+      row.client === equipment?.client &&
+      (!row.equipment || row.equipment === record.equipment),
+  );
+  const warranties = (data.warranties || []).filter(
+    (row) => row.equipment === record.equipment,
+  );
+  const canManage = user.role === "admin" || user.role === "manager";
+  const canAddOperation =
+    canManage ||
+    (user.role === "technician" &&
+      (record.assigned_technician === user.id ||
+        interventions.some((row) => row.technician === user.id)));
+  const equipmentRequestIds = new Set(
+    (data.requests || [])
+      .filter((row) => row.equipment === record.equipment)
+      .map((row) => row.id),
+  );
+  const canWriteEquipment =
+    canManage ||
+    (user.role === "technician" &&
+      ((data.requests || []).some(
+        (row) =>
+          equipmentRequestIds.has(row.id) &&
+          row.assigned_technician === user.id,
+      ) ||
+        (data.interventions || []).some(
+          (row) =>
+            equipmentRequestIds.has(row.service_request) &&
+            row.technician === user.id,
+        )));
+  const summaries = timelineEvents
+    .filter(
+      (event) =>
+        event.kind === "summary" &&
+        event.service_request === record.id &&
+        (!event.is_internal || user.role !== "client"),
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id,
+    );
+  const shown = interventions.filter(
+    (row) => (row.kind || "maintenance") === tab,
+  );
+
+  return (
+    <div className="request-dossier">
+      <div className="modal-content">
+        <div className="request-dossier-heading">
+          <div>
+            <h2 className="request-dossier-reference">{record.reference}</h2>
+            <p>{record.subject}</p>
+          </div>
+          <span className={`badge status-${record.status}`}>
+            {requestStatusLabels[record.status] || record.status}
+          </span>
+        </div>
+        <div className="request-dossier-meta">
+          <span>{record.client_name || equipment?.client_name}</span>
+          <span>
+            S/N : {record.equipment_serial || equipment?.serial_number}
+          </span>
+          <span>
+            {record.assigned_technician
+              ? `Affecté à ${record.assigned_technician_name}`
+              : "Non affecté"}
+          </span>
+          <span className={record.is_overdue ? "request-overdue" : ""}>
+            Échéance : {day(record.due_on)}
+          </span>
+        </div>
+        <div
+          className="request-dossier-tabs page-tabs"
+          role="tablist"
+          aria-label="Fiche du dossier SAV"
+          onKeyDown={handleTabKey}
+        >
+          {tabs.map(([key, label]) => (
+            <button
+              type="button"
+              role="tab"
+              id={`${tabId}-${key}`}
+              aria-controls={`${tabId}-panel`}
+              tabIndex={tab === key ? 0 : -1}
+              aria-selected={tab === key}
+              className={tab === key ? "active" : ""}
+              onClick={() => setTab(key)}
+              key={key}
+            >
+              {label}
+              {interventionKinds.some(([kind]) => kind === key) && (
+                <span>
+                  {
+                    interventions.filter(
+                      (row) => (row.kind || "maintenance") === key,
+                    ).length
+                  }
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div
+          className="request-dossier-panel"
+          role="tabpanel"
+          id={`${tabId}-panel`}
+          aria-labelledby={`${tabId}-${tab}`}
+        >
+          {tab === "equipment" && (
+            <>
+              <section className="request-dossier-card">
+                <h3>Matériel concerné</h3>
+                <dl className="request-dossier-facts">
+                  <Fact
+                    label="Client"
+                    value={record.client_name || equipment?.client_name}
+                  />
+                  <Fact
+                    label="Contact principal"
+                    value={client?.contact_name}
+                  />
+                  <Fact
+                    label="Numéro de série"
+                    value={record.equipment_serial || equipment?.serial_number}
+                  />
+                  <Fact
+                    label="Modèle"
+                    value={equipment?.model || record.equipment_model}
+                  />
+                  <Fact label="Marque" value={equipment?.brand} />
+                  <Fact
+                    label="Site / emplacement"
+                    value={equipment?.location}
+                  />
+                  <Fact label="Puissance (kVA)" value={equipment?.power_kva} />
+                  <Fact
+                    label="Fabrication enregistrée"
+                    value={
+                      equipment?.manufactured_on
+                        ? day(equipment.manufactured_on)
+                        : null
+                    }
+                  />
+                  <Fact
+                    label="Mise en service"
+                    value={
+                      equipment?.commissioned_on
+                        ? day(equipment.commissioned_on)
+                        : null
+                    }
+                  />
+                  <Fact
+                    label="Fin de garantie enregistrée"
+                    value={
+                      equipment?.warranty_until
+                        ? day(equipment.warranty_until)
+                        : null
+                    }
+                  />
+                </dl>
+              </section>
+              <section className="request-dossier-card">
+                <h3>Signalement</h3>
+                <p>
+                  {record.description || "Aucune description complémentaire."}
+                </p>
+              </section>
+              {warranties.length > 0 && (
+                <section className="request-dossier-card">
+                  <h3>
+                    <ShieldCheck size={16} /> Garanties enregistrées
+                  </h3>
+                  {warranties.map((warranty) => (
+                    <div className="request-dossier-related" key={warranty.id}>
+                      <strong>{warranty.provider}</strong>
+                      <span>
+                        {day(warranty.starts_on)} → {day(warranty.ends_on)}
+                      </span>
+                      <p>{warranty.terms}</p>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </>
+          )}
+          {tab === "contracts" && (
+            <section className="request-dossier-card">
+              <h3>Contrats de maintenance</h3>
+              <p>
+                Les contrats client ou équipement sont distincts des garanties
+                constructeur.
+              </p>
+              {contracts.length ? (
+                contracts.map((contract) => (
+                  <div className="request-dossier-related" key={contract.id}>
+                    <strong>{contract.number}</strong>
+                    <span className={`badge status-${contract.status}`}>
+                      {statuses[contract.status] || contract.status}
+                    </span>
+                    <p>
+                      {day(contract.starts_on)} → {day(contract.ends_on)} ·{" "}
+                      {contract.equipment
+                        ? "Contrat équipement"
+                        : "Contrat client"}
+                    </p>
+                    <p>{contract.coverage}</p>
+                    <small>{contract.visits_per_year} visite(s) par an</small>
+                  </div>
+                ))
+              ) : (
+                <p className="request-dossier-empty">
+                  Aucun contrat enregistré dans ce périmètre.
+                </p>
+              )}
+            </section>
+          )}
+          {interventionKinds.some(([kind]) => kind === tab) && (
+            <section className="request-dossier-card">
+              <div className="request-dossier-actions">
+                <h3>{interventionKinds.find(([kind]) => kind === tab)?.[1]}</h3>
+                {canAddOperation && (
+                  <button
+                    type="button"
+                    className="button primary small"
+                    onClick={() => onCreateIntervention(tab)}
+                  >
+                    <Plus size={16} />
+                    Créer une fiche
+                  </button>
+                )}
+              </div>
+              {shown.length ? (
+                shown.map((intervention) => (
+                  <article
+                    className="request-dossier-related"
+                    key={intervention.id}
+                  >
+                    <div className="request-dossier-actions">
+                      <strong>{intervention.reference}</strong>
+                      <span className={`badge status-${intervention.status}`}>
+                        {statuses[intervention.status] || intervention.status}
+                      </span>
+                    </div>
+                    <dl className="request-dossier-facts">
+                      <Fact
+                        label="Date de l’opération"
+                        value={day(intervention.performed_on)}
+                      />
+                      <Fact
+                        label="Technicien"
+                        value={intervention.technician_name}
+                      />
+                      <Fact
+                        label="Ancien numéro de série"
+                        value={intervention.equipment_serial}
+                      />
+                      {tab === "exchange" && (
+                        <Fact
+                          label="Nouveau numéro de série"
+                          value={
+                            intervention.replacement_equipment_serial ||
+                            data.equipment?.find(
+                              (row) =>
+                                row.id === intervention.replacement_equipment,
+                            )?.serial_number
+                          }
+                        />
+                      )}
+                      <Fact
+                        label="Armoire batteries"
+                        value={intervention.cabinet_serial}
+                      />
+                      <Fact
+                        label="Nombre de batteries"
+                        value={intervention.battery_count}
+                      />
+                      <Fact label="Site" value={intervention.site} />
+                      <Fact
+                        label="Client final"
+                        value={intervention.end_customer}
+                      />
+                      <Fact label="Contact" value={intervention.contact_name} />
+                      <Fact
+                        label="Téléphone du contact"
+                        value={intervention.contact_phone}
+                      />
+                      <Fact
+                        label="Contrat lié"
+                        value={
+                          data.contracts?.find(
+                            (row) => row.id === intervention.contract,
+                          )?.number || intervention.contract_number
+                        }
+                      />
+                      <Fact
+                        label="Début du contrat lié"
+                        value={
+                          intervention.contract_starts_on
+                            ? day(intervention.contract_starts_on)
+                            : null
+                        }
+                      />
+                      <Fact
+                        label="Fin du contrat lié"
+                        value={
+                          intervention.contract_ends_on
+                            ? day(intervention.contract_ends_on)
+                            : null
+                        }
+                      />
+                      <Fact
+                        label="Début de l’extension liée"
+                        value={
+                          intervention.extension_starts_on
+                            ? day(intervention.extension_starts_on)
+                            : null
+                        }
+                      />
+                      <Fact
+                        label="Fin de l’extension liée"
+                        value={
+                          intervention.extension_ends_on
+                            ? day(intervention.extension_ends_on)
+                            : null
+                        }
+                      />
+                      <Fact
+                        label="Conclusion"
+                        value={
+                          statuses[intervention.conclusion] ||
+                          intervention.conclusion
+                        }
+                      />
+                    </dl>
+                    {intervention.summary && <p>{intervention.summary}</p>}
+                    {intervention.conclusion_notes && (
+                      <p>{intervention.conclusion_notes}</p>
+                    )}
+                    <InterventionWorksheet
+                      kind={tab}
+                      value={intervention.structured_data || {}}
+                      readonly
+                      onChange={() => {}}
+                    />
+                    <div className="request-dossier-actions">
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        onClick={() => onOpenIntervention(intervention)}
+                      >
+                        <Wrench size={15} />
+                        Ouvrir l’intervention
+                      </button>
+                      {(canManage ||
+                        (user.role === "technician" &&
+                          intervention.technician === user.id)) && (
+                        <button
+                          type="button"
+                          className="button secondary small"
+                          onClick={() => onEditIntervention(intervention)}
+                        >
+                          <Pencil size={15} />
+                          Modifier la fiche
+                        </button>
+                      )}
+                      <a
+                        className="button secondary small"
+                        href={`/api/interventions/${intervention.id}/report/`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <FileText size={15} />
+                        Rapport PDF
+                      </a>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="request-dossier-empty">
+                  Aucune fiche de ce type pour cette demande.
+                </p>
+              )}
+            </section>
+          )}
+          {tab === "conclusion" && (
+            <section className="request-dossier-card request-dossier-conclusion">
+              <h3>Synthèses du dossier</h3>
+              {summaries.length ? (
+                summaries.map((event) => (
+                  <article className="request-dossier-related" key={event.id}>
+                    <strong>{dateFR(event.created_at, true)}</strong>
+                    {event.is_internal && (
+                      <span className="badge">Interne</span>
+                    )}
+                    <p>{event.summary}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="request-dossier-empty">
+                  Aucune synthèse visible n’a été enregistrée. Les synthèses
+                  peuvent être ajoutées dans l’historique du dossier ci-dessous.
+                </p>
+              )}
+              <h3>Conclusions des interventions</h3>
+              {interventions
+                .filter((row) => row.conclusion || row.conclusion_notes)
+                .map((row) => (
+                  <article className="request-dossier-related" key={row.id}>
+                    <strong>
+                      {row.reference} ·{" "}
+                      {statuses[row.conclusion] ||
+                        row.conclusion ||
+                        "Conclusion renseignée"}
+                    </strong>
+                    <p>{row.conclusion_notes || row.summary}</p>
+                  </article>
+                ))}
+            </section>
+          )}
+        </div>
+        <div
+          className="page-tabs request-dossier-timeline-scope"
+          role="group"
+          aria-label="Périmètre de l’historique"
+        >
+          <button
+            type="button"
+            aria-pressed={timelineScope === "request"}
+            className={timelineScope === "request" ? "active" : ""}
+            onClick={() => {
+              setTimelineEvents([]);
+              setTimelineScope("request");
+            }}
+          >
+            Historique du dossier
+          </button>
+          <button
+            type="button"
+            aria-pressed={timelineScope === "equipment"}
+            className={timelineScope === "equipment" ? "active" : ""}
+            onClick={() => {
+              setTimelineEvents([]);
+              setTimelineScope("equipment");
+            }}
+          >
+            Historique de l’onduleur
+          </button>
+        </div>
+        <OperationTimeline
+          requestId={timelineScope === "request" ? record.id : undefined}
+          equipmentId={
+            timelineScope === "equipment" ? record.equipment : undefined
+          }
+          user={user}
+          canWrite={
+            timelineScope === "request" ? canAddOperation : canWriteEquipment
+          }
+          onChanged={onChanged}
+          onEventsLoaded={setTimelineEvents}
+        />
+      </div>
+      <div className="modal-footer">
+        <span className="form-secure">
+          Dossier partagé · {record.reference}
+        </span>
+        {canManage && (
+          <button
+            type="button"
+            className="button primary"
+            onClick={onEditRequest}
+          >
+            <Pencil size={16} />
+            Modifier le dossier
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

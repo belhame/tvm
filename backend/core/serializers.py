@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import AuditLog, Client, Contract, DeliveryLine, DeliveryNote, Equipment, Intervention, Part, ServiceRequest, StockMovement, Warranty
+from .workflow import is_overdue, request_category, technician_can_write
 
 User = get_user_model()
 
@@ -42,7 +43,7 @@ class EquipmentSerializer(LegacySerializer):
             raise serializers.ValidationError('Ce numéro de série est déjà enregistré.')
         return value
     def validate(self, attrs):
-        if self.instance and 'client' in attrs and attrs['client'].pk != self.instance.client_id and (self.instance.service_requests.exists() or self.instance.contracts.exists() or self.instance.warranties.exists()):
+        if self.instance and 'client' in attrs and attrs['client'].pk != self.instance.client_id and (self.instance.service_requests.exists() or self.instance.contracts.exists() or self.instance.warranties.exists() or self.instance.replacement_interventions.exists() or self.instance.operation_events.exists() or self.instance.related_operation_events.exists()):
             raise serializers.ValidationError({'client': 'Un équipement lié à des dossiers ne peut pas changer de client. Archivez-le et validez une procédure de transfert.'})
         start = attrs.get('commissioned_on', getattr(self.instance, 'commissioned_on', None))
         end = attrs.get('warranty_until', getattr(self.instance, 'warranty_until', None))
@@ -54,9 +55,13 @@ class EquipmentSerializer(LegacySerializer):
 class ServiceRequestSerializer(LegacySerializer):
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
+    assigned_technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role='client'), required=False, allow_null=True)
+    assigned_technician_name = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'created_at', 'legacy_id', 'intake_key', 'intake_data']
+        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data']
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -66,9 +71,26 @@ class ServiceRequestSerializer(LegacySerializer):
             fields.pop('intake_data', None)
         return fields
     def validate(self, attrs):
-        if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and self.instance.interventions.exists():
+        if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and (self.instance.interventions.exists() or self.instance.operation_events.exists()):
             raise serializers.ValidationError({'equipment': 'Un dossier ayant des interventions ne peut pas changer d’équipement.'})
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.effective_role == 'technician' and any(field in attrs for field in ('assigned_technician', 'due_on')):
+            raise serializers.ValidationError('Le responsable gère les affectations et les échéances.')
+        assigned = attrs.get('assigned_technician', getattr(self.instance, 'assigned_technician', None))
+        state = attrs.get('status', getattr(self.instance, 'status', 'new'))
+        if assigned is not None and state == 'new':
+            raise serializers.ValidationError({'status': 'Un dossier affecté doit quitter l’état Non affecté. Choisissez par exemple En attente.'})
         return attrs
+    def get_assigned_technician_name(self, obj):
+        return (obj.assigned_technician.get_full_name() or obj.assigned_technician.username) if obj.assigned_technician else 'Non affecté'
+    def get_category(self, obj):
+        return request_category(obj)
+    def get_is_overdue(self, obj):
+        return is_overdue(obj)
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        instance = ServiceRequest.objects.select_for_update().get(pk=instance.pk)
+        return super().update(instance, validated_data)
 
 
 class InterventionSerializer(LegacySerializer):
@@ -78,9 +100,16 @@ class InterventionSerializer(LegacySerializer):
     client_name = serializers.CharField(source='service_request.equipment.client.name', read_only=True)
     technician_name = serializers.SerializerMethodField()
     technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role='client'), required=False, allow_null=True)
+    replacement_equipment_serial = serializers.CharField(source='replacement_equipment.serial_number', read_only=True, default=None)
+    contract_number = serializers.CharField(source='contract.number', read_only=True, default=None)
+    contract_starts_on = serializers.DateField(source='contract.starts_on', read_only=True, default=None)
+    contract_ends_on = serializers.DateField(source='contract.ends_on', read_only=True, default=None)
+    extension_starts_on = serializers.DateField(source='extension_warranty.starts_on', read_only=True, default=None)
+    extension_ends_on = serializers.DateField(source='extension_warranty.ends_on', read_only=True, default=None)
+    extension_scope = serializers.CharField(source='extension_warranty.scope', read_only=True, default=None)
     class Meta:
         model = Intervention
-        fields = ['id', 'reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'legacy_id']
+        fields = ['id', 'reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'kind', 'performed_on', 'replacement_equipment', 'replacement_equipment_serial', 'contract', 'contract_number', 'contract_starts_on', 'contract_ends_on', 'extension_warranty', 'extension_starts_on', 'extension_ends_on', 'extension_scope', 'cabinet_serial', 'battery_count', 'site', 'end_customer', 'contact_name', 'contact_phone', 'summary', 'conclusion', 'conclusion_notes', 'structured_data', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'legacy_id']
         read_only_fields = ['reference', 'completed_at', 'created_at']
     def get_technician_name(self, obj):
         return (obj.technician.get_full_name() or obj.technician.username) if obj.technician else 'Non affecté'
@@ -102,12 +131,16 @@ class InterventionSerializer(LegacySerializer):
             raise serializers.ValidationError({'duration_minutes': 'Durée maximale : 48 heures.'})
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.effective_role == 'technician':
+            request = attrs.get('service_request', getattr(self.instance, 'service_request', None))
+            if self.instance is None and request and not technician_can_write(user, request):
+                raise serializers.ValidationError({'service_request': 'Le responsable doit vous affecter au dossier avant de créer une intervention.'})
             assigned = attrs.get('technician', self.instance.technician if self.instance else user)
             if assigned != user:
                 raise serializers.ValidationError({'technician': 'Un technicien ne peut affecter qu’à lui-même. Le responsable gère les affectations.'})
             attrs.setdefault('technician', user)
-        return attrs
-    def _save_state(self, instance, service_request):
+        from .intervention_workflow import validate_intervention_workflow
+        return validate_intervention_workflow(self, attrs)
+    def _save_state(self, instance, service_request, *, sync_status=True):
         # Verrou partagé par toutes les interventions d'un dossier : un rapport
         # terminé ne doit pas masquer une seconde intervention encore en cours.
         if instance.status == 'completed':
@@ -115,10 +148,13 @@ class InterventionSerializer(LegacySerializer):
         else:
             instance.completed_at = None
         instance.save(update_fields=['completed_at'])
-        if service_request.status != 'closed':
+        if sync_status and service_request.status in ('new', 'scheduled', 'in_progress', 'resolved', 'maintenance', 'testing'):
+            canonical = service_request.status in ('maintenance', 'testing')
             states = set(service_request.interventions.values_list('status', flat=True))
-            if states & {'in_progress', 'testing'}:
-                service_request.status = 'in_progress'
+            if canonical and 'testing' in states:
+                service_request.status = 'testing'
+            elif states & {'in_progress', 'testing'}:
+                service_request.status = 'maintenance' if canonical else 'in_progress'
             elif 'scheduled' in states:
                 service_request.status = 'scheduled'
             elif 'completed' in states:
@@ -134,7 +170,8 @@ class InterventionSerializer(LegacySerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         service_request = ServiceRequest.objects.select_for_update().get(pk=instance.service_request_id)
-        return self._save_state(super().update(instance, validated_data), service_request)
+        sync_status = 'status' in validated_data and validated_data['status'] != instance.status
+        return self._save_state(super().update(instance, validated_data), service_request, sync_status=sync_status)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -245,6 +282,8 @@ class ContractSerializer(DateRangeMixin, LegacySerializer):
         attrs = super().validate(attrs)
         equipment = attrs.get('equipment', getattr(self.instance, 'equipment', None))
         client = attrs.get('client', getattr(self.instance, 'client', None))
+        if self.instance and self.instance.reported_interventions.exists() and (client.pk != self.instance.client_id or getattr(equipment, 'pk', None) != self.instance.equipment_id):
+            raise serializers.ValidationError('Un contrat cité dans une intervention ne peut pas changer de client ou d’équipement.')
         if equipment and client and equipment.client_id != client.pk:
             raise serializers.ValidationError({'equipment': 'Cet équipement appartient à un autre client.'})
         return attrs
@@ -253,6 +292,11 @@ class ContractSerializer(DateRangeMixin, LegacySerializer):
 class WarrantySerializer(DateRangeMixin, LegacySerializer):
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if self.instance and self.instance.reported_interventions.exists() and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id:
+            raise serializers.ValidationError({'equipment': 'Une garantie citée dans une intervention ne peut pas changer d’équipement.'})
+        return attrs
     class Meta:
         model = Warranty
         fields = ['id', 'equipment', 'equipment_serial', 'client_name', 'provider', 'scope', 'starts_on', 'ends_on', 'terms', 'legacy_id']

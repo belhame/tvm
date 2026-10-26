@@ -22,6 +22,8 @@ from .pdf import intervention_report
 from .permissions import AdminAccountsPermission, BusinessPermission, InternalPermission, ManagerPermission
 from .serial_numbers import analyze_serial_number
 from .serializers import AuditSerializer, ClientSerializer, ContractSerializer, DeliveryNoteSerializer, EquipmentSerializer, InterventionSerializer, PartSerializer, ServiceRequestSerializer, StaffSerializer, StockMovementSerializer, UserSerializer, WarrantySerializer
+from .workflow import CATEGORIES, overdue_filter
+from .workflow_api import timeline_response
 
 User = get_user_model()
 
@@ -112,9 +114,11 @@ class BusinessViewSet(viewsets.ModelViewSet):
         return scope_queryset(super().get_queryset(), self.request.user, self.owner_path)
     def audit(self, instance, action_name):
         AuditLog.objects.create(actor=self.request.user, action=action_name, resource=instance._meta.model_name, resource_id=str(instance.pk))
+    @transaction.atomic
     def perform_create(self, serializer):
         instance = serializer.save()
         self.audit(instance, 'create')
+    @transaction.atomic
     def perform_update(self, serializer):
         instance = serializer.save()
         self.audit(instance, 'update')
@@ -146,21 +150,75 @@ class EquipmentViewSet(BusinessViewSet):
             except ValueError:
                 raise ValidationError({'client': 'Identifiant invalide.'})
         return qs
+    @action(detail=True, methods=['get', 'post'], permission_classes=[IsAuthenticated])
+    def timeline(self, request, pk=None):
+        return timeline_response(request, equipment=self.get_object())
 
 
 class ServiceRequestViewSet(BusinessViewSet):
-    queryset = ServiceRequest.objects.select_related('equipment__client').all()
+    queryset = ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all()
     serializer_class = ServiceRequestSerializer
     owner_path = 'equipment__client_id'
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        for field, lookup in [('equipment', 'equipment_id'), ('client', 'equipment__client_id'), ('assigned_technician', 'assigned_technician_id')]:
+            value = params.get(field)
+            if value:
+                if not value.isascii() or not value.isdecimal() or len(value) > 19:
+                    raise ValidationError({field: 'Identifiant invalide.'})
+                qs = qs.filter(**{lookup: int(value)})
+        query = params.get('q', '').strip()
+        if len(query) > 200:
+            raise ValidationError({'q': 'La recherche est limitée à 200 caractères.'})
+        if query:
+            qs = qs.filter(Q(reference__icontains=query) | Q(subject__icontains=query) | Q(equipment__serial_number__icontains=query) | Q(equipment__client__name__icontains=query))
+        state = params.get('status')
+        if state:
+            if state not in ServiceRequest.Status.values:
+                raise ValidationError({'status': 'État inconnu.'})
+            qs = qs.filter(status=state)
+        category = params.get('category', 'all')
+        if category not in {item[0] for item in CATEGORIES}:
+            raise ValidationError({'category': 'Sous-catégorie inconnue.'})
+        if getattr(self, 'action', '') != 'categories':
+            if category == 'overdue':
+                qs = qs.filter(overdue_filter())
+            elif category != 'all':
+                states = next(item[2] for item in CATEGORIES if item[0] == category)
+                qs = qs.filter(status__in=states)
+        return qs
+    @transaction.atomic
     def perform_create(self, serializer):
         instance = serializer.save(requested_by=self.request.user)
         self.audit(instance, 'create')
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        qs = self.get_queryset()
+        counts = dict(qs.values('status').annotate(total=Count('id')).values_list('status', 'total'))
+        total = sum(counts.values())
+        items = []
+        for key, label, states in CATEGORIES:
+            count = total if key == 'all' else (qs.filter(overdue_filter()).count() if key == 'overdue' else sum(counts.get(state, 0) for state in states))
+            items.append({'key': key, 'label': label, 'count': count})
+        return Response({'categories': items, 'total': total, 'as_of': timezone.localdate().isoformat()})
+    @action(detail=True, methods=['get', 'post'], permission_classes=[IsAuthenticated])
+    def timeline(self, request, pk=None):
+        return timeline_response(request, service_request=self.get_object())
 
 
 class InterventionViewSet(BusinessViewSet):
     queryset = Intervention.objects.select_related('service_request__equipment__client', 'technician').all()
     serializer_class = InterventionSerializer
     owner_path = 'service_request__equipment__client_id'
+    def get_queryset(self):
+        qs = super().get_queryset()
+        kind = self.request.query_params.get('kind')
+        if kind:
+            if kind not in Intervention.Kind.values:
+                raise ValidationError({'kind': 'Type d’intervention inconnu.'})
+            qs = qs.filter(kind=kind)
+        return qs
     @action(detail=True, methods=['get'])
     def report(self, request, pk=None):
         instance = self.get_object()
@@ -267,7 +325,7 @@ def dashboard_view(request):
     critical = Part.objects.filter(stock_quantity__lte=F('min_stock')).count() if user.effective_role != 'client' else None
     metrics = {
         'active_interventions': interventions.exclude(status__in=['completed', 'cancelled']).count(),
-        'open_requests': requests.exclude(status__in=['resolved', 'closed']).count(),
+        'open_requests': requests.exclude(status__in=['resolved', 'rejected', 'closed']).count(),
         'critical_stock': critical,
         'equipment_count': equipment.count(), 'client_count': clients.count(),
         'completed_interventions': interventions.filter(status='completed').count(),

@@ -11,8 +11,8 @@ Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (ba
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
 - `/api/clients/` : `id,name,contact_name,email,phone,address,city,postal_code,country,legacy_id`.
 - `/api/equipment/` : `id,client,client_name,serial_number,brand,model,power_kva,location,commissioned_on,manufactured_on,catalogue_product,warranty_until,status,legacy_id`. Statuts `active,maintenance,inactive`. `manufactured_on` et `catalogue_product` sont en lecture seule dans ce CRUD ; leur création contrôlée passe par le parcours d'admission SAV. `catalogue_product` est absent des réponses du portail client.
-- `/api/requests/` : `id,reference,equipment,equipment_serial,client_name,subject,description,priority,status,created_at,legacy_id,intake_key,intake_data`. Priorités `low,normal,high,urgent`. Statuts `new,scheduled,in_progress,resolved,closed`. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
-- `/api/interventions/` : `id,reference,service_request,request_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
+- `/api/requests/` : `id,reference,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,category,is_overdue,created_at,legacy_id,intake_key,intake_data`. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `assigned_technician_name`, `category` et `is_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
+- `/api/interventions/` : `id,reference,service_request,request_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
 - `/api/users/` : admin CRUD `id,username,first_name,last_name,email,role,client,is_active,password` (password écriture seulement). Autres internes : lecture liste limitée aux employés actifs pour affectation, aucun compte client. Client : interdit.
 - `/api/parts/` : `id,sku,name,category,unit_price,stock_quantity,min_stock,legacy_id`. Quantité initiale zéro ; le stock s'ajuste via mouvements. Catégories `battery,board,ventilation,other`.
 - `/api/stock-movements/` : `id,part,part_name,quantity,kind,reference,intervention,created_at` ; POST atomique (quantité signée : entrée positive, sortie négative) sans stock négatif. Types `in,out,adjustment`.
@@ -89,6 +89,60 @@ Le serveur recalcule la recherche ; une sélection ambiguë n'est jamais remplac
 Réponse HTTP `201` lors d'une création, HTTP `200` lors du rejeu identique : `{created,request,equipment,created_equipment,warranty,intake}`. Le même UUID, pour le même acteur et le même contenu normalisé, retourne la même demande. Réutiliser cette clé avec un autre contenu ou un autre acteur entraîne un conflit générique sans révéler le dossier concerné. Erreurs principales : `400` pour une validation, `403` pour un rôle interdit et `409` pour un conflit de clé ou de série concurrente.
 
 Voir [le parcours utilisateur, la règle des six mois et les limites par profil](PARCOURS_DEMANDE_SERIE.md). Les noms de procédures retrouvés dans les fichiers WINDEV ne constituent pas une conversion des corps WLangage binaires.
+
+## Classement des demandes et historique métier
+
+### Catégories et filtres
+
+`GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans la référence, le sujet, la série et le client.
+
+`GET /api/requests/categories/` retourne `{categories: [{key,label,count}], total, as_of}` dans le périmètre autorisé. `overdue` est calculé avec `due_on < date_du_serveur` en excluant `resolved`, `rejected` et `closed` ; ce n'est pas une valeur de `status`. Ce compteur peut recouper d'autres catégories. `assigned_technician` et `due_on` sont modifiables par administrateur ou responsable via le CRUD des demandes.
+
+Le parcours `POST /api/requests/intake/` conserve son contrat de création par série ; les nouveaux états, l'affectation et l'échéance se règlent ensuite via la modification du dossier par un rôle autorisé. Ces nouveaux champs ne sont pas ajoutés implicitement au contenu idempotent de l'admission.
+
+### Chronologies
+
+`GET /api/requests/{id}/timeline/` et `GET /api/equipment/{id}/timeline/` retournent directement un tableau d'événements : `{id,equipment,equipment_serial,related_equipment,related_equipment_serial,service_request,request_reference,intervention,intervention_reference,kind,actor_name,created_at,recorded_created_at,status_before,status_after,observation,summary,is_internal,source}`. L'historique équipement couvre les événements qui lui sont rattachés, y compris comme matériel lié d'un échange. Les clients sont limités à leur société et aux événements publics ; leur réponse présente l'auteur sous le libellé « Équipe SAV ».
+
+Les événements sont immuables par ces API. Une synthèse est un événement `kind: "summary"`, pas un champ mutable qui remplacerait les synthèses passées. Les notes sont internes par défaut ; une transition d'état publique ne doit pas exposer une note interne. Un technicien ajoute des notes uniquement sur les dossiers de son périmètre d'affectation. Les comptes clients n'ont aucun droit de publication d'événement.
+
+PostgreSQL bloque également les mises à jour et suppressions d'événements par un trigger. Les relations protégées vers les comptes auteurs, équipements et dossiers peuvent faire refuser leur suppression avec HTTP `409`. Utiliser la désactivation d'un compte ou les états métier de fin d'utilisation pour conserver les références.
+
+`POST /api/requests/{id}/timeline/` accepte une note `kind: "observation"` ou `kind: "summary"`, avec au moins un texte non vide `observation` / `summary` limité à 10 000 caractères, ou une transition `kind: "status_changed"` avec `status_after` et une note facultative. Répéter l'état courant est refusé. `is_internal` est un booléen strict, interne par défaut pour les notes. Administrateurs, responsables et techniciens dans leur périmètre d'affectation peuvent publier ; les techniciens ne gagnent pas pour autant le droit de modifier l'affectation ou l'échéance du dossier. La transition reste publique ; une note interne qui l'accompagne est enregistrée comme événement privé distinct. Une création d'événement retourne HTTP `201`.
+
+`POST /api/equipment/{id}/timeline/` permet les observations et synthèses sur l'équipement, même sans dossier, mais refuse `status_changed`. Ce point d'entrée n'accepte pas de référence arbitraire à un autre dossier. L'auteur et la date proviennent du serveur ; le libellé de l'auteur est conservé pour éviter de réécrire l'historique lors d'un renommage de compte.
+
+Les événements d'état de référence utilisent `source: "baseline"`. Leur `created_at` correspond à l'enregistrement de la baseline lors de la migration, et non à une ancienne action métier. L'état courant repris et une éventuelle ancienne date de création ont une valeur de contexte ; ils ne prouvent pas un changement ou une intervention à cette date. Les anciens journaux HFSQL restent en dehors de cette chronologie tant qu'une reprise spécifique n'a pas été réalisée.
+
+Voir [le guide de suivi et ses limites](GUIDE_SUIVI_SAV.md). L'accès au journal technique `/api/audit/` demeure une fonction distincte pour administrateurs et responsables.
+
+### Fiches d'intervention structurées
+
+Les routes CRUD existantes `/api/interventions/` et `/api/interventions/{id}/` portent les fiches. Elles ajoutent `kind`, `performed_on`, `replacement_equipment`, `contract`, `extension_warranty`, `cabinet_serial`, `battery_count`, `site`, `end_customer`, `contact_name`, `contact_phone`, `summary`, `conclusion`, `conclusion_notes` et `structured_data`.
+
+Les valeurs liées sont également exposées en lecture seule : `replacement_equipment_serial`, `contract_number`, `contract_starts_on`, `contract_ends_on`, `extension_starts_on`, `extension_ends_on` et `extension_scope`.
+
+`GET /api/interventions/?kind=maintenance|exchange|commissioning|preventive` filtre le type de fiche dans le périmètre autorisé ; une valeur inconnue est refusée. Ce type est distinct du statut `exchange` d'une demande.
+
+Un technicien ne crée une intervention que dans son périmètre d'affectation au dossier et ne l'affecte qu'à lui-même. Une première intervention exige donc l'affectation préalable du dossier par le responsable ; la création n'accorde pas automatiquement des droits sur un dossier tiers.
+
+`kind` vaut `maintenance`, `exchange`, `commissioning` ou `preventive`. `performed_on` est une date réelle, jamais future ; la planification demeure `scheduled_at`. Une fiche non maintenance terminée exige `performed_on`. Un échange terminé exige aussi un `replacement_equipment` différent du matériel d'origine et rattaché au même client. Ce champ est interdit pour les autres types. Le dossier reste lié à l'équipement d'origine.
+
+`contract` doit concerner le client et l'équipement d'origine, ou être global à ce client. `extension_warranty` doit concerner l'équipement d'origine. `battery_count` est un entier de 0 à 100 000. `summary` est limité à 10 000 caractères ; `conclusion_notes` à 4 000. La conclusion est vide ou vaut `follow_up`, `completed`, `not_applicable_billable` ; ce dernier choix impose une justification dans `conclusion_notes`. Il n'entraîne pas de facturation automatique.
+
+`structured_data` est un objet validé strictement. **Lors d'un PATCH, la valeur fournie remplace l'objet entier** ; le client API doit conserver les sections voulues, pas envoyer une sous-clé en supposant une fusion serveur. Sections autorisées :
+
+| Section | Cases booléennes JSON autorisées |
+|---|---|
+| `maintenance` | `battery_failure`, `electronics_failure`, `overload`, `overvoltage`, `overheating`, `replace_batteries`, `configure`, `replace_board`, `replace_ups`, `recover_ups`, `repair_board` |
+| `commissioning` | `electrical_protection`, `cable_section`, `configure`, `connection`, `power_on`, `normal_operation_test`, `runtime_test`, `bypass_test`, `alarm_test` |
+| `preventive` | `environment`, `power_cables`, `alarm_history`, `runtime_test`, `bypass_test`, `alarm_test`, `dusting` |
+
+Chaque section accepte aussi un `comment` texte de 4 000 caractères maximum. `maintenance` accepte `battery_replaced_count`, entier de 0 à 100 000 ; un nombre positif exige `replace_batteries: true`, et un remplacement déclaré sur une intervention terminée exige un nombre positif. Les clés inconnues, nombres à la place de booléens et sections non prises en charge sont refusés. La fiche d'échange utilise ses champs dédiés, pas une section libre `exchange` dans cet objet.
+
+Une case absente signifie « non renseignée » ; une valeur booléenne `false` signifie « explicitement non cochée ». Les fiches existantes ne sont pas remplies avec des contrôles ou conclusions supposés.
+
+`GET /api/interventions/{id}/report/` reprend les champs structurés connus, les cases effectivement renseignées, les références liées, les séries ancien/nouveau matériel, la synthèse et la conclusion. Les notes internes et les clés JSON inconnues ne sont pas imprimées. Une case ne modifie pas automatiquement le stock, les contrats, les garanties ou les fiches équipements.
 
 ## Exécution
 Backend `backend/manage.py`, réglages `config.settings`, application `core`. Serveur 8000, Vite 5173. Fichiers compilés `frontend/dist`, servis par Django via WhiteNoise. Base depuis `DATABASE_URL`, SQLite seulement avec `TVM_ALLOW_SQLITE=1` explicite pour tests isolés. Démo activée explicitement par `python manage.py seed_demo`; identités fictives signalées dans l'interface via `GET /api/session/` champ `demo_mode` issu de `TVM_DEMO_MODE`. Aucun identifiant HFSQL réel n'est inventé.

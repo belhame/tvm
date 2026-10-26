@@ -94,10 +94,17 @@ class ServiceRequest(ReferencedModel):
         HIGH = 'high', 'Haute'
         URGENT = 'urgent', 'Urgente'
     class Status(models.TextChoices):
-        NEW = 'new', 'Nouvelle'
+        NEW = 'new', 'Non affecté'
         SCHEDULED = 'scheduled', 'Planifiée'
         IN_PROGRESS = 'in_progress', 'En cours'
-        RESOLVED = 'resolved', 'Résolue'
+        MAINTENANCE = 'maintenance', 'En entretien'
+        TESTING = 'testing', 'En test'
+        RESOLVED = 'resolved', 'Traité'
+        QUOTATION = 'quotation', 'Devis'
+        PENDING = 'pending', 'En attente'
+        APPROVED = 'approved', 'Validé'
+        REJECTED = 'rejected', 'Refusé'
+        EXCHANGE = 'exchange', 'Échange'
         CLOSED = 'closed', 'Clôturée'
     reference_prefix = 'SAV'
     equipment = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name='service_requests')
@@ -106,6 +113,8 @@ class ServiceRequest(ReferencedModel):
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
     requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    assigned_technician = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='assigned_requests')
+    due_on = models.DateField(null=True, blank=True)
     intake_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     intake_data = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -117,6 +126,16 @@ class ServiceRequest(ReferencedModel):
 
 
 class Intervention(ReferencedModel):
+    class Kind(models.TextChoices):
+        MAINTENANCE = 'maintenance', 'Maintenance'
+        EXCHANGE = 'exchange', 'Échange'
+        COMMISSIONING = 'commissioning', 'Mise en service'
+        PREVENTIVE = 'preventive', 'Maintenance préventive'
+    class Conclusion(models.TextChoices):
+        UNSPECIFIED = '', 'Non renseignée'
+        FOLLOW_UP = 'follow_up', 'À suivre'
+        COMPLETED = 'completed', 'Terminée'
+        NOT_APPLICABLE_BILLABLE = 'not_applicable_billable', 'Garantie non applicable / à facturer'
     class Status(models.TextChoices):
         SCHEDULED = 'scheduled', 'Planifiée'
         IN_PROGRESS = 'in_progress', 'En maintenance'
@@ -129,6 +148,21 @@ class Intervention(ReferencedModel):
     scheduled_at = models.DateTimeField(null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(default=120, validators=[MinValueValidator(1)])
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.MAINTENANCE)
+    performed_on = models.DateField(null=True, blank=True)
+    replacement_equipment = models.ForeignKey(Equipment, on_delete=models.PROTECT, null=True, blank=True, related_name='replacement_interventions')
+    contract = models.ForeignKey('Contract', on_delete=models.PROTECT, null=True, blank=True, related_name='reported_interventions')
+    extension_warranty = models.ForeignKey('Warranty', on_delete=models.PROTECT, null=True, blank=True, related_name='reported_interventions')
+    cabinet_serial = models.CharField(max_length=120, blank=True)
+    battery_count = models.PositiveIntegerField(null=True, blank=True)
+    site = models.CharField(max_length=250, blank=True)
+    end_customer = models.CharField(max_length=200, blank=True)
+    contact_name = models.CharField(max_length=150, blank=True)
+    contact_phone = models.CharField(max_length=40, blank=True)
+    summary = models.TextField(blank=True)
+    conclusion = models.CharField(max_length=32, choices=Conclusion.choices, default='', blank=True)
+    conclusion_notes = models.TextField(blank=True)
+    structured_data = models.JSONField(default=dict, blank=True)
     diagnosis = models.TextField(blank=True)
     work_done = models.TextField(blank=True)
     recommendations = models.TextField(blank=True)
@@ -273,3 +307,4 @@ class DemoInitialization(models.Model):
 
 # Keep catalogue models separately while registering them with the core app.
 from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueState, CatalogueWarranty  # noqa: E402,F401
+from .workflow_models import OperationEvent  # noqa: E402,F401
