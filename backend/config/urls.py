@@ -9,6 +9,7 @@ from core.serial_lookup_views import serial_lookup_view
 from core import attachment_views
 from core.client_import_views import client_import
 from core import exchange_views
+from core import disposition_views
 
 router = DefaultRouter()
 router.register('clients', views.ClientViewSet, basename='client')
@@ -36,6 +37,18 @@ urlpatterns = [
     path('api/clients/import/', client_import),
     path('api/requests/intake/', intake_views.request_intake),
     path('api/exchanges/', exchange_views.exchange_list),
+    path('api/dispatch/ready/', disposition_views.dispatch_list, {'queue': 'ready'}),
+    path('api/dispatch/returns/', disposition_views.dispatch_list, {'queue': 'returns'}),
+    path('api/dispatch/billing/', disposition_views.dispatch_list, {'queue': 'billing'}),
+    path('api/requests/<int:request_id>/disposition/', disposition_views.disposition_detail),
+    path('api/requests/<int:request_id>/disposition/repair/', disposition_views.disposition_action, {'operation': 'repair'}),
+    path('api/requests/<int:request_id>/disposition/nonrepairable/', disposition_views.disposition_action, {'operation': 'nonrepairable'}),
+    path('api/requests/<int:request_id>/disposition/quote/issue/', disposition_views.disposition_action, {'operation': 'quote_issue'}),
+    path('api/requests/<int:request_id>/disposition/invoice/', disposition_views.disposition_action, {'operation': 'invoice'}),
+    path('api/requests/<int:request_id>/disposition/free/', disposition_views.disposition_action, {'operation': 'free'}),
+    path('api/requests/<int:request_id>/disposition/close/', disposition_views.disposition_action, {'operation': 'close'}),
+    path('api/requests/<int:request_id>/disposition/reset/', disposition_views.disposition_action, {'operation': 'reset'}),
+    path('api/diagnostic-quotes/<int:quote_id>/pdf/', disposition_views.diagnostic_quote_download),
     path('api/exchanges/billing/', exchange_views.exchange_list, {'billing': True}),
     path('api/requests/<int:request_id>/exchange/', exchange_views.exchange_detail),
     path('api/requests/<int:request_id>/exchange/validate/', exchange_views.exchange_action, {'operation': 'validate'}),

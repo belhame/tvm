@@ -82,9 +82,11 @@ Si ces éléments ne sont pas visibles, ouvrez l’Explorateur Windows et active
 
 Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs utilisent un nom de projet Docker Compose fixe et retrouvent le volume PostgreSQL existant. La mise à jour ne demande ni suppression de volume, ni réinitialisation de la base. Gardez les fichiers de configuration et leur copie de sauvegarde sur votre PC ; ils ne doivent pas être partagés.
 
-La version ajoute le suivi des échanges et une validation financière distincte. Après installation, l'administrateur peut accorder **Peut valider la facturation** dans **Comptes** aux personnes internes choisies. Ce droit est désactivé par défaut pour les anciens comptes non administrateurs ; le rôle Responsable SAV ne l'accorde pas automatiquement.
+La version ajoute le suivi des échanges et une validation financière distincte. Après installation, l'administrateur peut accorder **Peut valider la facturation** dans **Comptes** aux personnes internes choisies. Ce droit n'est pas donné automatiquement au rôle Responsable SAV ou Technicien ; les délégations déjà enregistrées restent conservées.
 
 Les anciens échanges et visites restent conservés sans approbation technique ou facture inventée. La procédure **Échange → validation technique → Prêt à être livré**, puis **Échanges à facturer → Confirmer la facturation** est décrite dans [le guide](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation). La mise à jour du code ne signifie pas que cette procédure a déjà été effectuée dans la base du PC.
+
+Le suivi commun **Prêt à être livré** et les devis de diagnostic TVM utilisent aussi cette mise à jour. Les anciens dossiers ne reçoivent pas de tests validés ou de gratuité par déduction. Après installation, saisir le résultat réel, les données du devis et les décisions financières dans votre instance, selon [le parcours prêt / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
 ## Importer son annuaire clients après la mise à jour
 

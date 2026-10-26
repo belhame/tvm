@@ -1,4 +1,5 @@
 """Authenticated, owner-scoped exchange queues and explicit approval actions."""
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -8,7 +9,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .exchange_workflow import (bill_exchange, close_exchange, exchange_related, is_exchange_case,
+from .exchange_workflow import (bill_exchange, close_exchange, exchange_related, is_exchange_case, workflow_permission_hints,
                                 prepare_exchange, ready_exchange, reset_exchange, validate_exchange)
 from .models import ServiceRequest
 from .permissions import can_validate_billing
@@ -16,6 +17,7 @@ from .preventive_visits import with_preventive_counts
 from .request_numbering import reference_query_value
 from .serializers import ServiceRequestSerializer
 from .workflow_api import StrictText
+from .workflow_api import StrictBoolean
 
 
 class StrictInput(serializers.Serializer):
@@ -46,11 +48,15 @@ class ResetInput(StrictInput):
     reason = StrictText(max_length=4000)
 
 
+class ValidationInput(StrictInput):
+    mark_ready = StrictBoolean(required=False, default=False)
+
+
 def _queryset(user):
     queryset = exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician')))
     if user.effective_role == 'client':
         queryset = queryset.filter(equipment__client_id=user.client_id)
-    return queryset
+    return workflow_permission_hints(queryset, user)
 
 
 def _exchanges(queryset):
@@ -133,13 +139,18 @@ def exchange_action(request, request_id, operation):
     record = _record(request_id, request.user)
     if request.user.effective_role == 'client':
         raise PermissionDenied('Le portail client permet uniquement la consultation de ses dossiers.')
-    input_class = BillingInput if operation == 'billing' else ResetInput if operation == 'reset' else StrictInput
+    input_class = BillingInput if operation == 'billing' else ResetInput if operation == 'reset' else ValidationInput if operation == 'validate' else StrictInput
     serializer = input_class(data=request.data)
     serializer.is_valid(raise_exception=True)
     if operation == 'billing':
         record = bill_exchange(record.pk, serializer.validated_data, actor=request.user)
     elif operation == 'reset':
         record = reset_exchange(record.pk, actor=request.user, reason=serializer.validated_data['reason'])
+    elif operation == 'validate':
+        with transaction.atomic():
+            record = validate_exchange(record.pk, actor=request.user)
+            if serializer.validated_data['mark_ready']:
+                record = ready_exchange(record.pk, actor=request.user)
     else:
         action = {'validate': validate_exchange, 'ready': ready_exchange, 'close': close_exchange}.get(operation)
         if action is None:

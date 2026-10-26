@@ -9,6 +9,7 @@ import RequestDocuments from "./RequestDocuments";
 import CallReference, { callIdentity } from "./CallReference";
 import PreventiveProgress from "./PreventiveProgress";
 import { ExchangePanel } from "./ExchangeWorkspace";
+import DispositionPanel, { type DispositionAction } from "./DispositionPanel";
 
 const tabs = [
   ["followup", "Suivi"],
@@ -18,6 +19,7 @@ const tabs = [
   ["commissioning", "Mise en service"],
   ["preventive", "Préventive"],
   ["exchange", "Échange"],
+  ["dispatch", "Livraison / Retour"],
   ["conclusion", "Conclusion"],
   ["documents", "Documents"],
 ] as const;
@@ -50,6 +52,7 @@ export default function RequestDossier({
   onEditIntervention,
   onChanged,
   onOpenExchange,
+  onOpenDispatch,
 }: {
   record: RecordData;
   data: Record<string, RecordData[]>;
@@ -60,6 +63,7 @@ export default function RequestDossier({
   onEditIntervention: (record: RecordData) => void;
   onChanged: () => Promise<void>;
   onOpenExchange?: () => void;
+  onOpenDispatch?: () => void;
 }) {
   const tabId = useId();
   const [record, setRecord] = useState<RecordData>(initialRecord);
@@ -102,6 +106,15 @@ export default function RequestDossier({
   }, [initialRecord.id]);
   useServerTimingRefresh(refreshRecord);
   const [tab, setTab] = useState<string>("followup");
+  const [dispositionAction, setDispositionAction] = useState<
+    DispositionAction | undefined
+  >();
+  const [decisionNonce, setDecisionNonce] = useState(0);
+  function openDecision(action: DispositionAction) {
+    setDispositionAction(action);
+    setDecisionNonce((value) => value + 1);
+    setTab("dispatch");
+  }
   function handleTabKey(event: KeyboardEvent<HTMLDivElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -203,6 +216,35 @@ export default function RequestDossier({
           </span>
         </div>
         <RequestTimer timing={record.timing} />
+        {user.role !== "client" &&
+          tab !== "dispatch" &&
+          (record.disposition?.can_mark_repaired ||
+            record.disposition?.can_mark_nonrepairable) && (
+            <div className="request-test-decision-bar">
+              <div>
+                <strong>Résultat des tests et du diagnostic</strong>
+                <span>Choisissez l’orientation réelle de l’onduleur.</span>
+              </div>
+              {record.disposition.can_mark_repaired && (
+                <button
+                  type="button"
+                  className="button primary small"
+                  onClick={() => openDecision("repair")}
+                >
+                  Tests validés — Réparé
+                </button>
+              )}
+              {record.disposition.can_mark_nonrepairable && (
+                <button
+                  type="button"
+                  className="button secondary small"
+                  onClick={() => openDecision("nonrepairable")}
+                >
+                  Non réparable — Retour client
+                </button>
+              )}
+            </div>
+          )}
         {timingError && (
           <div className="error-box" role="alert">
             <span>Le dossier n’a pas pu être actualisé : {timingError}</span>
@@ -346,6 +388,44 @@ export default function RequestDossier({
               user={user}
               onChanged={onChanged}
             />
+          )}
+          {tab === "dispatch" && (
+            <>
+              <DispositionPanel
+                key={`${record.id}:${user.id}:${decisionNonce}`}
+                record={record}
+                user={user}
+                initialAction={dispositionAction}
+                onChanged={async (updated) => {
+                  setRecord(updated);
+                  await onChanged();
+                }}
+              />
+              {onOpenDispatch && (
+                <button
+                  type="button"
+                  className="button secondary small dispatch-open-dossier"
+                  onClick={onOpenDispatch}
+                >
+                  Ouvrir les livraisons et retours
+                </button>
+              )}
+              {record.exchange && (
+                <div className="request-exchange-dispatch-link">
+                  <p>
+                    Le remplacement et sa validation financière se suivent dans
+                    l’onglet Échange du dossier.
+                  </p>
+                  <button
+                    type="button"
+                    className="button secondary small"
+                    onClick={() => setTab("exchange")}
+                  >
+                    Voir l’échange et sa facturation
+                  </button>
+                </div>
+              )}
+            </>
           )}
           {tab === "equipment" && (
             <>

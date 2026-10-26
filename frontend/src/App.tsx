@@ -94,6 +94,7 @@ import CallReference, { callIdentity, callPrimary } from "./CallReference";
 import ClientsDirectory from "./ClientsDirectory";
 import PreventiveProgress from "./PreventiveProgress";
 import ExchangeWorkspace from "./ExchangeWorkspace";
+import DispatchWorkspace from "./DispatchWorkspace";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -126,6 +127,12 @@ const navGroups = [
       { id: "commissioning", label: "Mise en service", icon: CheckCircle2 },
       { id: "preventive", label: "Préventive", icon: ShieldCheck },
       { id: "planning", label: "Planning", icon: CalendarDays },
+      { id: "dispatch", label: "Livraisons & retours", icon: Truck },
+      {
+        id: "diagnostic-billing",
+        label: "Diagnostics à facturer",
+        icon: FileText,
+      },
     ],
   },
   {
@@ -153,6 +160,7 @@ const clientPages = new Set([
   "equipment",
   "requests",
   "exchange",
+  "dispatch",
   "contracts",
   "delivery-notes",
   "reports",
@@ -819,7 +827,26 @@ function EditForm({
                             <option value="">Sélectionner…</option>
                           )}
                           {field.options?.map(([value, label]) => (
-                            <option key={value} value={value}>
+                            <option
+                              key={value}
+                              value={value}
+                              disabled={
+                                modal.resource === "requests" &&
+                                field.name === "status" &&
+                                (([
+                                  "ready_for_delivery",
+                                  "return_to_client",
+                                ].includes(value) &&
+                                  modal.record?.status !== value) ||
+                                  (value === "closed" &&
+                                    modal.record?.status !== "closed" &&
+                                    ((modal.record?.exchange &&
+                                      !modal.record.exchange.can_close) ||
+                                      (modal.record?.disposition
+                                        ?.requires_diagnostic_billing &&
+                                        !modal.record.disposition.can_close))))
+                              }
+                            >
                               {label}
                             </option>
                           ))}
@@ -2969,7 +2996,7 @@ export default function App() {
     : "all";
   const allowedPage =
     (user.role === "client" && !clientPages.has(basePage)) ||
-    (basePage === "exchange-billing" &&
+    (["exchange-billing", "diagnostic-billing"].includes(basePage) &&
       !(
         user.role !== "client" &&
         (user.role === "admin" || user.can_validate_billing === true)
@@ -3011,7 +3038,9 @@ export default function App() {
             const items = group.items.filter(
               (item) =>
                 (user.role !== "client" || clientPages.has(item.id)) &&
-                (item.id !== "exchange-billing" ||
+                (!["exchange-billing", "diagnostic-billing"].includes(
+                  item.id,
+                ) ||
                   (user.role !== "client" &&
                     (user.role === "admin" ||
                       user.can_validate_billing === true))) &&
@@ -3223,6 +3252,19 @@ export default function App() {
               onCountsChange={setRequestCounts}
               refreshKey={data.requests}
               initialSearch={externalSearch}
+            />
+          ) : ["dispatch", "diagnostic-billing"].includes(allowedPage) ? (
+            <DispatchWorkspace
+              key={`${allowedPage}:${user.id}:${user.role}`}
+              user={user}
+              equipment={data.equipment || []}
+              refreshKey={data.requests}
+              onChanged={saved}
+              onOpenRequest={setRequestDetail}
+              Dialog={Modal}
+              billing={allowedPage === "diagnostic-billing"}
+              initialSearch={externalSearch}
+              onOpenBilling={() => navigate("diagnostic-billing")}
             />
           ) : ["exchange", "exchange-billing"].includes(allowedPage) ? (
             <ExchangeWorkspace
@@ -3437,6 +3479,10 @@ export default function App() {
             onOpenExchange={() => {
               setRequestDetail(null);
               navigate("exchange", currentRequestDetail.reference);
+            }}
+            onOpenDispatch={() => {
+              setRequestDetail(null);
+              navigate("dispatch", currentRequestDetail.reference);
             }}
             onEditRequest={(freshRecord) => {
               setRequestDetail(null);

@@ -16,6 +16,8 @@ Pour la prévention, l'objectif de visites du dossier reste distinct du nombre c
 
 Les demandes classées **Échange** alimentent automatiquement leur file de suivi. La validation technique du remplacement et la confirmation financière sont distinctes ; la clôture attend la confirmation d'une facture émise dans le système externe de l'entreprise.
 
+Le menu **Livraisons & retours** réunit les réparations testées et les échanges prêts, avec une colonne **À retourner au client** pour les non-réparables. TVM crée le devis PDF de diagnostic ; la clôture du retour exige une facture externe confirmée ou une gratuité approuvée et justifiée. Cette gratuité ne dispense pas un échange de sa facture. Voir [le parcours](docs/GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
+
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 
 ## Essayer la version de démonstration

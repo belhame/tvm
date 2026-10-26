@@ -146,14 +146,17 @@ test('les textes de connexion et des listes SAV ont un contraste minimal de 4,5:
   await clientImport.getByRole('button', { name: 'Fermer', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   for (const queue of [
-    { navigation: 'Échange', heading: 'Échanges d’onduleurs', path: '/api/exchanges/' },
-    { navigation: 'Échanges à facturer', heading: 'Échanges à facturer', path: '/api/exchanges/billing/' },
+    { navigation: 'Échange', heading: 'Échanges d’onduleurs', paths: ['/api/exchanges/'], spinner: '.exchange-queue .loading-state' },
+    { navigation: 'Échanges à facturer', heading: 'Échanges à facturer', paths: ['/api/exchanges/billing/'], spinner: '.exchange-queue .loading-state' },
+    { navigation: 'Livraisons & retours', heading: 'Livraisons & retours', paths: ['/api/dispatch/ready/', '/api/dispatch/returns/'], spinner: '.dispatch-workspace .loading-state', columns: ['Prêts à être livrés', 'À retourner au client'] },
+    { navigation: 'Diagnostics à facturer', heading: 'Diagnostics à facturer', paths: ['/api/dispatch/billing/'], spinner: '.dispatch-workspace .loading-state' },
   ]) {
-    const loaded = page.waitForResponse(result => new URL(result.url()).pathname === queue.path && result.request().method() === 'GET' && result.ok());
+    const loaded = Promise.all(queue.paths.map(path => page.waitForResponse(result => new URL(result.url()).pathname === path && result.request().method() === 'GET' && result.ok())));
     await navigation.getByText(queue.navigation, { exact: true }).click();
     await expect(page.getByRole('heading', { name: queue.heading, exact: true })).toBeVisible();
     await loaded;
-    await expect(page.locator('.exchange-queue .loading-state')).toHaveCount(0);
+    await expect(page.locator(queue.spinner)).toHaveCount(0);
+    for (const name of queue.columns || []) await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
     await expectNormalTextContrast(page, queue.heading);
   }
   await navigation.getByText('Contrats & garanties', { exact: true }).click();

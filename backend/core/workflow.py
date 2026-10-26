@@ -19,6 +19,7 @@ CATEGORIES = (
     ('rejected', 'Refusé', ('rejected',)),
     ('exchange', 'Échange', ('exchange',)),
     ('ready_for_delivery', 'Prêt à être livré', ('ready_for_delivery',)),
+    ('return_to_client', 'À retourner au client', ('return_to_client',)),
     ('closed', 'Clôturé', ('closed',)),
     ('all', 'Tous', ()),
 )

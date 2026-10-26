@@ -172,6 +172,7 @@ export const statuses: Record<string, string> = {
   rejected: "Refusé",
   exchange: "Échange",
   ready_for_delivery: "Prêt à être livré",
+  return_to_client: "À retourner au client",
   commissioning: "Mise en service",
   preventive: "Préventive",
   follow_up: "À suivre",
@@ -188,6 +189,7 @@ export const requestStatusLabels: Record<string, string> = {
   rejected: "Refusé",
   exchange: "Échange",
   ready_for_delivery: "Prêt à être livré",
+  return_to_client: "À retourner au client",
   closed: "Clôturé",
   scheduled: "En attente (ancien état)",
   in_progress: "En entretien (ancien état)",
@@ -204,6 +206,7 @@ export const requestCategories = [
   { key: "rejected", label: "Refusé" },
   { key: "exchange", label: "Échange" },
   { key: "ready_for_delivery", label: "Prêt à être livré" },
+  { key: "return_to_client", label: "À retourner au client" },
   { key: "closed", label: "Clôturé" },
   { key: "all", label: "Tous" },
 ];
@@ -362,6 +365,7 @@ export const resources: Record<string, Resource> = {
         type: "select",
         options: Object.entries(requestStatusLabels),
         default: "new",
+        help: "La mise à disposition pour livraison et le retour non réparable se confirment dans Livraison / Retour ou dans Échange. La clôture reste soumise aux validations du dossier.",
       },
       {
         name: "assigned_technician",

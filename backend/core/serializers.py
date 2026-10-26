@@ -68,6 +68,8 @@ class EquipmentSerializer(LegacySerializer):
 
 
 class ServiceRequestSerializer(LegacySerializer):
+    disposition = serializers.SerializerMethodField()
+    dispatch_kind = serializers.SerializerMethodField()
     exchange = serializers.SerializerMethodField()
     call_number = serializers.CharField(source='reference', read_only=True)
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
@@ -85,7 +87,7 @@ class ServiceRequestSerializer(LegacySerializer):
     preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', *FOLLOWUP_FIELD_NAMES]
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -113,6 +115,17 @@ class ServiceRequestSerializer(LegacySerializer):
             return None
         from .exchange_workflow import exchange_payload
         return exchange_payload(obj, request.user)
+    def get_disposition(self, obj):
+        request = self.context.get('request')
+        if request is None:
+            return None
+        from .disposition_workflow import disposition_payload
+        return disposition_payload(obj, request.user)
+    def get_dispatch_kind(self, obj):
+        if self.context.get('request') is None:
+            return None
+        from .disposition_workflow import dispatch_kind
+        return dispatch_kind(obj)
     def get_category(self, obj):
         return request_category(obj)
     def get_is_overdue(self, obj):

@@ -21,6 +21,8 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Interventions | Affectation, dates, durée, diagnostic, travaux, recommandations, état et fiches de maintenance, échange, mise en service ou préventive | Cases et conclusions déclaratives ; aucun mouvement de stock, décision de garantie ou facturation déclenchés par une case |
 | Échanges | File automatique des demandes classées Échange, remplacement et validation technique explicites, passage Prêt à être livré | Un classement ou une visite terminée ne constitue pas une validation ; aucune ancienne approbation inventée |
 | Échanges à facturer | Confirmation financière séparée avec référence et date de facture externe ; contrôle avant clôture | Droit délégué par l'administrateur ; aucun ERP, envoi de facture ou paiement confirmé par cette saisie |
+| Prêt à être livré | File commune des réparations avec tests validés et des échanges effectivement prêts ; colonne séparée des non-réparables à retourner | Un test absent ou échoué ne vaut pas validation ; aucune expédition physique automatique |
+| Devis de diagnostic | Devis PDF créé dans TVM avec prix HT, TVA et devise explicites, document émis immuable | Aucun taux fiscal déduit ; aucune révision du devis émis dans cette version ; retour clôturable après facture ou gratuité approuvée, sans exemption de facture pour un échange |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
 | Visites préventives | Objectif par dossier et nombre réalisé calculé depuis ses fiches préventives terminées ; progression sur la fiche et le PDF | L'objectif ne crée pas de visites ; aucune date ou ancienne prévision inventée, aucun autre dossier inclus |
 | Rapports | Rapport PDF d'intervention structuré d'après le modèle fourni et fiche PDF de suivi du dossier, soumis aux droits d'accès | Documents générés depuis la base ; pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
@@ -46,7 +48,7 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
 
-La validation de facturation des échanges est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif. Le rôle Responsable SAV ou Technicien ne l'accorde pas automatiquement. Un client ne peut jamais en bénéficier ; la gestion de ce droit reste réservée à l'administrateur.
+La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
 
@@ -54,7 +56,7 @@ L'import d'annuaire est réservé aux administrateurs et responsables. Il accept
 
 ## Catégories et historique SAV
 
-Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés ou clôturés. Le dépassement en cours est calculé depuis l'arrivée au-delà de **48 heures cumulées du lundi au vendredi** et peut recouper un autre état. L'échéance manuelle reste distincte. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
+Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés, prêts, à retourner ou clôturés. Le dépassement en cours est calculé depuis l'arrivée au-delà de **48 heures cumulées du lundi au vendredi** et peut recouper un autre état. L'échéance manuelle reste distincte. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
 
 La chronologie d'une demande ou d'un onduleur expose les événements enregistrés, leur date et leur auteur, les changements d'état, les observations et les synthèses ajoutées. Les notes sont internes par défaut ; le portail client ne voit que les événements publics de ses propres dossiers. Une synthèse est un événement conservé, pas une réponse de l'assistant IA.
 
@@ -65,6 +67,8 @@ La conservation des événements protège aussi leurs liens : supprimer un compt
 Les fiches d'intervention structurées enregistrent les vérifications propres au type d'opération, le matériel de remplacement pour un échange, les références de contrat ou d'extension et une synthèse/conclusion. Le PDF reprend ces données connues sans notes internes. Une conclusion « non applicable / facturable » exige une justification humaine ; elle ne résulte pas d'une déduction automatique depuis la garantie.
 
 Le parcours d'échange distingue la validation technique du remplacement, l'état Prêt à être livré et la confirmation de facturation. La clôture attend une facture confirmée ; aucune case de fiche ou ancienne opération terminée ne remplace cette validation. Voir [le guide des échanges](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation).
+
+Les réparations testées rejoignent la même file prête que les échanges validés. Les non-réparables utilisent une colonne distincte et un devis de diagnostic TVM, suivi d'une facture externe confirmée ou d'une gratuité approuvée. Les statuts anciens restent conservés sans preuves inventées. Voir [le parcours livraison / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
 ## Scan sur téléphone
 

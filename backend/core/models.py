@@ -90,6 +90,8 @@ class Equipment(LegacyModel):
         if self.pk:
             from .exchange_workflow import guard_equipment_update
             guard_equipment_update(self, kwargs.get('update_fields'))
+            from .disposition_workflow import guard_disposition_equipment_update
+            guard_disposition_equipment_update(self, kwargs.get('update_fields'))
         return super().save(*args, **kwargs)
 
 
@@ -145,6 +147,7 @@ class ServiceRequest(ReferencedModel):
         REJECTED = 'rejected', 'Refusé'
         EXCHANGE = 'exchange', 'Échange'
         READY_FOR_DELIVERY = 'ready_for_delivery', 'Prêt à être livré'
+        RETURN_TO_CLIENT = 'return_to_client', 'À retourner au client'
         CLOSED = 'closed', 'Clôturée'
     reference_prefix = 'SAV'
     equipment = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name='service_requests')
@@ -191,6 +194,8 @@ class ServiceRequest(ReferencedModel):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
         from .exchange_workflow import guard_request_update, register_exchange_request
         old_status = guard_request_update(self, kwargs.get('update_fields'))
+        from .disposition_workflow import guard_disposition_update, register_disposition_request
+        guard_disposition_update(self, kwargs.get('update_fields'), old_status)
         allocated = not self.reference
         if allocated:
             from .request_numbering import next_request_number
@@ -198,6 +203,7 @@ class ServiceRequest(ReferencedModel):
         try:
             result = super().save(*args, **kwargs)
             register_exchange_request(self, old_status)
+            register_disposition_request(self, old_status)
             return result
         except Exception:
             if allocated:
@@ -406,3 +412,4 @@ from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueState,
 from .workflow_models import OperationEvent  # noqa: E402,F401
 from .attachment_models import RequestAttachment  # noqa: E402,F401
 from .exchange_models import ExchangeProcess  # noqa: E402,F401
+from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, DispositionProcess  # noqa: E402,F401

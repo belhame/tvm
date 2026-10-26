@@ -70,6 +70,7 @@ Les catégories de demandes correspondent aux états suivants :
 | Refusé | État `rejected` |
 | Échange | État `exchange` |
 | Prêt à être livré | État `ready_for_delivery` |
+| À retourner au client | État `return_to_client`, après diagnostic non réparable |
 | Clôturé | État `closed` |
 | En dépassement délai | Chronomètre en cours dépassant 48 heures cumulées du lundi au vendredi, avec une arrivée connue |
 | Tous | Tous les dossiers accessibles |
@@ -98,7 +99,7 @@ La mise à jour ne remplit ni l'arrivée ni la clôture des anciennes fiches. Il
 
 ## Lire une fiche et sa chronologie
 
-Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Conclusion** et **Documents**. Un administrateur ou responsable dispose de **Modifier le dossier** pour régler notamment son état, son affectation et son échéance. L'état **Non affecté** n'accepte pas de technicien affecté : sélectionner l'état approprié lors de l'affectation.
+Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Livraison / Retour**, **Conclusion** et **Documents**. Un administrateur ou responsable dispose de **Modifier le dossier** pour régler notamment son état, son affectation et son échéance. L'état **Non affecté** n'accepte pas de technicien affecté : sélectionner l'état approprié lors de l'affectation.
 
 La fiche d'une demande regroupe son équipement, le client, l'état du dossier et les informations de traitement. L'historique de l'onduleur permet de retrouver les demandes et interventions rattachées au même matériel. La fiche équipement propose les onglets **Matériel** et **Historique des opérations** ; le dossier distingue **Historique du dossier** et **Historique de l'onduleur**.
 
@@ -143,7 +144,7 @@ Pour un échange terminé, le nouvel équipement doit être différent de l'anci
 
 Les cases enregistrent ce que l'utilisateur déclare. Elles ne déclenchent pas à elles seules un mouvement de stock, une modification des équipements, une nouvelle garantie ou une facturation. Si le remplacement des batteries est déclaré sur une intervention terminée, leur nombre doit être précisé.
 
-Créer une intervention ou changer réellement son état peut actualiser l'état de suivi de la demande en tenant compte des autres interventions. Modifier uniquement le diagnostic ne change pas cet état. Les états de gestion Devis, En attente, Validé, Refusé, Échange et Clôturé sont conservés par cette synchronisation.
+Créer une intervention ou changer réellement son état peut actualiser l'état de suivi de la demande en tenant compte des autres interventions. Modifier uniquement le diagnostic ne change pas cet état. Les états de gestion Devis, En attente, Validé, Refusé, Échange, Prêt à être livré, À retourner au client et Clôturé sont conservés par cette synchronisation.
 
 La fiche comporte une **Synthèse de l'opération** et une **Conclusion de la fiche** : à suivre, terminée ou non applicable / facturable. Ce dernier choix exige une justification ; il n'est jamais déduit automatiquement de la date de garantie. La synthèse de la fiche est son texte courant, distinct des événements de synthèse ajoutés à l'historique.
 
@@ -163,13 +164,41 @@ Le PDF présente les **visites réalisées / prévues**, les **visites enregistr
 
 La fiche et le PDF de **Mise en service** présentent séparément le matériel, le site, le client final, le contact et la date de réalisation. Ils ne sont pas comptés comme une visite préventive ; une date manquante reste explicitement non renseignée.
 
+## Prêt à être livré et retour d'un matériel non réparable
+
+Le menu **Livraisons & retours** présente deux colonnes. **Prêts à être livrés** regroupe les onduleurs réparés dont les tests ont été explicitement validés et les échanges dont le remplacement a été validé et déclaré prêt. Une fiche simplement terminée, un test échoué ou un test non renseigné ne suffit pas à y placer le matériel.
+
+Les anciens dossiers déjà classés prêts restent visibles avec leur état conservé ; la mise à jour ne leur invente aucune preuve de tests ou d'approbation. Les nouveaux passages à cet état utilisent les actions dédiées ci-dessous.
+
+La colonne distincte **À retourner au client** sert aux matériels déclarés **Non réparables**, avec un diagnostic renseigné et le suivi de leurs frais de diagnostic. Déclarer un matériel non réparable n'est pas une validation de réparation réussie.
+
+Le champ Retour renseigné à l'accueil ne qualifie pas à lui seul cette non-réparabilité : la décision technique doit être enregistrée dans ce parcours.
+
+Dans un dossier **En test** ou **Traité**, l'onglet **Livraison / Retour** propose **Tests validés — Réparé** : saisir la synthèse technique et la date réelle des tests, confirmer qu'ils sont réussis, puis utiliser **Confirmer la réparation et mettre prêt à livrer**. Pour un matériel non réparable, choisir **Non réparable — Retour client**, renseigner le diagnostic et le mode de frais, puis **Enregistrer le retour client**. Ces opérations sont accessibles à l'administrateur, au responsable ou au technicien affecté. Les contrôles sont des déclarations enregistrées par l'équipe ; aucune lecture automatique des mesures de l'onduleur n'est effectuée.
+
+### Devis de diagnostic créé dans TVM
+
+TVM génère le PDF du devis. Saisir explicitement le **prix HT**, le **taux de TVA** et la devise : **TND avec trois décimales par défaut**, ou EUR / USD avec deux décimales. Le taux peut être de 0 à 100 %, avec deux décimales maximum ; aucune règle fiscale n'est déduite automatiquement du pays ou du matricule client. Une prestation facturable a un prix HT positif ; une gratuité proposée a un montant nul.
+
+Utiliser **Renseigner les conditions du devis**, puis **Enregistrer les conditions du devis**. Après vérification, **Émettre le devis PDF** attribue le numéro et fige les données ; **Télécharger le devis PDF** ouvre le document émis. Les conditions du devis figurent dans ce PDF destiné au client ; conserver les informations privées dans les champs internes.
+
+Le serveur calcule la TVA avec arrondi à la précision de la devise, puis le total TTC. Un devis **émis** conserve son numéro, sa date et son contenu : son PDF n'est pas réécrit après une modification du dossier. Vérifier les conditions avant l'émission. Cette version ne propose pas encore de révision d'un devis émis, d'avoir ou de devis de remplacement ; une observation peut préciser une correction dans l'historique sans modifier le document officiel. Émettre le devis ne signifie pas l'avoir envoyé, fait accepter ou signer par le client.
+
+Les coordonnées légales de l'émetteur et les conditions commerciales complémentaires non fournies ne sont pas inventées ; le PDF signale qu'elles ne sont pas renseignées.
+
+Dans **Diagnostics à facturer** ou le dossier, un compte autorisé utilise soit **Confirmer la facturation du diagnostic** avec référence et date de facture externe, soit **Approuver la gratuité du diagnostic** avec un motif. Cette étape est nécessaire avant **Clôturer le dossier**. Une gratuité seulement proposée sur le devis n'est pas encore l'approbation financière. Son état actuel se consulte dans le dossier ; le PDF historique conserve ce qui était connu à son émission.
+
+Cette option de gratuité concerne **uniquement le diagnostic**. Elle ne remplace pas la facture exigée pour clôturer un échange. Ni le devis TVM ni une confirmation de facture ne prétendent à un encaissement ou à un envoi vers un ERP. La file prépare le suivi du retour ; elle n'enregistre pas une expédition physique automatique.
+
+Avant émission du devis, le responsable ou l'administrateur peut reprendre la qualification avec un motif. Cette reprise conserve l'historique et le contrôle financier du diagnostic ; changer simplement de statut ne dispense pas de la décision requise. Après émission, le devis et les conditions qui l'ont produit restent figés.
+
 ## Échange : remplacement et facturation
 
 Passer une demande à **Échange** l'affiche dans la file correspondante, sans devoir créer d'abord une visite de type échange. Le classement permet de commencer le traitement ; il ne vaut pas validation technique. Le dossier reste suivi dans cette file au fil de ses étapes, y compris lorsqu'il devient prêt à être livré.
 
 1. Dans **Échange**, ouvrir le dossier puis **Préparer l'échange**. Renseigner le numéro de série, le modèle et la marque du remplacement ; **Enregistrer la préparation** conserve un brouillon, sans créer d'équipement. La recherche catalogue reste une aide facultative avec choix explicite.
 2. Un administrateur ou responsable vérifie le numéro de série et le modèle, confirme leur contrôle puis clique sur **Valider l'échange**. Cet acte technique est distinct du statut terminé d'une visite. Il enregistre le nouvel équipement si nécessaire et le réserve pour ce dossier, sans remplacer l'identité de l'ancien onduleur.
-3. L'administrateur ou responsable utilise ensuite le bouton séparé **Prêt à être livré** lorsque le matériel est prêt. Ce statut ne constitue pas une preuve de livraison physique.
+3. L'administrateur ou responsable utilise ensuite le bouton séparé **Prêt à être livré** lorsque le matériel est prêt. Le bouton combiné **Valider et mettre prêt à livrer** permet aussi d'enregistrer les deux étapes après leur vérification. Le matériel rejoint alors la file commune **Livraisons & retours** ; ce statut ne constitue pas une preuve de livraison physique.
 4. Dans **Échanges à facturer**, un compte autorisé renseigne la référence et la date de la facture émise dans le système de l'entreprise, puis clique sur **Confirmer la facturation**.
 5. Utiliser **Clôturer le dossier** lorsque les validations requises sont enregistrées. Une facture non confirmée bloque la clôture ; classer le dossier ou terminer une visite ne contourne pas ce contrôle.
 

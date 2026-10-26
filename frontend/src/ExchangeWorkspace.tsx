@@ -771,18 +771,21 @@ export function ExchangePanel({
       setResetOpen(false);
       setResetReason("");
       setNotice(
-        {
-          prepare: "Préparation enregistrée. Le remplacement reste à valider.",
-          validate:
-            "Échange validé. Vous pouvez maintenant préparer sa livraison.",
-          ready:
-            "Le dossier est prêt à être livré. La facturation reste à confirmer.",
-          billing:
-            "Facturation confirmée. Le dossier peut être clôturé séparément.",
-          close: "Dossier clôturé.",
-          reset:
-            "La préparation est rouverte. Une nouvelle validation technique sera nécessaire.",
-        }[action],
+        action === "validate" && payload.mark_ready === true
+          ? "Échange validé et prêt à être livré. La facturation reste à confirmer."
+          : {
+              prepare:
+                "Préparation enregistrée. Le remplacement reste à valider.",
+              validate:
+                "Échange validé. Vous pouvez maintenant préparer sa livraison.",
+              ready:
+                "Le dossier est prêt à être livré. La facturation reste à confirmer.",
+              billing:
+                "Facturation confirmée. Le dossier peut être clôturé séparément.",
+              close: "Dossier clôturé.",
+              reset:
+                "La préparation est rouverte. Une nouvelle validation technique sera nécessaire.",
+            }[action],
       );
       try {
         await onChanged(response);
@@ -1186,6 +1189,25 @@ export function ExchangePanel({
           <button
             type="button"
             className="button primary"
+            disabled={
+              !confirmed ||
+              !exchange.replacement_serial_number?.trim() ||
+              !exchange.replacement_model?.trim() ||
+              !!busy ||
+              loading
+            }
+            onClick={() => void mutate("validate", { mark_ready: true })}
+          >
+            {busy === "validate" ? (
+              <LoaderCircle size={16} className="spin" />
+            ) : (
+              <Truck size={16} />
+            )}
+            Valider et mettre prêt à livrer
+          </button>
+          <button
+            type="button"
+            className="button secondary"
             disabled={
               !confirmed ||
               !exchange.replacement_serial_number?.trim() ||

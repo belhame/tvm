@@ -81,7 +81,11 @@ class IndependentExchangeReportTests(TestCase):
         self.assertEqual(response.status_code, 400, response.data)
 
     def test_ready_nonexchange_repair_does_not_print_exchange_or_billing_requirements(self):
-        ordinary = ServiceRequest.objects.create(equipment=self.original, subject='Réparation ordinaire fictive', status='ready_for_delivery')
+        ordinary = ServiceRequest.objects.create(equipment=self.original, subject='Ancienne réparation ordinaire fictive')
+        # Reproduce a historical ready record without inventing a new test
+        # approval under the current, explicit qualification workflow.
+        ServiceRequest.objects.filter(pk=ordinary.pk).update(status='ready_for_delivery')
+        ordinary.refresh_from_db()
         visit = Intervention.objects.create(service_request=ordinary, technician=self.tech, kind='maintenance', status='completed', work_done='Réparation fictive réalisée')
         for content in (intervention_report(visit), service_request_report(ordinary)):
             text = pdf_text(content)

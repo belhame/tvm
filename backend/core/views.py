@@ -26,7 +26,8 @@ from .workflow import CATEGORIES, overdue_filter
 from .workflow_api import timeline_response
 from .request_numbering import reference_query_value
 from .preventive_visits import with_preventive_counts
-from .exchange_workflow import exchange_related
+from .exchange_workflow import exchange_related, workflow_permission_hints
+from .disposition_workflow import disposition_related
 
 User = get_user_model()
 
@@ -169,11 +170,11 @@ class EquipmentViewSet(BusinessViewSet):
 
 
 class ServiceRequestViewSet(BusinessViewSet):
-    queryset = exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all()))
+    queryset = disposition_related(exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all())))
     serializer_class = ServiceRequestSerializer
     owner_path = 'equipment__client_id'
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = workflow_permission_hints(super().get_queryset(), self.request.user)
         params = self.request.query_params
         for field, lookup in [('equipment', 'equipment_id'), ('client', 'equipment__client_id'), ('assigned_technician', 'assigned_technician_id')]:
             value = params.get(field)
