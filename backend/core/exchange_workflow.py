@@ -20,12 +20,14 @@ from .workflow_events import append_event, current_actor
 
 
 def exchange_related(queryset):
+    from .logistics_models import OutboundJob
     return queryset.select_related(
         'exchange_process__replacement_equipment', 'exchange_process__validated_by',
         'exchange_process__ready_by', 'exchange_process__billing_validated_by',
     ).annotate(
         _exchange_legacy=Exists(Intervention.objects.filter(service_request_id=OuterRef('pk'), kind='exchange')),
         _exchange_history=Exists(OperationEvent.objects.filter(service_request_id=OuterRef('pk'), status_after='exchange')),
+        _logistics_handed_over=Exists(OutboundJob.objects.filter(service_request_id=OuterRef('pk'), handed_over_at__isnull=False)),
     )
 
 
@@ -127,6 +129,14 @@ def _name(user):
     return (user.get_full_name() or user.username) if user else ''
 
 
+def recorded_handoff(service_request):
+    """Read-only capability hint; mutation guards always query under the lock."""
+    if hasattr(service_request, '_logistics_handed_over'):
+        return service_request._logistics_handed_over
+    from .logistics_models import OutboundJob
+    return OutboundJob.objects.filter(service_request_id=service_request.pk, handed_over_at__isnull=False).exists()
+
+
 def exchange_payload(service_request, actor):
     process = get_process(service_request)
     if not is_exchange_case(service_request):
@@ -139,7 +149,8 @@ def exchange_payload(service_request, actor):
     internal = bool(actor and actor.effective_role != 'client')
     manager = _manager(actor)
     active_exchange = service_request.status == 'exchange'
-    writable = not closed and not validated and active_exchange
+    handed_over = recorded_handoff(service_request)
+    writable = not closed and not validated and active_exchange and not handed_over
     visible_replacement = bool(process and (internal or validated))
     result = {
         'state': state,
@@ -153,10 +164,10 @@ def exchange_payload(service_request, actor):
         'is_validated': validated, 'is_ready': ready, 'is_invoiced': invoiced,
         'can_prepare': writable and _editable(actor, service_request),
         'can_validate': writable and manager,
-        'can_mark_ready': not closed and active_exchange and validated and not ready and manager,
+        'can_mark_ready': not closed and active_exchange and validated and not ready and manager and not handed_over,
         'can_validate_billing': not closed and service_request.status == 'ready_for_delivery' and ready and validated and not invoiced and can_validate_billing(actor),
         'can_close': not closed and invoiced and (manager or can_validate_billing(actor)),
-        'can_reset': not closed and not invoiced and manager and bool(process and (process.prepared_at or validated)),
+        'can_reset': not closed and not invoiced and manager and bool(process and (process.prepared_at or validated)) and not handed_over,
     }
     if internal:
         result.update({
@@ -183,7 +194,14 @@ def _locked_process(service_request):
     return ExchangeProcess.objects.select_for_update().get(pk=process.pk)
 
 
+def _not_handed_over(service_request):
+    from .logistics_models import OutboundJob
+    if OutboundJob.objects.filter(service_request_id=service_request.pk, handed_over_at__isnull=False).exists():
+        raise ValidationError('La remise de ce matériel est déjà enregistrée. Sa préparation et sa validation restent conservées ; utilisez un nouveau dossier pour une nouvelle opération.')
+
+
 def _active(service_request):
+    _not_handed_over(service_request)
     if service_request.status != 'exchange':
         raise ValidationError({'status': 'Placez le dossier au statut Échange avant de préparer ou valider son remplacement.'})
 
@@ -374,6 +392,7 @@ def reset_exchange(identifier, *, actor, reason):
     service_request = _locked_request(identifier)
     if not _manager(actor):
         raise PermissionDenied('Le responsable SAV ou un administrateur reprend la préparation de cet échange.')
+    _not_handed_over(service_request)
     process = _locked_process(service_request)
     if process.billing_validated_at or service_request.status == 'closed':
         raise ValidationError('Un échange facturé ou clôturé ne peut pas être réinitialisé par cette action.')

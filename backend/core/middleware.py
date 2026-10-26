@@ -15,7 +15,7 @@ class PrivateAPIHeaders:
             response['Cache-Control'] = 'private, no-store'
             patch_vary_headers(response, ['Cookie'])
         response.setdefault('X-Frame-Options', 'DENY')
-        response.setdefault('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'")
+        response.setdefault('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'")
         return response
 
 

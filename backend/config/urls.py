@@ -8,6 +8,7 @@ from core import intake_views
 from core.serial_lookup_views import serial_lookup_view
 from core import attachment_views
 from core.client_import_views import client_import
+from core.serial_photo_views import recognize_serial
 from core import exchange_views
 from core import disposition_views
 
@@ -35,6 +36,9 @@ urlpatterns = [
     path('api/catalogue/warranties/', catalogue_views.catalogue_warranties),
     path('api/catalogue/import/', catalogue_views.catalogue_import),
     path('api/clients/import/', client_import),
+    path('api/logistics/recognize-serial/', recognize_serial),
+    path('api/logistics/', include('core.logistics_urls')),
+    path('api/logistics/', include('core.notification_urls')),
     path('api/requests/intake/', intake_views.request_intake),
     path('api/exchanges/', exchange_views.exchange_list),
     path('api/dispatch/ready/', disposition_views.dispatch_list, {'queue': 'ready'}),

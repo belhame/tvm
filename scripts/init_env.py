@@ -37,7 +37,7 @@ if args.demo:
     fd = os.open(access, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as f:
         f.write('PowerCare — comptes de démonstration fictifs\n')
-        f.write('Comptes : admin / responsable / technicien / client\n')
+        f.write('Comptes (installation neuve) : admin / responsable / technicien / livreur / client\n')
         f.write(f'Mot de passe local commun : {demo_password}\n')
         f.write('Ne pas ouvrir ces comptes à des utilisateurs réels.\n')
 print('Configuration créée dans .env (permissions 600).')

@@ -7,14 +7,25 @@ umask 077
 mkdir -p .local/backups
 task_stamp="$(date -u +%Y%m%dT%H%M%SZ)-$RANDOM"
 task_base=".local/backups/tvm-$task_stamp"
-task_web_was_running="$(docker compose ps --status running -q web)"
-task_restore_web() {
-  if [[ -n "$task_web_was_running" ]]; then
-    docker compose start web > /dev/null || printf 'Relancez DEMARRER_TVM.cmd ou docker compose start web.\n' >&2
+task_running_services="$(docker compose --profile container ps --status running --services)"
+task_writers=()
+for task_service in web reminders; do
+  if [[ $'\n'"$task_running_services"$'\n' == *$'\n'"$task_service"$'\n'* ]]; then
+    task_writers+=("$task_service")
+  fi
+done
+task_restore_writers() {
+  if (( ${#task_writers[@]} )); then
+    docker compose --profile container start --wait --wait-timeout 90 "${task_writers[@]}" > /dev/null || printf 'Relancez DEMARRER_TVM.cmd pour redemarrer les services arretes pendant la sauvegarde.\n' >&2
   fi
 }
-trap task_restore_web EXIT
-if [[ -n "$task_web_was_running" ]]; then
+trap task_restore_writers EXIT
+# Stop the reminder worker before the web application so neither can write
+# between the database snapshot and the private-file snapshot.
+if [[ " ${task_writers[*]} " == *" reminders "* ]]; then
+  docker compose --profile container stop reminders > /dev/null
+fi
+if [[ " ${task_writers[*]} " == *" web "* ]]; then
   docker compose stop web > /dev/null
 fi
 task_files=("$task_base.dump")

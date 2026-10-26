@@ -9,6 +9,8 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
+import type { User } from "./api";
+import NotificationCenter from "./NotificationCenter";
 
 type IntegrationStatus = {
   configured?: boolean;
@@ -26,7 +28,7 @@ type IntegrationsPayload = {
   assistant?: IntegrationStatus;
 };
 
-export default function Integrations() {
+export default function Integrations({ user }: { user: User }) {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -322,6 +324,11 @@ export default function Integrations() {
           </ul>
         </section>
       </div>
+      {user.role === "admin" && (
+        <div className="card integration-reminders">
+          <NotificationCenter key={user.id} user={user} />
+        </div>
+      )}
       <div
         className="card"
         style={{

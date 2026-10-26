@@ -192,6 +192,39 @@ Cette option de gratuité concerne **uniquement le diagnostic**. Elle ne remplac
 
 Avant émission du devis, le responsable ou l'administrateur peut reprendre la qualification avec un motif. Cette reprise conserve l'historique et le contrôle financier du diagnostic ; changer simplement de statut ne dispense pas de la décision requise. Après émission, le devis et les conditions qui l'ont produit restent figés.
 
+## Enlèvement, réception atelier et remise au client
+
+L'administrateur crée un compte **Livreur** dans **Comptes & accès**. Ce rôle ouvre un espace logistique adapté au téléphone : **Accueil**, **Tournées**, **Réception**, **Prêts** et **Retours**. Il ne donne accès ni à la finance, ni aux comptes, ni aux diagnostics techniques internes. Les clients proposés lors d'une réception servent à identifier le propriétaire ; le livreur ne peut pas créer une société ou modifier les données d'un équipement connu.
+
+Depuis son portail, le client ouvre **Mes enlèvements → Demander un enlèvement** pour sa société : choisir son équipement ou renseigner sa série et son modèle, décrire le problème et préciser l'adresse, le contact et son téléphone. Cette demande de transport ne prouve pas encore l'arrivée physique et ne crée pas automatiquement une réception SAV. Le responsable retrouve ces demandes dans **Logistique** et leur affecte un livreur. Le livreur voit ses propres missions et enregistre leur prise en charge.
+
+À l'arrivée à l'atelier, ouvrir **Réception** ou **Réception atelier** :
+
+1. Saisir la série, utiliser la douchette USB, la caméra compatible ou une photo d'étiquette, puis **Rechercher le matériel**. Une photo peut proposer plusieurs numéros : choisir et vérifier le numéro avant de poursuivre.
+2. Vérifier le client, le modèle et la série. Un équipement connu garde ses informations enregistrées. Pour un matériel nouveau, sélectionner explicitement le modèle proposé ; si nécessaire, saisir un modèle manuel et sa justification. Un résultat ambigu n'est pas choisi arbitrairement.
+3. Si un dossier ouvert existe, le sélectionner. Confirmer **Je confirme avoir reçu physiquement cet onduleur**, puis **Confirmer la réception**. Le serveur enregistre la date réelle de réception et retrouve ou crée le dossier approprié. Une nouvelle demande est **Non affecté**, sans technicien attribué.
+4. Contrôler le reçu affiché : numéros TVM/client, matériel, propriétaire et arrivée. Une confirmation déjà enregistrée est retrouvée sans recréer le dossier ou remplacer sa date d'arrivée. Une simple lecture de code ou de photo n'enregistre rien.
+
+Si un ancien dossier déjà traité n'a pas de date d'arrivée, demander au responsable de vérifier cette information ; la réception ne remplit pas cette date historique par supposition.
+
+Les photos JPEG/PNG/WEBP sont analysées localement sur le serveur, avec une limite de 8 Mio et 12 millions de pixels. La lecture de code-barres puis l'OCR peuvent échouer selon l'étiquette ; les fichiers temporaires sont supprimés et la photo n'est pas ajoutée au dossier. La saisie manuelle reste possible. La caméra d'un téléphone réel et les étiquettes de l'entreprise doivent encore être essayées dans leur environnement HTTPS.
+
+Pour la sortie, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact de livraison, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve les missions affectées dans **Prêts** ou **Retours**, avec leur destination et leur contact. Avant une remise, le responsable peut annuler une affectation avec un motif puis la réaffecter si nécessaire, en conservant la trace de l'annulation. Une remise déjà enregistrée reste conservée et ne se réaffecte pas.
+
+Après remise physique, ouvrir **Confirmer la remise au client**, saisir le nom du destinataire, cocher **Je confirme avoir remis physiquement cet onduleur au destinataire indiqué**, puis **Enregistrer la remise**. L'heure et l'auteur viennent du serveur. Cette saisie atteste ce que le livreur déclare ; elle n'est ni une signature électronique ni un accusé de réception envoyé par le client. Le client consulte la remise de son propre dossier et reçoit une notification interne.
+
+Après une remise, le remplacement et la qualification technique ne sont plus réinitialisables pour ce dossier. Les opérations financières requises restent possibles : la preuve de remise ne remplace ni la facture d'échange, ni la facture ou gratuité approuvée du diagnostic avant clôture.
+
+## Notifications et rappels du livreur
+
+La rubrique **Notifications et rappels** affiche les messages du compte connecté. Le portail client reçoit les événements de réception et de remise enregistrés pour sa société ; **Marquer comme lue** concerne uniquement la lecture dans TVM, sans accusé externe ou accord du client.
+
+Le livreur et l'administrateur disposent, pour leur propre compte, de **Rappel quotidien à 08:00**. Cocher **Activer le rappel quotidien dans l'application**, vérifier le **Fuseau horaire du rappel**, puis utiliser **Enregistrer les rappels**. Le réglage est désactivé au départ. Il utilise un fuseau IANA, par exemple `Africa/Tunis` ; l'heure reste 08:00 dans ce fuseau, chaque jour. Le rappel présente les enlèvements et livraisons encore affectés au compte, sans informations de facturation.
+
+Le serveur contrôle les rappels chaque minute : la notification est créée au premier contrôle à partir de 08:00, même si le navigateur est fermé, et sera consultable à sa réouverture. Un arrêt du serveur peut retarder le rappel jusqu'à sa reprise le même jour ; il ne crée pas toute une série de rappels anciens. Une désactivation arrête les créations suivantes ; réactiver le même jour ne crée pas de doublon.
+
+**WhatsApp à connecter** et **Aperçu du message prévu** préparent une intégration future. Aucun accès WhatsApp n'a été fourni et l'utilisateur a choisi de connecter ce canal plus tard : aucun message, aucun envoi programmé et aucun ancien rappel en attente d'envoi WhatsApp n'est créé. Les rappels opérationnels de cette version sont ceux de la boîte de réception TVM.
+
 ## Échange : remplacement et facturation
 
 Passer une demande à **Échange** l'affiche dans la file correspondante, sans devoir créer d'abord une visite de type échange. Le classement permet de commencer le traitement ; il ne vaut pas validation technique. Le dossier reste suivi dans cette file au fil de ses étapes, y compris lorsqu'il devient prêt à être livré.

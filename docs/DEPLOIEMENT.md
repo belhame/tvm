@@ -75,6 +75,18 @@ La seconde commande n'est requise qu'à la création du premier compte. Les serv
 
 Les fichiers du dépôt et la configuration conservée ne garantissent pas que des processus sont actifs après une restauration de machine. Relancer les services et vérifier un vrai parcours authentifié, pas seulement un port ouvert.
 
+## Rappels internes de 08:00
+
+Le profil Compose `container` démarre également le service **`reminders`**, avec la même image que `web`, après disponibilité de la base et du serveur migré. Il vérifie les rappels toutes les 60 secondes, réglables par `TVM_REMINDER_POLL_SECONDS` entre 10 et 3 600. Les comptes doivent activer leur préférence ; le démarrage du worker n'active personne automatiquement. Le worker crée seulement des notifications dans PostgreSQL et n'envoie aucun message WhatsApp.
+
+En mode Python local, après chargement du `.env`, lancer un second processus supervisé :
+
+```bash
+.venv/bin/python backend/manage.py logistics_reminders
+```
+
+Pour un contrôle ponctuel, ajouter `--once`. Ne pas utiliser la simple ouverture d'une page pour déclencher le traitement : les GET ne créent aucun rappel. Plusieurs workers gardent un seul rappel par destinataire et jour local ; un seul processus supervisé suffit à cette équipe. Le fuseau personnel du compte détermine 08:00, avec repli sur `TVM_TIMEZONE`. Aucun rappel ancien n'est conservé dans une file WhatsApp future.
+
 ## Sauvegarder
 
 ```bash
@@ -93,7 +105,7 @@ Elle produit un ensemble portant le même préfixe `tvm-<horodatage UTC>-<suffix
 | `.env` | Copie de la configuration locale, si elle existe |
 | `.sha256` | Empreintes des fichiers de cet ensemble |
 
-Le script vérifie la lecture du dump, le catalogue des archives média et les empreintes. Il arrête brièvement le service web Compose s'il était actif et le relance à la fin, y compris après une erreur. **Un serveur Gunicorn lancé hors Docker doit être arrêté avant la commande**, ainsi que toute autre source d'écriture ; le script ne peut pas arrêter ces processus à votre place. PostgreSQL doit être démarré.
+Le script vérifie la lecture du dump, le catalogue des archives média et les empreintes. Il arrête brièvement les services Compose `reminders` puis `web` s'ils étaient actifs, et reprend seulement ces services à la fin, y compris après une erreur. **Un serveur Gunicorn ou un worker de rappels lancé hors Docker doit être arrêté avant la commande**, ainsi que toute autre source d'écriture ; le script ne peut pas arrêter ces processus à votre place. PostgreSQL doit être démarré.
 
 Conserver les fichiers de même préfixe ensemble. Ne pas remplacer seulement `.env` avec une configuration provenant d'une autre base : les accès et fichiers doivent correspondre à la même installation sauvegardée. Le fichier `.env` copié et le contenu métier sont privés.
 

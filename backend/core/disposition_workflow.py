@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, DispositionProcess
-from .exchange_workflow import _editable, _manager, get_process as get_exchange, is_exchange_case
+from .exchange_workflow import _editable, _manager, get_process as get_exchange, is_exchange_case, recorded_handoff
 from .models import AuditLog, Equipment, ServiceRequest
 from .permissions import can_validate_billing
 from .workflow_events import append_event, current_actor
@@ -116,6 +116,7 @@ def disposition_payload(service_request, actor):
     closed = service_request.status == 'closed'
     quote = process.current_quote
     finance = _financial_evidence(process)
+    handed_over = recorded_handoff(service_request)
     if closed:
         state = 'closed'
     elif finance:
@@ -129,13 +130,13 @@ def disposition_payload(service_request, actor):
         'tests_passed': process.tests_passed, 'tested_on': process.tested_on, 'classified_at': process.classified_at,
         'fee_mode': process.fee_mode, 'currency': process.currency, 'requires_diagnostic_billing': process.requires_diagnostic_billing,
         'quote': quote_payload(quote), 'finance_validated_at': process.finance_validated_at,
-        'can_mark_repaired': not closed and editable and not is_exchange_case(service_request) and not quote and not process.finance_validated_at and service_request.status in ('testing', 'resolved'),
-        'can_mark_nonrepairable': not closed and editable and not is_exchange_case(service_request) and not quote and not process.finance_validated_at,
+        'can_mark_repaired': not closed and editable and not is_exchange_case(service_request) and not quote and not process.finance_validated_at and service_request.status in ('testing', 'resolved') and not handed_over,
+        'can_mark_nonrepairable': not closed and editable and not is_exchange_case(service_request) and not quote and not process.finance_validated_at and not handed_over,
         'can_edit_quote': can_edit, 'can_issue_quote': can_edit,
         'can_confirm_invoice': not closed and bool(quote) and not finance and process.fee_mode == 'billable' and can_validate_billing(actor),
         'can_approve_free': not closed and bool(quote) and not finance and process.fee_mode == 'free' and can_validate_billing(actor),
         'can_close': not closed and bool(process.classified_at or service_request.status == 'ready_for_delivery') and (manager or (process.requires_diagnostic_billing and can_validate_billing(actor))) and (not process.requires_diagnostic_billing or finance),
-        'can_reset': not closed and bool(process.pk and process.classified_at) and manager and not quote and not process.finance_validated_at,
+        'can_reset': not closed and bool(process.pk and process.classified_at) and manager and not quote and not process.finance_validated_at and not handed_over,
     }
     if internal:
         result.update({'price_ht': _price(process.price_ht, process.currency), 'vat_rate': str(process.vat_rate) if process.vat_rate is not None else None,
@@ -200,6 +201,12 @@ def _edit_allowed(actor, service_request):
         raise PermissionDenied('Cette opération est réservée au responsable ou au technicien affecté au dossier.')
 
 
+def _technical_change_allowed(service_request):
+    from .logistics_models import OutboundJob
+    if OutboundJob.objects.filter(service_request_id=service_request.pk, handed_over_at__isnull=False).exists():
+        raise ValidationError('La remise de ce matériel est déjà enregistrée. La qualification technique reste conservée ; les décisions financières et la clôture restent possibles.')
+
+
 def _event(service_request, actor, kind, summary, *, observation='', private=False):
     return append_event(equipment=service_request.equipment, service_request=service_request, actor=actor,
                         kind=kind, summary=summary, observation=observation, is_internal=private)
@@ -221,6 +228,7 @@ def mark_repaired(identifier, data, *, actor):
         raise ValidationError({'status': 'Placez le dossier En test ou Traité avant de confirmer que la réparation a passé ses tests.'})
     if data['tests_passed'] is not True:
         raise ValidationError({'tests_passed': 'Confirmez explicitement que les tests sont réussis.'})
+    _technical_change_allowed(service_request)
     service_request.equipment = Equipment.objects.select_for_update(no_key=True).get(pk=service_request.equipment_id)
     process.outcome = 'repaired'
     process.diagnosis = data['diagnosis']
@@ -245,6 +253,7 @@ def mark_nonrepairable(identifier, data, *, actor):
     _mutable(service_request, process)
     if process.outcome == 'nonrepairable' and process.diagnosis == data['diagnosis'] and process.fee_mode == data.get('fee_mode', process.fee_mode) and process.free_reason == data.get('free_reason', process.free_reason) and service_request.status == 'return_to_client':
         return service_request
+    _technical_change_allowed(service_request)
     service_request.equipment = Equipment.objects.select_for_update(no_key=True).get(pk=service_request.equipment_id)
     process.outcome = 'nonrepairable'
     process.diagnosis = data['diagnosis']
@@ -405,6 +414,7 @@ def reset_disposition(identifier, *, actor, reason):
     service_request = _locked(identifier)
     if not _manager(actor):
         raise PermissionDenied('Le responsable SAV ou un administrateur reprend la qualification.')
+    _technical_change_allowed(service_request)
     process = _process(service_request)
     _mutable(service_request, process)
     process.outcome = 'pending'

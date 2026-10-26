@@ -34,6 +34,7 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  MapPin,
   MoreHorizontal,
   Package,
   Pencil,
@@ -95,6 +96,10 @@ import ClientsDirectory from "./ClientsDirectory";
 import PreventiveProgress from "./PreventiveProgress";
 import ExchangeWorkspace from "./ExchangeWorkspace";
 import DispatchWorkspace from "./DispatchWorkspace";
+import CourierWorkspace from "./CourierWorkspace";
+import ClientPickups from "./ClientPickups";
+import LogisticsWorkspace from "./LogisticsWorkspace";
+import type { LogisticsBootstrap } from "./logistics";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -108,6 +113,7 @@ const roleNames = {
   manager: "Responsable SAV",
   technician: "Technicien SAV",
   client: "Portail client",
+  courier: "Livreur",
 };
 const navGroups = [
   {
@@ -127,6 +133,8 @@ const navGroups = [
       { id: "commissioning", label: "Mise en service", icon: CheckCircle2 },
       { id: "preventive", label: "Préventive", icon: ShieldCheck },
       { id: "planning", label: "Planning", icon: CalendarDays },
+      { id: "pickups", label: "Mes enlèvements", icon: Truck },
+      { id: "logistics", label: "Logistique", icon: MapPin },
       { id: "dispatch", label: "Livraisons & retours", icon: Truck },
       {
         id: "diagnostic-billing",
@@ -161,6 +169,7 @@ const clientPages = new Set([
   "requests",
   "exchange",
   "dispatch",
+  "pickups",
   "contracts",
   "delivery-notes",
   "reports",
@@ -537,7 +546,9 @@ function EditForm({
     setValues((previous) => ({
       ...previous,
       [name]: entry,
-      ...(modal.resource === "users" && name === "role" && entry === "client"
+      ...(modal.resource === "users" &&
+      name === "role" &&
+      ["client", "courier"].includes(String(entry))
         ? { can_validate_billing: "false" }
         : {}),
       ...(modal.resource === "interventions" && name === "service_request"
@@ -660,7 +671,10 @@ function EditForm({
       }
       if (modal.resource === "users" && payload.role !== "client")
         payload.client = null;
-      if (modal.resource === "users" && payload.role === "client")
+      if (
+        modal.resource === "users" &&
+        ["client", "courier"].includes(payload.role)
+      )
         payload.can_validate_billing = false;
       if (modal.resource === "delivery-notes")
         payload.lines = lines
@@ -813,7 +827,7 @@ function EditForm({
                             readonly ||
                             (modal.resource === "users" &&
                               field.name === "can_validate_billing" &&
-                              values.role === "client") ||
+                              ["client", "courier"].includes(values.role)) ||
                             (field.name === "technician" &&
                               user.role === "technician")
                           }
@@ -2835,6 +2849,23 @@ export default function App() {
       activeUserId.current === user.id;
     setLoading(true);
     setLoadError("");
+    if (user.role === "courier") {
+      setData({});
+      try {
+        const bootstrap = await api<LogisticsBootstrap>("logistics/bootstrap/");
+        if (current()) setDashboard(bootstrap);
+      } catch (error) {
+        if (current())
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "L’espace livreur est indisponible.",
+          );
+      } finally {
+        if (current()) setLoading(false);
+      }
+      return;
+    }
     const client = user.role === "client";
     const names = client
       ? [
@@ -2904,6 +2935,17 @@ export default function App() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
   function navigate(target: string, search = "") {
+    if (
+      user?.role === "courier" &&
+      ![
+        "courier/home",
+        "courier/routes",
+        "courier/receive",
+        "courier/ready",
+        "courier/returns",
+      ].includes(target)
+    )
+      target = "courier/home";
     if (user?.role === "client" && !clientPages.has(target.split("/")[0]))
       target = "dashboard";
     if (target === "users" && user?.role !== "admin") target = "dashboard";
@@ -2931,8 +2973,10 @@ export default function App() {
     setLoading(false);
     setUser(nextUser);
     setDemo(nextDemo);
-    setPage("dashboard");
-    window.history.replaceState(null, "", "#dashboard");
+    const firstPage =
+      nextUser?.role === "courier" ? "courier/home" : "dashboard";
+    setPage(firstPage);
+    window.history.replaceState(null, "", `#${firstPage}`);
   }
   async function saved() {
     await reload();
@@ -2988,6 +3032,27 @@ export default function App() {
         />
       </>
     );
+  if (user.role === "courier")
+    return (
+      <CourierWorkspace
+        key={user.id}
+        user={user}
+        bootstrap={
+          dashboard.metrics && Array.isArray(dashboard.clients)
+            ? (dashboard as LogisticsBootstrap)
+            : null
+        }
+        loading={loading}
+        error={loadError}
+        page={page}
+        onNavigate={navigate}
+        onReload={reload}
+        onLogout={logout}
+        logoutBusy={logoutBusy}
+        Dialog={Modal}
+        demo={demo}
+      />
+    );
   const basePage = page.startsWith("requests/") ? "requests" : page;
   const requestCategory = requestCategories.some(
     (entry) => entry.key === page.split("/")[1],
@@ -2996,6 +3061,8 @@ export default function App() {
     : "all";
   const allowedPage =
     (user.role === "client" && !clientPages.has(basePage)) ||
+    (basePage === "logistics" && !["admin", "manager"].includes(user.role)) ||
+    (basePage === "pickups" && user.role !== "client") ||
     (["exchange-billing", "diagnostic-billing"].includes(basePage) &&
       !(
         user.role !== "client" &&
@@ -3038,6 +3105,9 @@ export default function App() {
             const items = group.items.filter(
               (item) =>
                 (user.role !== "client" || clientPages.has(item.id)) &&
+                (item.id !== "pickups" || user.role === "client") &&
+                (item.id !== "logistics" ||
+                  ["admin", "manager"].includes(user.role)) &&
                 (!["exchange-billing", "diagnostic-billing"].includes(
                   item.id,
                 ) ||
@@ -3229,6 +3299,21 @@ export default function App() {
               {...common}
               dashboard={dashboard}
               onNavigate={navigate}
+            />
+          ) : allowedPage === "pickups" ? (
+            <ClientPickups
+              key={user.id}
+              user={user}
+              equipment={data.equipment || []}
+              client={data.clients?.find((client) => client.id === user.client)}
+              Dialog={Modal}
+            />
+          ) : allowedPage === "logistics" ? (
+            <LogisticsWorkspace
+              key={user.id}
+              user={user}
+              clients={data.clients || []}
+              Dialog={Modal}
             />
           ) : allowedPage === "clients" ? (
             <ClientsDirectory
@@ -3427,7 +3512,7 @@ export default function App() {
           ) : allowedPage === "catalogue" ? (
             <EatonCatalogue user={user} />
           ) : allowedPage === "integrations" ? (
-            <Integrations />
+            <Integrations user={user} />
           ) : resources[allowedPage] ? (
             <ResourcePage
               key={allowedPage}

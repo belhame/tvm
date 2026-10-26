@@ -74,7 +74,7 @@ class ServiceRequestSerializer(LegacySerializer):
     call_number = serializers.CharField(source='reference', read_only=True)
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
-    assigned_technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role='client'), required=False, allow_null=True)
+    assigned_technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role__in=['client', 'courier']), required=False, allow_null=True)
     assigned_technician_name = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
@@ -167,7 +167,7 @@ class InterventionSerializer(LegacySerializer):
     equipment_model = serializers.CharField(source='service_request.equipment.model', read_only=True)
     client_name = serializers.CharField(source='service_request.equipment.client.name', read_only=True)
     technician_name = serializers.SerializerMethodField()
-    technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role='client'), required=False, allow_null=True)
+    technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role__in=['client', 'courier']), required=False, allow_null=True)
     replacement_equipment_serial = serializers.CharField(source='replacement_equipment.serial_number', read_only=True, default=None)
     contract_number = serializers.CharField(source='contract.number', read_only=True, default=None)
     contract_starts_on = serializers.DateField(source='contract.starts_on', read_only=True, default=None)
@@ -282,8 +282,10 @@ class UserSerializer(serializers.ModelSerializer):
         if (role == 'client') != (client is not None):
             raise serializers.ValidationError({'client': 'Un compte client doit être lié à un client ; un compte interne ne doit pas l’être.'})
         billing_permission = attrs.get('can_validate_billing', getattr(self.instance, 'can_validate_billing', False))
-        if role == 'client' and billing_permission:
-            raise serializers.ValidationError({'can_validate_billing': 'Un compte client ne peut pas valider la facturation. Retirez cette autorisation avant de convertir le compte.'})
+        if role in ('client', 'courier') and billing_permission:
+            raise serializers.ValidationError({'can_validate_billing': 'Un compte client ou livreur ne peut pas valider la facturation. Retirez cette autorisation avant de convertir le compte.'})
+        if role == 'courier' and self.instance and (self.instance.is_staff or self.instance.is_superuser):
+            raise serializers.ValidationError({'role': 'Retirez d’abord les droits d’administration Django avant de convertir ce compte en livreur.'})
         if not self.instance and not attrs.get('password'):
             raise serializers.ValidationError({'password': 'Mot de passe obligatoire à la création.'})
         if attrs.get('password'):

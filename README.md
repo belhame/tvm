@@ -18,6 +18,10 @@ Les demandes classées **Échange** alimentent automatiquement leur file de suiv
 
 Le menu **Livraisons & retours** réunit les réparations testées et les échanges prêts, avec une colonne **À retourner au client** pour les non-réparables. TVM crée le devis PDF de diagnostic ; la clôture du retour exige une facture externe confirmée ou une gratuité approuvée et justifiée. Cette gratuité ne dispense pas un échange de sa facture. Voir [le parcours](docs/GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
+Le portail permet de demander un enlèvement ; le responsable affecte les transports et le livreur enregistre la réception atelier puis la remise au client dans [son espace logistique](docs/GUIDE_SUIVI_SAV.md#enlèvement-réception-atelier-et-remise-au-client). La série peut venir d'une saisie, d'une douchette, d'une caméra compatible ou d'une photo, toujours vérifiée avant confirmation.
+
+Les notifications sont enregistrées dans TVM. Le livreur peut activer un rappel quotidien de ses missions à 08:00 dans le fuseau choisi ; les clients voient les événements de réception/remise de leur société. **WhatsApp reste à connecter**, avec un aperçu uniquement et aucun envoi externe. Voir [les rappels](docs/GUIDE_SUIVI_SAV.md#notifications-et-rappels-du-livreur).
+
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 
 ## Essayer la version de démonstration
@@ -43,7 +47,7 @@ bash scripts/start.sh
 
 Ouvrir sur la machine exécutant le serveur l'adresse locale indiquée par Gunicorn, port **8000**. Le serveur écoute par défaut uniquement sur cette machine. Pour un accès depuis plusieurs ordinateurs, suivre [le déploiement sur un serveur partagé](docs/DEPLOIEMENT.md).
 
-Les comptes fictifs sont `admin`, `responsable`, `technicien` et `client`. Leur mot de passe est **généré localement**, disponible dans `.local/demo-access.txt`, jamais codé en dur. Le compte `client` sert à tester le portail limité à sa société. Le mode démonstration est signalé dans l'application.
+Sur une installation neuve, les comptes fictifs sont `admin`, `responsable`, `technicien`, `livreur` et `client`. Leur mot de passe est **généré localement**, disponible dans `.local/demo-access.txt`, jamais codé en dur. Le compte `client` sert à tester le portail limité à sa société. Une démo déjà initialisée conserve ses comptes : l'administrateur ajoute le rôle Livreur depuis **Comptes & accès**. Le mode démonstration est signalé dans l'application.
 
 `setup.sh --demo` initialise `.env`, installe les dépendances, démarre PostgreSQL, compile le frontend, applique les migrations et ajoute les données fictives. Un `.env` existant est conservé. Si ce fichier désactive la démo, le script n'y active pas silencieusement les comptes fictifs.
 

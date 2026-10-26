@@ -5,11 +5,11 @@ Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (ba
 ## Session
 - `GET /api/session/` → `{user: null | {id, username, first_name, last_name, email, role, client, can_validate_billing}, csrfToken}`.
 - `POST /api/login/` avec `{username,password}` → `{user}` ; `POST /api/logout/`.
-- Rôles : `admin`, `manager`, `technician`, `client`. Portail client : ses propres clients/équipements/dossiers/interventions/contrats/garanties/BL/rapports, lecture seule. Toutes les restrictions sont appliquées côté serveur. Aucun stock ni compte tiers ni note interne exposé au client.
+- Rôles : `admin`, `manager`, `technician`, `courier`, `client`. Portail client : consultation de ses propres équipements/dossiers/interventions/contrats/garanties/BL/rapports ; demande d'enlèvement dans sa société et marquage de ses notifications comme lues par les routes dédiées. Toutes les restrictions sont appliquées côté serveur. Aucun stock ni compte tiers ni note interne exposé au client. Le livreur dispose d'un espace logistique restreint, sans accès aux routes métier, aux comptes ou à la finance.
 
 `can_validate_billing` est une autorisation distincte, à `false` par défaut. Un administrateur est autorisé implicitement ; un autre compte doit être interne, actif et disposer explicitement de ce drapeau pour valider la facturation. Aucun nouveau rôle n'est créé. Seul un administrateur peut donner ou retirer ce droit via les comptes. La session expose le drapeau enregistré du compte connecté ; les listes du personnel accessibles aux non-administrateurs ne divulguent pas les permissions individuelles des autres comptes.
 
-Un compte client ne peut pas avoir ce droit. Transformer un compte autorisé en client exige de remettre `can_validate_billing` à `false` dans la même modification, sinon l'API refuse la demande. La migration ne délègue pas automatiquement la validation financière aux anciens responsables ou techniciens.
+Un compte client ou livreur ne peut pas avoir ce droit. Transformer un compte autorisé en client ou livreur exige de remettre `can_validate_billing` à `false` dans la même modification, sinon l'API refuse la demande. Le livreur ne peut pas être administrateur Django. La migration ne délègue pas automatiquement la validation financière aux anciens responsables ou techniciens.
 
 ## Ressources
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
@@ -28,6 +28,62 @@ Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création P
 - `/api/search/?q=...` : recherche autorisée `{equipment,clients,requests,interventions}`.
 - `POST /api/serial-analysis/` : analyse consultative du format Eaton décrit dans le classeur fourni, avec `{serial_number: string}` (1–120 caractères), session et CSRF obligatoires. Réponse `{status: "matches" | "not_applicable", normalized_serial_number, rule_id, source, segments: null | {manufacturing_location_code, product_identification_code, year_code, week_code, week_number, unit_order_code}, calendar_year: null, warnings: string[]}`. Aucune recherche d'équipement ni écriture ; un résultat compatible n'authentifie pas le matériel. Voir [les règles et leurs limites](NUMEROS_SERIE_EATON.md).
 - `/api/dashboard/` : `{metrics:{active_interventions,open_requests,critical_stock,equipment_count,client_count,completed_interventions},recent_interventions:[],activity:[{label,interventions,requests}],status_distribution:[{name,value}],upcoming:[]}`. Données réellement en base et filtrées par utilisateur.
+
+## Enlèvements, réception et remise logistique
+
+Les routes logistiques utilisent leurs propres projections minimales. Le rôle `courier` reste interdit sur les API métier générales et l'administration Django, même s'il connaît un identifiant. Il accède aux noms de clients nécessaires à la réception et aux coordonnées de ses missions affectées ; aucun diagnostic technique interne, document financier, stock ou compte tiers n'est fourni. Les rôles actifs `admin` et `manager` pilotent la logistique ; le client agit uniquement dans sa société. Les techniciens n'utilisent pas ces routes.
+
+| Route | Usage et droits |
+|---|---|
+| `GET /api/logistics/bootstrap/` | Administrateur/responsable/livreur : utilisateur, clients minimaux `{id,name}`, livreurs disponibles pour les responsables, compteurs du périmètre |
+| `GET /api/logistics/clients/?q=...` | Même accès ; au plus 250 noms/identifiants, recherche par nom |
+| `POST /api/logistics/lookup/` | Même accès : lecture d'une série, modèle et dossiers ouverts compatibles, sans écriture |
+| `POST /api/logistics/receive/` | Même accès : confirmation de réception physique idempotente |
+| `GET /api/logistics/pickups/` et `GET /api/logistics/pickups/{id}/` | Responsables : ensemble ; livreur : affectées ; client : sa société |
+| `POST /api/logistics/pickups/` | Client : nouvelle demande d'enlèvement de sa société |
+| `POST /api/logistics/pickups/{id}/assign/` | Administrateur/responsable : affecter un livreur actif |
+| `POST /api/logistics/pickups/{id}/collect/` | Responsable ou livreur affecté : prise en charge physique |
+| `POST /api/logistics/pickups/{id}/cancel/` | Responsable ou client propriétaire : annulation motivée avant collecte |
+| `GET /api/logistics/dispatch-candidates/` | Administrateur/responsable : dossiers prêts ou retours réellement affectables |
+| `GET /api/logistics/outbound/` et `GET /api/logistics/outbound/{id}/` | Transports dans le même périmètre responsables/livreur affecté/client propriétaire |
+| `POST /api/logistics/outbound/` | Administrateur/responsable : créer l'affectation depuis le dossier |
+| `POST /api/logistics/outbound/{id}/assign/` | Administrateur/responsable : modifier ou réactiver une mission avant remise |
+| `POST /api/logistics/outbound/{id}/handoff/` | Responsable ou livreur affecté : enregistrer la remise au destinataire |
+| `POST /api/logistics/outbound/{id}/cancel/` | Administrateur/responsable : annuler avec motif avant remise |
+
+Les listes renvoient des tableaux et acceptent `q` jusqu'à 200 caractères pour les séries, références et clients pertinents. Les réponses sont privées et `no-store`. Les corps JSON sont stricts : champs inconnus refusés, identifiants entiers positifs, UUID sous forme de texte. Les mutations exigent session/CSRF et renvoient HTTP `200` avec l'objet relu ; erreurs de saisie ou de clé réutilisée avec un autre contenu `400`, rôle interdit `403`, ressource hors périmètre `404`.
+
+`lookup` accepte `{serial_number,profile?,product_id?,catalogue_import_id?}`. La réponse comprend `status` (`known`, `catalogue_match`, `ambiguous`, `unknown`), `serial_number`, `equipment`, `suggested`, `candidates`, `profile_options`, `open_requests`, `warnings`. Une fiche connue est prioritaire ; un modèle catalogue ambigu nécessite un choix explicite. Les dossiers déjà clôturés ou matériellement remis ne sont pas proposés comme dossiers encore à l'atelier.
+
+`receive` exige `{request_key,serial_number,client}` et accepte `pickup`, `service_request`, `client_reference`, `fault_description`, `source` (`manual`, `usb`, `camera`, `photo`), les choix catalogue et `manual_model`, `manual_brand`, `manual_reason`. Un modèle manuel exige son nom et une justification. Le serveur contrôle série, propriétaire, enlèvement éventuel et dossier choisi ; une lecture n'autorise aucun transfert de client ou écrasement du modèle connu. Il crée si nécessaire l'équipement puis le dossier dans une transaction, sans garantie fabriquée. La nouvelle demande reçoit son numéro TVM, l'arrivée serveur, l'état `new` et aucun technicien. Plusieurs dossiers ouverts imposent un choix explicite. Une arrivée absente sur un dossier déjà traité doit être vérifiée par un responsable ; le parcours de réception ne lui invente pas de date historique.
+
+La réponse de réception est `{receipt_id,created_request,created_equipment,already_received,request}` avec une demande minimale : identifiant, numéros TVM/client, série, marque/modèle, type `ups`, nom d'équipement, client `{id,name}`, arrivée et état. Une même clé UUID du même acteur avec le même contenu retrouve le reçu ; une clé réutilisée autrement est refusée. Une arrivée déjà enregistrée conserve sa date et son état ; elle ne crée pas une deuxième demande ou notification.
+
+Une demande d'enlèvement accepte `{request_key,equipment?,serial_number?,brand?,model?,client_reference?,fault_description,pickup_address,contact_name,contact_phone?}`. L'équipement ou la série est obligatoire. Le client est imposé par le compte, sans champ de société libre. Le transport reste distinct du SAV : aucun équipement ou dossier nouveau ni date d'arrivée n'est créé à cette étape. Les états sont `requested`, `assigned`, `collected`, `received`, `cancelled`. `assign` exige `{courier}`, `collect` utilise `{}`, et `cancel` exige `{reason}` non vide. Les coordonnées et capacités `can_assign`, `can_collect`, `can_receive`, `can_cancel` sont filtrées par rôle et étape.
+
+La création d'un transport exige `{service_request,courier}` et accepte `delivery_address`, `contact_name`, `contact_phone` ; la réaffectation utilise le même format sans dossier obligatoire. Le matériel provient du dossier prêt, du remplacement explicitement validé pour un échange, ou de la qualification non réparable pour un retour. Un équipement ne peut avoir deux missions actives. Le DTO indique notamment `kind:delivery|return`, `status:assigned|completed|cancelled`, `active`, les références, le client, le matériel, la destination, le livreur affecté et les capacités calculées.
+
+`handoff` exige `{recipient_name}` non vide, au plus 150 caractères. Le serveur conserve l'heure, l'auteur et son rôle réels ainsi que série/marque/modèle remis. Un rejeu identique garde la preuve ; remplacer son destinataire est refusé. Cette déclaration ne prouve ni signature du client, ni facture, ni paiement. La remise n'arrête pas automatiquement le compteur SAV et ne clôture pas le dossier : la clôture et ses contrôles financiers restent distincts. Après remise, les reprises de validation d'échange et de qualification technique sont refusées ; les devis et validations financières applicables restent possibles. L'annulation motivée retire seulement une mission non remise de la charge active. Elle peut être réaffectée avant remise, après nouvelle vérification de son dossier ; l'événement d'annulation et son motif restent conservés dans l'historique.
+
+## Photo de numéro de série
+
+`POST /api/logistics/recognize-serial/` est réservé aux administrateurs, responsables et livreurs actifs, avec session et CSRF. Il accepte exactement un champ multipart `file`, photo JPEG, PNG ou WEBP, de **8 Mio et 12 millions de pixels maximum**. Le contrôle borne les octets réellement reçus. Le traitement local cherche les codes-barres avec ZXing puis du texte avec Tesseract, dans un worker limité ; il n'appelle aucune API extérieure.
+
+La réponse est `{candidates:[{serial_number,source}],method,status,message}` : au plus dix propositions, `source` valant `barcode` ou `ocr`, `method` valant `barcode`, `ocr` ou `none`, et `status` parmi `recognized`, `ambiguous`, `not_found`, `unavailable`. Aucun score de confiance inventé n'est fourni. Les métadonnées de la photo sont retirées ; la photo et les fichiers temporaires ne sont pas conservés. Le résultat reste consultatif : choix et vérification du numéro, recherche du matériel puis confirmation de réception sont des actions distinctes. La caméra du navigateur et la douchette USB restent des sources séparées ; aucun échec OCR n'empêche la saisie manuelle.
+
+## Notifications internes et rappel logistique de 08:00
+
+`GET /api/logistics/notifications/preferences/` consulte les préférences **du compte connecté**, administrateur ou livreur (`courier`). Un GET ne crée ni préférence ni notification. `PATCH` accepte seulement `{enabled?: boolean, timezone?: string}` : booléen JSON strict et fuseau IANA valide. Le rappel est désactivé par défaut ; l'heure reste fixée à **08:00**. Sans fuseau personnel, il utilise `TVM_TIMEZONE`, `Africa/Lagos` par défaut. Aucun identifiant d'un autre utilisateur ne peut être transmis pour lire ou modifier ses préférences.
+
+La réponse contient `{enabled,hour:8,minute:0,timezone,next_run_at,schedule_mode,editable,pickup_count,delivery_count,in_app_status,channel_status,whatsapp_connected,whatsapp_can_send,whatsapp_preview}`. `in_app_status` vaut `enabled` ou `disabled`. `schedule_mode` distingue `disabled` (`next_run_at:null`), `catch_up_today` (premier passage du worker après une activation/reprise tardive aujourd'hui) et `next_08` (prochain 08:00). Le canal WhatsApp reste `requires_credentials`, `whatsapp_connected:false`, `whatsapp_can_send:false`. Son aperçu contient `{text,scheduled_for,timezone,status:"preview_only",outbound_sent:false}` : il n'est ni un message envoyé ni une entrée de file d'envoi.
+
+`GET /api/logistics/notifications/` retourne les 100 dernières notifications du destinataire connecté sous `{results,unread_count,as_of}`. Une entrée expose `{id,kind,title,body,created_at,read_at,local_date,channel:"in_app",channel_status:"available",service_request,call_number,client_reference,details}`. `kind` vaut `daily_logistics`, `equipment_received` ou `equipment_delivered`. Le nombre non lu inclut aussi les entrées plus anciennes. `PATCH /api/logistics/notifications/{id}/read/` exige `{read:true}` et marque seulement une notification propre, sans changer sa date lors d'un rejeu. Ces écritures nécessitent session et CSRF ; un autre destinataire reçoit `404`.
+
+Le rappel quotidien est créé au premier passage du worker à partir de 08:00 locale, une seule fois par jour et destinataire, même avec deux workers. Il couvre uniquement les enlèvements affectés non terminés et les remises encore affectées d'un dossier prêt ou à retourner. Les identifiants des missions sont conservés ; leurs détails sont relus dans les affectations actuelles, sans finance, pour ne pas exposer une mission réaffectée. Une désactivation empêche les nouveaux rappels ; une réactivation le même jour ne duplique pas celui déjà créé. Aucun rappel historique n'est préparé pour un futur envoi WhatsApp.
+
+Après une réception réellement enregistrée ou une remise effectivement saisie par le livreur, les hooks logistiques créent une notification interne pour les comptes clients actifs de la société concernée. Ce sont des événements déclarés par TVM, sans prétendre à un accusé de réception du client. Les comptes clients ne reçoivent aucun rappel de personnel, brouillon de mission ni résumé financier ; leurs listes et lectures restent filtrées par société actuelle. Aucune de ces fonctions n'effectue un appel réseau WhatsApp.
+
+Le traitement s'exécute avec `python manage.py logistics_reminders --once` ou en boucle avec `python manage.py logistics_reminders`. L'intervalle par défaut est de 60 secondes (`TVM_REMINDER_POLL_SECONDS`, ou `--interval`, entre 10 et 3 600 secondes). Le service Compose `reminders` utilise l'image du serveur, attend sa santé après migration et s'arrête proprement sur SIGTERM. Les notifications sont persistées dans PostgreSQL ; elles ne dépendent pas du stockage navigateur.
 
 ## Import d'annuaire clients
 

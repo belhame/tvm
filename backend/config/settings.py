@@ -22,7 +22,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware', 'core.middleware.PrivateAPIHeaders', 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware', 'django.middleware.common.CommonMiddleware',
     'core.attachment_limits.AttachmentUploadLimitMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware', 'django.contrib.auth.middleware.AuthenticationMiddleware', 'core.workflow_events.WorkflowActorMiddleware',
+    'core.serial_photo_limits.SerialPhotoUploadLimitMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware', 'django.contrib.auth.middleware.AuthenticationMiddleware', 'core.logistics_permissions.CourierAPIAccessMiddleware', 'core.workflow_events.WorkflowActorMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware', 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 ROOT_URLCONF = 'config.urls'

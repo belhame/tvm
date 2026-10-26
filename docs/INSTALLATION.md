@@ -57,6 +57,8 @@ docker compose stop
 
 Les données relationnelles sont dans le volume Docker `tvm_postgres` du projet Compose. Les pièces jointes du service web conteneurisé sont dans le volume persistant `tvm_media`, monté sur `/app/backend/media`. Ne pas supprimer ces volumes pour « redémarrer » l'application. Ne pas utiliser `docker compose down -v` sur une installation contenant des données à conserver.
 
+Le profil Docker `container` démarre aussi `reminders` pour les rappels internes opt-in de 08:00. En mode Python local, ce worker se lance séparément après chargement de `.env` : `.venv/bin/python backend/manage.py logistics_reminders`. Voir [le fonctionnement et les sauvegardes du worker](DEPLOIEMENT.md#rappels-internes-de-0800). WhatsApp reste non connecté ; aucun envoi externe n'est déclenché.
+
 ## Fichiers privés et sauvegardes
 
 Les pièces jointes sont conservées côté serveur, séparément des sources et des fichiers statiques de l'interface. Hors conteneur, le stockage par défaut est `backend/media/` ; dans le mode Docker livré, il utilise le volume média. Le téléchargement passe par l'API authentifiée, pas par une publication du dossier média sur le Web.

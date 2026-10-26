@@ -1,0 +1,227 @@
+.serial-capture {
+  min-width: 0;
+  color: #243b5a;
+}
+.serial-capture-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+.serial-capture-modes .button {
+  min-height: 40px;
+}
+.serial-capture-modes [aria-pressed="true"] {
+  color: #124ec0;
+  border-color: #8baded;
+  background: #eaf1ff;
+}
+.serial-capture-manual > label,
+.serial-capture-photo-fields > label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #243b5a;
+}
+.serial-capture-entry {
+  display: flex;
+  gap: 9px;
+  align-items: stretch;
+}
+.serial-capture-entry > input {
+  min-width: 0;
+  flex: 1;
+}
+.serial-capture-help {
+  margin: 8px 0 0;
+  color: #526680;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.serial-capture-camera {
+  position: relative;
+  margin: 0 0 18px;
+  border-radius: 13px;
+  background: #112038;
+  overflow: hidden;
+}
+.serial-capture-camera[hidden] {
+  display: none;
+}
+.serial-capture-camera video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  min-height: 210px;
+  object-fit: cover;
+}
+.serial-capture-camera-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  color: #eef4ff;
+  background: #112038;
+  font-size: 13px;
+}
+.serial-capture-target {
+  position: absolute;
+  inset: 25% 12%;
+  border: 2px solid #52b1ff;
+  border-radius: 10px;
+  box-shadow: 0 0 0 250px #061a3240;
+  pointer-events: none;
+}
+.serial-capture-engine {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  color: #fff;
+  background: #142c4d;
+  font-size: 11px;
+}
+.serial-capture-camera-stop {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+.serial-capture-photo {
+  display: flex;
+  align-items: start;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 17px;
+  background: #f4f7fc;
+  border: 1px solid #dce5f2;
+  border-radius: 11px;
+}
+.serial-capture-photo-fields {
+  flex: 1;
+  min-width: 0;
+}
+.serial-capture-photo-fields > .input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.serial-capture-photo-fields > .button {
+  margin-top: 12px;
+}
+.serial-capture-file-name {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #425b7d;
+}
+.serial-capture-photo-preview {
+  max-width: 180px;
+  max-height: 160px;
+  object-fit: contain;
+  border: 1px solid #d6e0ed;
+  border-radius: 9px;
+  background: #fff;
+}
+.serial-capture-error {
+  display: flex;
+  gap: 9px;
+  align-items: start;
+  margin-top: 13px;
+  padding: 12px;
+  border-radius: 9px;
+  color: #a91d38;
+  background: #fff0f3;
+  font-size: 13px;
+}
+.serial-capture-error > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.serial-capture-error > p {
+  margin: 0;
+  line-height: 1.7;
+}
+.serial-capture-message {
+  margin: 12px 0 0;
+  color: #385574;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.serial-capture-candidates {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #ccdaef;
+  background: #f7faff;
+  border-radius: 11px;
+}
+.serial-capture-candidates > strong {
+  font-size: 13px;
+  color: #203b61;
+}
+.serial-capture-candidates ul {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 13px 0 0;
+  padding: 0;
+}
+.serial-capture-candidates li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 13px;
+  padding: 12px;
+  border: 1px solid #dce5f3;
+  border-radius: 9px;
+  background: #fff;
+}
+.serial-capture-candidates li > div {
+  min-width: 0;
+}
+.serial-capture-candidate-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  color: #1e385d;
+}
+.serial-capture-candidates li small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #566b87;
+}
+@media (max-width: 650px) {
+  .serial-capture-entry,
+  .serial-capture-photo {
+    flex-direction: column;
+  }
+  .serial-capture-entry > .button {
+    justify-content: center;
+  }
+  .serial-capture-modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .serial-capture-modes > .button {
+    justify-content: center;
+    padding: 9px 7px;
+    font-size: 11px;
+    white-space: normal;
+  }
+  .serial-capture-photo-preview {
+    max-width: 100%;
+    align-self: center;
+  }
+  .serial-capture-candidates li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .serial-capture-candidates li > .button {
+    justify-content: center;
+    min-height: 40px;
+  }
+}

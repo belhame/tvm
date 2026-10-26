@@ -5,7 +5,7 @@ export type User = {
   first_name: string;
   last_name: string;
   email: string;
-  role: "admin" | "manager" | "technician" | "client";
+  role: "admin" | "manager" | "technician" | "client" | "courier";
   client: number | null;
   can_validate_billing?: boolean;
 };

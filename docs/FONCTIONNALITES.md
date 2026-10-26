@@ -6,8 +6,8 @@ Cette version fournit une application serveur et son code source, avec des compt
 
 | Domaine | Comportement de cette version | Limite à connaître |
 |---|---|---|
-| Comptes | Administrateur, responsable SAV, technicien et client ; sessions serveur ; gestion des comptes par l'administrateur | Pas de SSO ni d'authentification multifacteur fournis |
-| Portail client | Lecture des équipements, demandes, interventions et documents autorisés de sa société | Portail en lecture seule ; pas de création publique de compte |
+| Comptes | Administrateur, responsable SAV, technicien, livreur et client ; sessions serveur ; gestion des comptes par l'administrateur | Pas de SSO ni d'authentification multifacteur fournis |
+| Portail client | Consultation des dossiers de sa société, demande d'enlèvement et notifications propres | Pas de modification des dossiers SAV ni de création publique de compte |
 | Clients | Annuaire recherchable, contacts, coordonnées, matricule fiscal et notes internes ; import CSV avec prévisualisation | Aucun écrasement de fiche ni reprise de compte ; conflits et valeurs incertaines à vérifier, CSV réel séparé des sources publiques |
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
@@ -33,6 +33,8 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Bons de livraison | Fiche de livraison, lignes, client et rattachement éventuel à une intervention | Pas de PDF de BL dans cette étape ; un BL ne débite pas implicitement le stock, enregistrer le mouvement une seule fois |
 | Tableau de bord | Compteurs, interventions récentes, activité et répartition des états issus de la base | Pas de statistiques historiques importées avant reprise des données |
 | Recherche | Recherche de clients, dossiers, interventions et séries selon les droits du compte | Aucun accès implicite à une autre société via une recherche |
+| Notifications internes | Boîte de réception propre au compte, événements de réception/remise pour le portail et rappel logistique opt-in de 08:00 | Rappel dans l'application, fuseau IANA explicite et missions affectées seulement ; aucun envoi WhatsApp |
+| Logistique | Demandes d'enlèvement client, affectation par responsable, espace livreur, réception atelier et preuve de remise | Lecture de série consultative avant confirmation ; preuve saisie par le livreur, sans signature ni acquittement automatique du client ; finance distincte |
 | Traçabilité | Journal des opérations accessible aux administrateurs / responsables via `/api/audit/` | Consultation via l'API ; pas de vue dédiée dans cette étape |
 
 Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue pas à lui seul un contrôle d'accès. Les rapports et recherches doivent rester dans le périmètre autorisé ; les notes internes n'ont pas vocation à être exposées au client.
@@ -44,11 +46,12 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 | Administrateur | Création et modification des données métier ; gestion des comptes, rôles et délégations de validation financière ; autorisation financière implicite |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
 | Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
-| Client | Lecture seule des ressources de sa société, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
+| Livreur | Espace logistique restreint : missions affectées, réception contrôlée et remise enregistrée ; ses propres rappels et notifications ; aucun accès aux diagnostics techniques internes, factures ou comptes |
+| Client | Consultation de sa société et demande d'enlèvement, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
 
-La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
+La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif éligible. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ou un livreur ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
 
@@ -70,11 +73,15 @@ Le parcours d'échange distingue la validation technique du remplacement, l'éta
 
 Les réparations testées rejoignent la même file prête que les échanges validés. Les non-réparables utilisent une colonne distincte et un devis de diagnostic TVM, suivi d'une facture externe confirmée ou d'une gratuité approuvée. Les statuts anciens restent conservés sans preuves inventées. Voir [le parcours livraison / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
-## Scan sur téléphone
+## Scan sur téléphone et photo d'étiquette
 
 Le scanner utilise la caméra du navigateur et l'API `BarcodeDetector` lorsqu'elle est disponible. Il lit un code-barres ou QR code contenant le numéro, puis effectue une recherche réelle côté serveur. La vidéo reste sur l'appareil ; elle n'est pas envoyée pour reconnaissance.
 
 La caméra requiert un contexte sécurisé : HTTPS en déploiement, ou l'exception locale du navigateur pour `localhost`. Le navigateur doit accepter l'accès caméra et supporter les formats de code concernés. La saisie manuelle du numéro de série reste disponible si le navigateur ou la caméra ne convient pas. La compatibilité d'un téléphone précis se valide avec une vraie étiquette de l'entreprise.
+
+La réception logistique accepte aussi une douchette USB qui saisit le numéro comme un clavier, ou une **photo JPEG/PNG/WEBP** analysée sur le serveur. Pour la photo, le serveur cherche un code-barres avec ZXing puis du texte avec Tesseract local, sans fournisseur IA ni API extérieure. Il propose des numéros à choisir et vérifier ; la photo ne confirme aucune réception et ne modifie aucun dossier. Elle n'est pas conservée, ses métadonnées sont retirées et les fichiers temporaires supprimés. Limites : 8 Mio, 12 millions de pixels et traitement borné. Les outils sont fournis dans l'image Docker ; hors Docker leur disponibilité doit être vérifiée.
+
+Une lecture OCR dépend de la netteté, de l'étiquette et du repérage du champ S/N. Elle peut proposer plusieurs numéros ou n'en trouver aucun ; la saisie manuelle reste disponible. Les tests fictifs ne valident pas toutes les étiquettes ni la caméra d'un téléphone physique.
 
 Une aide de lecture des séries Eaton est proposée dans le scanner et la fiche équipement. Elle découpe le format documenté en codes usine, produit, année, semaine et ordre de fabrication sans modifier les données. Les autres formats restent autorisés. Le document source comporte des ambiguïtés et ne permet pas de calculer une année civile ou une garantie ; voir [le détail et les points à valider](NUMEROS_SERIE_EATON.md).
 
@@ -94,7 +101,7 @@ La règle confirmée est **début de garantie = fabrication + six mois calendair
 
 | Intégration | État livré | Éléments requis avant activation |
 |---|---|---|
-| WhatsApp | Écran d'état et besoins d'intégration ; aucun message envoyé | Compte WhatsApp Business / Meta, numéro validé, accès serveur, modèles approuvés, webhooks et consentement des destinataires |
+| WhatsApp | Préparation et aperçu du rappel, état `requires_credentials` ; aucun message envoyé, connexion reportée à la demande de l'utilisateur | Compte WhatsApp Business / Meta, numéro validé, accès serveur, modèles approuvés, webhooks et consentement des destinataires |
 | Assistant IA | Écran d'état ; aucun diagnostic ni réponse simulés | Fournisseur et modèle retenus, accès API côté serveur, règles de confidentialité, filtrage des dossiers avant chaque requête et validation des réponses |
 
 Fournir une clé ne suffit pas à déclarer une intégration opérationnelle : les adaptateurs, les contrôles d'accès, les erreurs, la réception des événements et les essais réels doivent être réalisés. Aucun secret fournisseur n'est demandé dans un formulaire navigateur ou enregistré dans les sources.

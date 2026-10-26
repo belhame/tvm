@@ -43,6 +43,7 @@ class User(AbstractUser):
         ADMIN = 'admin', 'Administrateur'
         MANAGER = 'manager', 'Responsable SAV'
         TECHNICIAN = 'technician', 'Technicien'
+        COURIER = 'courier', 'Livreur'
         CLIENT = 'client', 'Client'
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.TECHNICIAN)
     can_validate_billing = models.BooleanField(default=False)
@@ -53,11 +54,14 @@ class User(AbstractUser):
         constraints = [
             models.CheckConstraint(condition=(models.Q(role='client', client__isnull=False) | (~models.Q(role='client') & models.Q(client__isnull=True))), name='user_client_role_consistent'),
             models.CheckConstraint(condition=~models.Q(role='client') | models.Q(can_validate_billing=False), name='user_client_cannot_validate_billing'),
+            models.CheckConstraint(condition=~models.Q(role='courier') | models.Q(can_validate_billing=False, is_staff=False, is_superuser=False), name='user_courier_restricted'),
         ]
     def clean(self):
         super().clean()
-        if self.role == self.Role.CLIENT and self.can_validate_billing:
-            raise ValidationError({'can_validate_billing': 'Un compte client ne peut pas valider la facturation.'})
+        if self.role in (self.Role.CLIENT, self.Role.COURIER) and self.can_validate_billing:
+            raise ValidationError({'can_validate_billing': 'Un compte client ou livreur ne peut pas valider la facturation.'})
+        if self.role == self.Role.COURIER and (self.is_staff or self.is_superuser):
+            raise ValidationError({'role': 'Un compte livreur ne dispose pas de droits d’administration Django.'})
     @property
     def effective_role(self):
         return 'admin' if self.is_superuser else self.role
@@ -92,6 +96,8 @@ class Equipment(LegacyModel):
             guard_equipment_update(self, kwargs.get('update_fields'))
             from .disposition_workflow import guard_disposition_equipment_update
             guard_disposition_equipment_update(self, kwargs.get('update_fields'))
+            from .logistics_service import guard_logistics_equipment_update
+            guard_logistics_equipment_update(self, kwargs.get('update_fields'))
         return super().save(*args, **kwargs)
 
 
@@ -194,6 +200,8 @@ class ServiceRequest(ReferencedModel):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
         from .exchange_workflow import guard_request_update, register_exchange_request
         old_status = guard_request_update(self, kwargs.get('update_fields'))
+        from .logistics_service import guard_logistics_request_update
+        guard_logistics_request_update(self, kwargs.get('update_fields'))
         from .disposition_workflow import guard_disposition_update, register_disposition_request
         guard_disposition_update(self, kwargs.get('update_fields'), old_status)
         allocated = not self.reference
@@ -413,3 +421,5 @@ from .workflow_models import OperationEvent  # noqa: E402,F401
 from .attachment_models import RequestAttachment  # noqa: E402,F401
 from .exchange_models import ExchangeProcess  # noqa: E402,F401
 from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, DispositionProcess  # noqa: E402,F401
+from .notification_models import DailyReminderPreferences, InAppNotification  # noqa: E402,F401
+from .logistics_models import CourierReceipt, OutboundJob, PickupRequest  # noqa: E402,F401

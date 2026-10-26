@@ -49,6 +49,7 @@ Sur une installation neuve, le mode démonstration est activé pour vous permett
 | `admin` | Administration et gestion des comptes |
 | `responsable` | Gestion du SAV |
 | `technicien` | Interventions du technicien |
+| `livreur` | Réception physique et tournées affectées, sur une démo neuve |
 | `client` | Portail limité à sa société de démonstration |
 
 L’interface signale le mode démonstration. Ces comptes servent à l’essai ; ils ne constituent pas une installation avec les données HFSQL de votre entreprise. L’export et la reprise réels sont décrits dans [EXPORT_HFSQL.md](EXPORT_HFSQL.md).
@@ -87,6 +88,8 @@ La version ajoute le suivi des échanges et une validation financière distincte
 Les anciens échanges et visites restent conservés sans approbation technique ou facture inventée. La procédure **Échange → validation technique → Prêt à être livré**, puis **Échanges à facturer → Confirmer la facturation** est décrite dans [le guide](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation). La mise à jour du code ne signifie pas que cette procédure a déjà été effectuée dans la base du PC.
 
 Le suivi commun **Prêt à être livré** et les devis de diagnostic TVM utilisent aussi cette mise à jour. Les anciens dossiers ne reçoivent pas de tests validés ou de gratuité par déduction. Après installation, saisir le résultat réel, les données du devis et les décisions financières dans votre instance, selon [le parcours prêt / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
+
+Le nouveau service Docker `reminders` est démarré avec l'application après les migrations. Il prépare les rappels **dans TVM** pour les comptes livreurs qui les activent à 08:00 ; il ne connecte pas WhatsApp et n'envoie aucun message externe. `ARRETER_TVM.cmd` suspend aussi ce worker. Les notifications et préférences restent dans la base conservée ; mettre à jour les sources ne configure pas les préférences d'un utilisateur à sa place.
 
 ## Importer son annuaire clients après la mise à jour
 
@@ -208,7 +211,7 @@ Les pièces jointes sont stockées dans un **second volume**, `tvm-powercare_tvm
 
 Le script `scripts/backup.sh` prépare l'ensemble de sauvegarde en environnement Bash compatible ; il n'est pas un lanceur Windows à double-clic. Avec Docker Desktop, la procédure d'administration suivante permet de garder les écritures arrêtées pendant la copie :
 
-1. Fermez l'application avec **`ARRETER_TVM.cmd`** et ne la redémarrez pas pendant la capture. Cela empêche les ajouts et suppressions de fichiers entre les deux sauvegardes.
+1. Fermez l'application avec **`ARRETER_TVM.cmd`** et ne la redémarrez pas pendant la capture. Ce lanceur arrête **le serveur web et le worker de rappels `reminders`**, afin de suspendre les écritures pendant la sauvegarde de la base et des fichiers.
 2. Ouvrez **l'Invite de commandes Windows (`cmd.exe`) dans le dossier TVM** : depuis l'Explorateur, saisir `cmd` dans sa barre d'adresse puis appuyer sur Entrée. Pour les redirections de fichiers binaires ci-dessous, **ne pas utiliser PowerShell 5**.
 3. Exécutez les commandes suivantes. Elles correspondent à la configuration livrée, avec une base et un rôle nommés `tvm` ; si votre support les a changés, il doit adapter ces deux noms.
 
@@ -224,7 +227,7 @@ echo Dossier de sauvegarde : %TVM_BACKUP_DIR%
 
 Une erreur à l'une de ces étapes doit être examinée avant de poursuivre. Le catalogue lisible du dump ne remplace pas un test de restauration.
 
-4. Sans redémarrer le service web, ouvrez la vue **Volumes** de Docker Desktop et sélectionnez **`tvm-powercare_tvm_media`**. Utilisez son export/sauvegarde vers **un fichier local**, dans le dossier de sauvegarde affiché par l'Invite de commandes. Ne choisissez pas une publication vers un registre ou un cloud. Conservez cette archive avec `database.dump` et `.env` du même instant.
+4. Sans redémarrer le serveur web ni le worker de rappels, ouvrez la vue **Volumes** de Docker Desktop et sélectionnez **`tvm-powercare_tvm_media`**. Utilisez son export/sauvegarde vers **un fichier local**, dans le dossier de sauvegarde affiché par l'Invite de commandes. Ne choisissez pas une publication vers un registre ou un cloud. Conservez cette archive avec `database.dump` et `.env` du même instant.
 5. Si ce volume n'existe pas encore, il n'y a pas de volume média à exporter. Si un ancien dossier `backend\media` contient déjà des fichiers, faites-en également une copie pendant l'arrêt. Si l'export local n'est pas proposé par votre version de Docker Desktop, utilisez le script Bash documenté avec votre support plutôt que de copier seulement la base.
 6. Une fois la base et les fichiers conservés ensemble, relancez **`DEMARRER_TVM.cmd`**, ou **`INSTALLER_TVM.cmd`** si vous appliquez la mise à jour des sources.
 

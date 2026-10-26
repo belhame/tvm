@@ -18,6 +18,7 @@ services:
       retries: 30
   web:
     profiles: ["container"]
+    image: tvm-powercare-web:local
     build: .
     restart: unless-stopped
     env_file: .env
@@ -48,6 +49,17 @@ services:
       retries: 40
       start_period: 15s
     command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --no-control-socket --bind 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile -"]
+  reminders:
+    profiles: ["container"]
+    image: tvm-powercare-web:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tvm}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tvm}
+    depends_on:
+      web:
+        condition: service_healthy
+    command: ["python", "manage.py", "logistics_reminders"]
 volumes:
   tvm_postgres:
   tvm_media:

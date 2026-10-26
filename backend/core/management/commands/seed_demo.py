@@ -32,7 +32,7 @@ class Command(BaseCommand):
             if model.objects.filter(Q(legacy_id__isnull=True) | ~Q(legacy_id__startswith='demo:')).exists():
                 raise CommandError('Cette base contient des données hors démonstration. Initialisation refusée pour éviter tout mélange.')
         User = get_user_model()
-        accounts = [('admin', 'Alex', 'Martin', 'admin'), ('responsable', 'Camille', 'Dubois', 'manager'), ('technicien', 'Thomas', 'Leroy', 'technician'), ('sofia', 'Sofia', 'Moreau', 'technician'), ('amine', 'Amine', 'Karim', 'technician'), ('client', 'Jean', 'Dupont', 'client')]
+        accounts = [('admin', 'Alex', 'Martin', 'admin'), ('responsable', 'Camille', 'Dubois', 'manager'), ('technicien', 'Thomas', 'Leroy', 'technician'), ('sofia', 'Sofia', 'Moreau', 'technician'), ('amine', 'Amine', 'Karim', 'technician'), ('client', 'Jean', 'Dupont', 'client'), ('livreur', 'Noé', 'Bernard', 'courier')]
         for username, *_ in accounts:
             if User.objects.filter(username=username).exclude(legacy_id=f'demo:user:{username}').exists():
                 raise CommandError(f'Le compte {username} existe déjà hors démo. Aucun compte n’a été modifié.')
@@ -100,4 +100,4 @@ class Command(BaseCommand):
         if created:
             DeliveryLine.objects.create(delivery_note=note, part=parts[1], description=parts[1].name, quantity=2)
         DemoInitialization.objects.create(name='powercare-demo-v1')
-        self.stdout.write(self.style.SUCCESS('Démonstration fictive initialisée. Comptes : admin, responsable, technicien, client. Mots de passe existants préservés.'))
+        self.stdout.write(self.style.SUCCESS('Démonstration fictive initialisée. Comptes : admin, responsable, technicien, livreur, client. Mots de passe existants préservés.'))

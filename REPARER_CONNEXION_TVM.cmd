@@ -3,6 +3,9 @@ setlocal EnableExtensions DisableDelayedExpansion
 title TVM PowerCare - Reparation de la connexion
 set "TVM_DIR_PUSHED=0"
 set "TVM_EXIT_CODE=0"
+set "TVM_WRITERS_PAUSED=0"
+set "TVM_CONNECTION_SAFE=1"
+set "TVM_RESUME_SERVICES="
 pushd "%~dp0"
 set "TVM_EXIT_CODE=%ERRORLEVEL%"
 if not "%TVM_EXIT_CODE%"=="0" goto folder_failed
@@ -38,6 +41,8 @@ if not "%TVM_EXIT_CODE%"=="10" goto diagnostic_failed
 
 echo.
 echo [2/4] Sauvegarde de la base et de la configuration avant reparation...
+call :pause_writers
+if errorlevel 1 goto backup_failed
 if not exist ".local\backups" mkdir ".local\backups"
 if not exist ".local\backups" goto backup_failed
 :choose_backup_name
@@ -64,6 +69,7 @@ if errorlevel 1 goto backup_failed
 
 echo.
 echo [3/4] Alignement de la connexion avec la configuration locale...
+set "TVM_CONNECTION_SAFE=0"
 docker compose exec -T db sh /tmp/tvm-repair-database.sh apply
 set "TVM_EXIT_CODE=%ERRORLEVEL%"
 if not "%TVM_EXIT_CODE%"=="0" goto repair_failed
@@ -74,6 +80,7 @@ docker compose --profile container run --rm --no-deps --pull never --user "0:0" 
 set "TVM_EXIT_CODE=%ERRORLEVEL%"
 if not "%TVM_EXIT_CODE%"=="0" goto verification_failed
 echo.
+set "TVM_CONNECTION_SAFE=1"
 echo Reparation terminee. La connexion PostgreSQL fonctionne.
 echo Sauvegarde conservee sur ce PC : %TVM_REPAIR_FOLDER%\database.dump
 echo Fermez cette fenetre, puis relancez INSTALLER_TVM.cmd dans CE dossier.
@@ -135,18 +142,48 @@ echo La sauvegarde est conservee dans .local\backups. Conservez les messages ci-
 goto failed
 
 :success
+call :resume_writers
 set "TVM_EXIT_CODE=0"
 echo.
 pause
 goto finished
 
 :failed
+call :resume_writers
 if "%TVM_EXIT_CODE%"=="0" set "TVM_EXIT_CODE=1"
 echo.
 echo Reparation interrompue. Code : %TVM_EXIT_CODE%
 echo Aucun volume ni dossier TVM n'a ete supprime.
 echo.
 pause
+goto finished
+
+:pause_writers
+docker compose --profile container ps --status running --services >nul
+if errorlevel 1 exit /b 1
+for /f "delims=" %%S in ('docker compose --profile container ps --status running --services') do call :remember_writer "%%S"
+if not defined TVM_RESUME_SERVICES exit /b 0
+set "TVM_WRITERS_PAUSED=1"
+docker compose --profile container stop %TVM_RESUME_SERVICES%
+exit /b %ERRORLEVEL%
+
+:remember_writer
+if "%~1"=="reminders" set "TVM_RESUME_SERVICES=reminders %TVM_RESUME_SERVICES%"
+if "%~1"=="web" set "TVM_RESUME_SERVICES=%TVM_RESUME_SERVICES% web"
+exit /b 0
+
+:resume_writers
+if not "%TVM_WRITERS_PAUSED%"=="1" exit /b 0
+if not "%TVM_CONNECTION_SAFE%"=="1" goto writers_stay_paused
+docker compose --profile container start --wait --wait-timeout 90 %TVM_RESUME_SERVICES%
+if errorlevel 1 echo Relancez DEMARRER_TVM.cmd pour redemarrer les services arretes.
+set "TVM_WRITERS_PAUSED=0"
+exit /b 0
+
+:writers_stay_paused
+echo Le site et les rappels restent en pause car la connexion n'est pas verifiee.
+echo Relancez INSTALLER_TVM.cmd apres correction de la connexion.
+exit /b 0
 
 :finished
 if "%TVM_DIR_PUSHED%"=="1" popd
