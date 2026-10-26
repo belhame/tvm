@@ -153,14 +153,15 @@ class RequestOperationTests(TestCase):
 
     def test_commercial_request_status_is_not_overwritten_by_report_edits(self):
         for state in ['quotation', 'pending', 'approved', 'rejected', 'exchange', 'closed']:
-            self.request.status = state
-            self.request.save()
-            response = self.api.post('/api/interventions/', {'service_request': self.request.pk, 'status': 'in_progress'}, format='json')
+            # Each independent legacy state is a separate dossier. A modern
+            # exchange may no longer jump to Closed without billing evidence.
+            request = ServiceRequest.objects.create(equipment=self.equipment, subject=f'État indépendant {state}', status=state)
+            response = self.api.post('/api/interventions/', {'service_request': request.pk, 'status': 'in_progress'}, format='json')
             self.assertEqual(response.status_code, 201, response.data)
             pk = response.data['id']
             self.api.patch(f'/api/interventions/{pk}/', {'diagnosis': 'Diagnostic actualisé'}, format='json')
-            self.request.refresh_from_db()
-            self.assertEqual(self.request.status, state)
+            request.refresh_from_db()
+            self.assertEqual(request.status, state)
 
     def test_checklist_changes_are_named_and_notes_remain_private(self):
         response = self.api.post('/api/interventions/', {'service_request': self.request.pk, 'structured_data': {'maintenance': {'overload': True}}, 'internal_notes': 'SECRET_INTERVENTION'}, format='json')

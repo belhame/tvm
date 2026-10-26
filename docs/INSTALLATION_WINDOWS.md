@@ -82,6 +82,10 @@ Si ces éléments ne sont pas visibles, ouvrez l’Explorateur Windows et active
 
 Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs utilisent un nom de projet Docker Compose fixe et retrouvent le volume PostgreSQL existant. La mise à jour ne demande ni suppression de volume, ni réinitialisation de la base. Gardez les fichiers de configuration et leur copie de sauvegarde sur votre PC ; ils ne doivent pas être partagés.
 
+La version ajoute le suivi des échanges et une validation financière distincte. Après installation, l'administrateur peut accorder **Peut valider la facturation** dans **Comptes** aux personnes internes choisies. Ce droit est désactivé par défaut pour les anciens comptes non administrateurs ; le rôle Responsable SAV ne l'accorde pas automatiquement.
+
+Les anciens échanges et visites restent conservés sans approbation technique ou facture inventée. La procédure **Échange → validation technique → Prêt à être livré**, puis **Échanges à facturer → Confirmer la facturation** est décrite dans [le guide](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation). La mise à jour du code ne signifie pas que cette procédure a déjà été effectuée dans la base du PC.
+
 ## Importer son annuaire clients après la mise à jour
 
 Le ZIP public contient les sources génériques, pas les noms et contacts réels issus des captures. Le CSV des clients est un fichier privé fourni séparément ; ne le publier ni avec les sources ni avec d'anciens identifiants de connexion.
@@ -102,11 +106,33 @@ Un import effectué dans le cloud ne signifie pas que la base de votre PC est d�
 | Le moteur a indiqué le mode Windows | Dans la zone de notification Windows, faire un clic droit sur l’icône baleine Docker, choisir **Switch to Linux containers…** si cette option est proposée, puis attendre que le moteur soit prêt. |
 | Mode Docker absent ou non reconnu | Exécuter la commande de diagnostic ci-dessous. Cette erreur ne prouve pas que Docker utilise des conteneurs Windows ; ne pas changer de mode sans vérifier le résultat. |
 | Échec de téléchargement ou de certificat | Vérifier Internet et, en entreprise, le proxy et le certificat de confiance autorisé. Ne pas désactiver les vérifications TLS. |
+| `lookup auth.docker.io: no such host` | Problème DNS d'accès au registre Docker : suivre le dépannage réseau ci-dessous. Ce message ne concerne pas le mot de passe PostgreSQL. |
 | Fichiers manquants ou dossier inaccessible | Extraire toute l’archive dans un dossier local accessible, puis relancer le script dans ce dossier. |
 | Port `8000` ou `55432` déjà utilisé | Identifier l’application qui utilise ce port. Ne pas arrêter un service inconnu ; faire adapter les ports par votre support si nécessaire. |
 | Image locale manquante au prochain démarrage | Relancer `INSTALLER_TVM.cmd`. La configuration est conservée et les données ne sont pas effacées. |
 | `password authentication failed for user "tvm"` | Récupérer d’abord la configuration de l’ancienne installation. Si le refus persiste, suivre la procédure `REPARER_CONNEXION_TVM.cmd` ci-dessous. Ne pas supprimer la base. |
 | Échec de disponibilité après trois minutes | Lire les messages dans la fenêtre. Les services peuvent avoir démarré sans être prêts ; consulter leurs journaux avant de réessayer. |
+
+### Docker ne résout pas `auth.docker.io`
+
+Le message `lookup auth.docker.io: no such host` signale un problème de résolution réseau pendant le téléchargement d'une image. Il ne signale pas une panne de la base TVM ou un mauvais mot de passe PostgreSQL.
+
+1. Ouvrir **PowerShell en tant qu'administrateur** et vider le cache DNS Windows :
+
+```powershell
+ipconfig /flushdns
+```
+
+2. Dans Docker Desktop, ouvrir **Troubleshoot**, puis **Restart Docker Desktop**. Attendre le redémarrage du moteur ; ne pas utiliser l'effacement des données ou le retour aux paramètres d'usine.
+3. Tester l'accès au registre :
+
+```powershell
+docker pull node:24-alpine
+```
+
+4. Si le téléchargement réussit, relancer `INSTALLER_TVM.cmd` depuis le **même dossier**, avec son `.env` et ses volumes conservés. Si le DNS échoue encore, faire vérifier le réseau ou le proxy Windows avant de poursuivre ; modifier un DNS dans le moteur Docker ne garantit pas la correction des téléchargements du daemon.
+
+Cette procédure conserve les données. Elle ne réinitialise ni PostgreSQL ni ses accès. Son exécution sur le PC Windows reste à vérifier ; un succès dans le cloud Linux ne prouve pas la résolution du problème réseau local.
 
 ### Erreur de mot de passe PostgreSQL après une mise à jour
 

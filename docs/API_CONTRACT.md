@@ -3,17 +3,21 @@
 Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (backend), PostgreSQL partagé. Authentification par sessions HttpOnly et protection CSRF. API sous `/api/`, même origine en production et proxy Vite en développement. Les listes métier de cette version ne sont pas paginées ; la liste des produits du catalogue Eaton est paginée.
 
 ## Session
-- `GET /api/session/` → `{user: null | {id, username, first_name, last_name, email, role, client}, csrfToken}`.
+- `GET /api/session/` → `{user: null | {id, username, first_name, last_name, email, role, client, can_validate_billing}, csrfToken}`.
 - `POST /api/login/` avec `{username,password}` → `{user}` ; `POST /api/logout/`.
 - Rôles : `admin`, `manager`, `technician`, `client`. Portail client : ses propres clients/équipements/dossiers/interventions/contrats/garanties/BL/rapports, lecture seule. Toutes les restrictions sont appliquées côté serveur. Aucun stock ni compte tiers ni note interne exposé au client.
+
+`can_validate_billing` est une autorisation distincte, à `false` par défaut. Un administrateur est autorisé implicitement ; un autre compte doit être interne, actif et disposer explicitement de ce drapeau pour valider la facturation. Aucun nouveau rôle n'est créé. Seul un administrateur peut donner ou retirer ce droit via les comptes. La session expose le drapeau enregistré du compte connecté ; les listes du personnel accessibles aux non-administrateurs ne divulguent pas les permissions individuelles des autres comptes.
+
+Un compte client ne peut pas avoir ce droit. Transformer un compte autorisé en client exige de remettre `can_validate_billing` à `false` dans la même modification, sinon l'API refuse la demande. La migration ne délègue pas automatiquement la validation financière aux anciens responsables ou techniciens.
 
 ## Ressources
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
 - `/api/clients/` : `id,name,contact_name,tax_id,email,phone,address,city,postal_code,country,notes,legacy_id,created_at,equipment_count,open_requests_count,portal_users_count`. `tax_id` est un texte de 80 caractères ; `notes` est un texte interne de 4 000 caractères, absent du portail client. La date de création et les trois compteurs sont en lecture seule ; `portal_users_count` reste réservé aux comptes internes. `q` recherche dans le nom, le contact, le matricule fiscal, l'email, le téléphone et la ville.
 - `/api/equipment/` : `id,client,client_name,serial_number,brand,model,power_kva,location,commissioned_on,manufactured_on,catalogue_product,warranty_until,status,legacy_id`. Statuts `active,maintenance,inactive`. `manufactured_on` et `catalogue_product` sont en lecture seule dans ce CRUD ; leur création contrôlée passe par le parcours d'admission SAV. `catalogue_product` est absent des réponses du portail client.
-- `/api/requests/` : `id,reference,call_number,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,created_at,legacy_id,intake_key,intake_data`, complétés par les champs de suivi, dont `client_reference`, ci-dessous. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `call_number`, `assigned_technician_name`, `timing`, `category`, `is_overdue` et `is_due_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
+- `/api/requests/` : `id,reference,call_number,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,exchange,created_at,legacy_id,intake_key,intake_data`, complétés par les champs de suivi, dont `client_reference`, ci-dessous. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,ready_for_delivery,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `call_number`, `assigned_technician_name`, `timing`, `category`, `is_overdue`, `is_due_overdue` et `exchange` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
 - `/api/interventions/` : `id,reference,service_request,request_reference,call_number,client_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. `request_reference`, `call_number` et `client_reference` sont des valeurs liées en lecture seule. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
-- `/api/users/` : admin CRUD `id,username,first_name,last_name,email,role,client,is_active,password` (password écriture seulement). Autres internes : lecture liste limitée aux employés actifs pour affectation, aucun compte client. Client : interdit.
+- `/api/users/` : admin CRUD `id,username,first_name,last_name,email,role,client,is_active,can_validate_billing,password` (password écriture seulement). Autres internes : lecture liste limitée aux employés actifs pour affectation, aucun compte client et aucune permission individuelle de facturation exposée par cette liste. Client : interdit.
 - `/api/parts/` : `id,sku,name,category,unit_price,stock_quantity,min_stock,legacy_id`. Quantité initiale zéro ; le stock s'ajuste via mouvements. Catégories `battery,board,ventilation,other`.
 - `/api/stock-movements/` : `id,part,part_name,quantity,kind,reference,intervention,created_at` ; POST atomique (quantité signée : entrée positive, sortie négative) sans stock négatif. Types `in,out,adjustment`.
 - `/api/contracts/` : `id,number,client,client_name,equipment,starts_on,ends_on,coverage,visits_per_year,status,legacy_id`. Statuts `active,expired,draft`.
@@ -121,7 +125,7 @@ Voir [le parcours utilisateur, la règle des six mois et les limites par profil]
 
 ### Catégories et filtres
 
-`GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans les deux numéros de dossier, le sujet, la série et le client.
+`GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `ready_for_delivery`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans les deux numéros de dossier, le sujet, la série et le client.
 
 `GET /api/requests/categories/` retourne `{categories: [{key,label,count}], total, as_of}` dans le périmètre autorisé. `overdue` et `is_overdue` correspondent au chronomètre en cours dépassant strictement 48 heures cumulées du lundi au vendredi ; ce n'est pas une valeur de `status`. Ce compteur peut recouper d'autres catégories. `is_due_overdue` décrit séparément le dépassement d'une échéance `due_on` manuelle. `assigned_technician` et `due_on` sont modifiables par administrateur ou responsable via le CRUD des demandes.
 
@@ -138,6 +142,8 @@ La réponse des listes et détails comporte `timing: {timer_state,elapsed_hours,
 Le calcul utilise le fuseau `TVM_TIMEZONE` et exclut samedi/dimanche. Les jours fériés et les plages d'heures de bureau ne sont pas retirés. Le seuil est strict : 48 heures exactes ne constituent pas un dépassement. Une arrivée vendredi 10 h atteint 24 heures lundi 10 h, 48 heures mardi 10 h, puis dépasse le seuil après mardi 10 h.
 
 `closed_at` est automatiquement enregistré lors du passage à `closed`, conservé lors d'une simple édition et effacé en cas de réouverture. Un administrateur ou responsable peut compléter une ancienne clôture manquante avec une date passée, postérieure ou égale à l'arrivée. Le compteur s'arrête à la clôture ; son indicateur rouge historique peut rester vrai, sans inclure cette demande dans le dépassement en cours.
+
+Un échange facturé puis clôturé ne peut pas être rouvert par une modification de statut. Son processus dédié conserve la preuve de facturation ; une nouvelle opération se traite dans un nouveau dossier.
 
 Seul `closed` arrête le chronomètre. Les demandes `resolved` ou `rejected` restent en cours pour ce calcul jusqu'à leur clôture. Après une clôture tardive, `timing.is_overdue_48h` peut rester `true` tandis que `is_overdue` est `false`. La migration ne renseigne aucune arrivée ni clôture historique supposée.
 
@@ -219,6 +225,36 @@ Une case absente signifie « non renseignée » ; une valeur booléenne `false` 
 Demandes et interventions exposent en lecture seule `preventive_completed_visit_count`, `preventive_total_visit_count` et `preventive_remaining_visit_count`. Le calcul porte uniquement sur les interventions du **même dossier** : `kind=preventive` et `status=completed` pour les terminées ; `kind=preventive` hors `cancelled` pour le total enregistré ; reste = `max(prévues - terminées, 0)`. Sans objectif, `planned_visit_count` et le reste sont `null`, tandis que les compteurs réels restent des entiers. Les autres types d'intervention et les autres dossiers du même équipement ne sont pas inclus.
 
 Renseigner un objectif ne crée aucune visite, planification, garantie ou contrat. Les anciens objectifs restent inconnus ; les visites déjà déclarées terminées peuvent compter sans leur inventer une date de réalisation. Les numéros TVM et références de visite restent inchangés. Le PDF préventif affiche cette progression ; la mise en service conserve son récapitulatif dédié de matériel, lieu, contact et date connue.
+
+### Parcours d'échange et confirmation de facture
+
+Les échanges sont des demandes : un dossier classé `exchange` figure dans la file même sans intervention `kind=exchange`. Les anciens cas repérés par leur processus, leurs visites ou leur historique restent consultables, sans transformer un ancien état terminé en validation.
+
+| Route | Usage et droit |
+|---|---|
+| `GET /api/exchanges/` | Liste des dossiers d'échange ; portail client limité à sa société |
+| `GET /api/exchanges/billing/` | File financière, réservée aux comptes autorisés à valider la facturation ; dossiers clôturés exclus par défaut, `include_closed=1` pour les inclure |
+| `GET /api/requests/{id}/exchange/` | Détail de la demande avec son état d'échange calculé |
+| `PATCH /api/requests/{id}/exchange/` | Préparation du remplacement : administrateur, responsable ou technicien affecté |
+| `POST /api/requests/{id}/exchange/validate/` | Validation technique : administrateur ou responsable |
+| `POST /api/requests/{id}/exchange/ready/` | Passage Prêt à être livré : administrateur ou responsable, après validation technique |
+| `POST /api/requests/{id}/exchange/billing/` | Confirmation d'une facture externe par un compte autorisé |
+| `POST /api/requests/{id}/exchange/close/` | Clôture après facture confirmée : administrateur, responsable ou compte autorisé à la facturation |
+| `POST /api/requests/{id}/exchange/reset/` | Reprise de préparation avec motif, administrateur ou responsable, avant facturation et clôture |
+
+Les listes acceptent `q` (200 caractères maximum, deux numéros d'appel, client et séries ancien/nouveau matériel) et `state` parmi `awaiting_preparation`, `pending_validation`, `validated`, `ready_for_delivery`, `invoiced`, `closed`. Elles renvoient des listes de demandes. Les actions renvoient HTTP `200` avec la demande relue et son objet `exchange`. Session et CSRF sont obligatoires pour les mutations.
+
+`exchange` est `null` hors parcours d'échange. Sinon il indique `state`, les données de remplacement visibles, les dates connues, `is_validated`, `is_ready`, `is_invoiced` et les capacités `can_prepare`, `can_validate`, `can_mark_ready`, `can_validate_billing`, `can_close`, `can_reset`. Les comptes internes reçoivent aussi les références/dates de validation, de facture et les notes de facturation. Le portail reçoit seulement le remplacement validé et un résumé ; ni brouillon privé, ni identité des validateurs, ni référence/date de facture ou note financière.
+
+La préparation accepte uniquement `replacement_serial_number` (120 caractères), `replacement_model` (120), `replacement_brand` (100) et `replacement_equipment` facultatif. Elle ne crée pas d'équipement. La validation technique utilise un corps `{}` : elle contrôle un remplacement distinct et du même client, crée le matériel si son numéro est nouveau et son modèle renseigné, puis le réserve pour cet échange actif. Un même matériel ne peut pas être réservé simultanément pour deux échanges. Le dossier conserve son équipement d'origine et ses références ; aucune visite, livraison, écriture de stock ou garantie n'est générée par cette validation.
+
+L'action `ready` utilise `{}` et passe explicitement le dossier à `ready_for_delivery`. Dans un échange, écrire ce statut par une autre route est refusé. Une fiche d'intervention terminée ne remplace pas cette action.
+
+`billing` exige `{invoice_reference,invoiced_on,billing_notes?}` : référence non vide de 120 caractères maximum, date ISO non future et notes internes de 4 000 caractères maximum. Le remplacement doit déjà être validé et prêt. Ce sont les références d'une facture émise ailleurs ; aucun ERP, émission de facture ou paiement n'est exécuté. Une confirmation identique peut être rejouée ; remplacer ensuite ses justificatifs par d'autres valeurs est refusé.
+
+`close` utilise `{}` et vérifie la facturation, y compris si le dossier a changé de statut entre-temps. Un échange facturé puis clôturé est conservé sans réouverture. `reset` exige `{reason}` non vide de 4 000 caractères maximum ; il retire la validation et l'état prêt, libère la réservation avant facturation et conserve le brouillon de série/modèle. Les événements antérieurs restent et une nouvelle validation est nécessaire. Il ne supprime pas le matériel créé ni l'historique.
+
+Les identités du matériel d'origine et du remplacement validé sont protégées contre les modifications incohérentes. Les erreurs de validation sont signalées `400`, les rôles refusés `403` et les ressources non accessibles `404`. Voir [le parcours utilisateur](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation).
 
 ### Pièces jointes privées des demandes
 

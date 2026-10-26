@@ -1,6 +1,7 @@
 import secrets
 
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Lower
@@ -44,11 +45,19 @@ class User(AbstractUser):
         TECHNICIAN = 'technician', 'Technicien'
         CLIENT = 'client', 'Client'
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.TECHNICIAN)
+    can_validate_billing = models.BooleanField(default=False)
     client = models.ForeignKey(Client, on_delete=models.PROTECT, null=True, blank=True, related_name='portal_users')
     legacy_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
     objects = PowerCareUserManager()
     class Meta:
-        constraints = [models.CheckConstraint(condition=(models.Q(role='client', client__isnull=False) | (~models.Q(role='client') & models.Q(client__isnull=True))), name='user_client_role_consistent')]
+        constraints = [
+            models.CheckConstraint(condition=(models.Q(role='client', client__isnull=False) | (~models.Q(role='client') & models.Q(client__isnull=True))), name='user_client_role_consistent'),
+            models.CheckConstraint(condition=~models.Q(role='client') | models.Q(can_validate_billing=False), name='user_client_cannot_validate_billing'),
+        ]
+    def clean(self):
+        super().clean()
+        if self.role == self.Role.CLIENT and self.can_validate_billing:
+            raise ValidationError({'can_validate_billing': 'Un compte client ne peut pas valider la facturation.'})
     @property
     def effective_role(self):
         return 'admin' if self.is_superuser else self.role
@@ -76,6 +85,12 @@ class Equipment(LegacyModel):
         constraints = [models.UniqueConstraint(Lower('serial_number'), name='equipment_serial_case_unique'), models.CheckConstraint(condition=models.Q(power_kva__gte=0), name='equipment_power_nonnegative')]
     def __str__(self):
         return f'{self.model} · {self.serial_number}'
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        if self.pk:
+            from .exchange_workflow import guard_equipment_update
+            guard_equipment_update(self, kwargs.get('update_fields'))
+        return super().save(*args, **kwargs)
 
 
 class ReferencedModel(LegacyModel):
@@ -129,6 +144,7 @@ class ServiceRequest(ReferencedModel):
         APPROVED = 'approved', 'Validé'
         REJECTED = 'rejected', 'Refusé'
         EXCHANGE = 'exchange', 'Échange'
+        READY_FOR_DELIVERY = 'ready_for_delivery', 'Prêt à être livré'
         CLOSED = 'closed', 'Clôturée'
     reference_prefix = 'SAV'
     equipment = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name='service_requests')
@@ -173,12 +189,16 @@ class ServiceRequest(ReferencedModel):
         # when a status-only workflow update supplies update_fields.
         if kwargs.get('update_fields'):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
+        from .exchange_workflow import guard_request_update, register_exchange_request
+        old_status = guard_request_update(self, kwargs.get('update_fields'))
         allocated = not self.reference
         if allocated:
             from .request_numbering import next_request_number
             self.reference = next_request_number()
         try:
-            return super().save(*args, **kwargs)
+            result = super().save(*args, **kwargs)
+            register_exchange_request(self, old_status)
+            return result
         except Exception:
             if allocated:
                 self.reference = ''
@@ -235,6 +255,22 @@ class Intervention(ReferencedModel):
         constraints = [models.CheckConstraint(condition=models.Q(duration_minutes__gte=1), name='intervention_duration_positive')]
     def __str__(self):
         return self.reference
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        previous = type(self).objects.filter(pk=self.pk).values('kind', 'service_request_id').first() if self.pk else None
+        old_kind = previous['kind'] if previous else None
+        if (self.kind == 'exchange' or old_kind == 'exchange'):
+            from rest_framework.exceptions import ValidationError
+            if previous and previous['service_request_id'] != self.service_request_id:
+                raise ValidationError({'service_request': 'Une fiche d’échange conserve son dossier d’origine.'})
+            linked = ServiceRequest.objects.select_for_update().get(pk=self.service_request_id)
+            if self.kind == 'exchange' and old_kind != 'exchange' and linked.status == 'closed':
+                raise ValidationError({'kind': 'Rouvrez le dossier avant d’y créer un nouvel échange, ou créez un nouveau dossier.'})
+        result = super().save(*args, **kwargs)
+        if self.kind == 'exchange' or old_kind == 'exchange':
+            from .exchange_models import ExchangeProcess
+            ExchangeProcess.objects.get_or_create(service_request_id=self.service_request_id)
+        return result
 
 
 class Part(LegacyModel):
@@ -369,3 +405,4 @@ class DemoInitialization(models.Model):
 from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueState, CatalogueWarranty  # noqa: E402,F401
 from .workflow_models import OperationEvent  # noqa: E402,F401
 from .attachment_models import RequestAttachment  # noqa: E402,F401
+from .exchange_models import ExchangeProcess  # noqa: E402,F401

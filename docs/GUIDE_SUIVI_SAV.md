@@ -69,6 +69,7 @@ Les catégories de demandes correspondent aux états suivants :
 | Validé | État `approved` |
 | Refusé | État `rejected` |
 | Échange | État `exchange` |
+| Prêt à être livré | État `ready_for_delivery` |
 | Clôturé | État `closed` |
 | En dépassement délai | Chronomètre en cours dépassant 48 heures cumulées du lundi au vendredi, avec une arrivée connue |
 | Tous | Tous les dossiers accessibles |
@@ -87,7 +88,7 @@ L'affichage utilise les valeurs du serveur et les actualise périodiquement, ain
 
 La liste présente **Date d'arrivée** et **Nbr de jours ouvrés**. Le libellé indique **Dans le délai de 2 jours ouvrés** ou **Délai de 2 jours ouvrés dépassé** ; un dossier clôturé précise **Durée figée à la clôture**.
 
-Passer la demande à **Clôturé** enregistre sa clôture et fige le compteur. Une durée déjà supérieure au seuil peut rester rouge à titre historique, mais une demande dont le compteur est arrêté ne figure plus dans le dépassement en cours. Réouvrir la demande enlève la clôture automatique. L'échéance manuelle reste un autre indicateur ; elle ne remplace pas le calcul depuis l'arrivée.
+Passer la demande à **Clôturé** enregistre sa clôture et fige le compteur. Une durée déjà supérieure au seuil peut rester rouge à titre historique, mais une demande dont le compteur est arrêté ne figure plus dans le dépassement en cours. Une réouverture autorisée enlève la clôture automatique ; un échange facturé et clôturé reste conservé et exige un nouveau dossier pour une nouvelle opération. L'échéance manuelle reste un autre indicateur ; elle ne remplace pas le calcul depuis l'arrivée.
 
 Les états **Traité** et **Refusé** n'arrêtent pas ce compteur : il continue jusqu'à la clôture du dossier. Terminer une intervention ne clôture donc pas implicitement la demande.
 
@@ -123,9 +124,9 @@ Une baseline doit être distinguée d'un événement utilisateur : elle ne prouv
 
 Les opérations de maintenance, d'échange, de mise en service et de prévention peuvent nécessiter des informations différentes. Les fiches structurées permettent d'enregistrer les contrôles et observations correspondant au type choisi, puis de les retrouver dans le dossier et son rapport.
 
-Les menus **Échange**, **Mise en service** et **Préventive** filtrent les fiches du type correspondant et préparent ce type lors d'une création. Le dossier SAV conserve son propre état, distinct du type de fiche.
+Les menus **Mise en service** et **Préventive** filtrent les fiches du type correspondant et préparent ce type lors d'une création. Le menu **Échange** est une file de demandes : passer un dossier à l'état Échange l'y fait apparaître automatiquement, même sans fiche d'intervention de type échange déjà créée.
 
-L'état d'une demande et le type d'une fiche d'intervention sont deux informations distinctes. Classer une demande dans **Échange** ne crée pas automatiquement une fiche d'échange remplie. Une demande peut être liée à plusieurs interventions ; ouvrir ou créer la fiche correspondant à l'opération réellement effectuée.
+Le dossier conserve son état et son numéro TVM commun aux visites. L'affichage dans la file permet de préparer le remplacement ; les validations technique et financière sont des opérations explicites, décrites ci-dessous.
 
 | Type de fiche | Informations principales |
 |---|---|
@@ -161,6 +162,24 @@ Le nombre réalisé est calculé depuis ses fiches **Préventive** au statut **T
 Le PDF présente les **visites réalisées / prévues**, les **visites enregistrées** et les **visites restant à réaliser**. Une ancienne fiche déjà terminée peut être comptée, mais une date absente n'est pas inventée. Modifier l'objectif ne change ni les visites existantes, ni leur référence `INT-…`, ni le numéro d'appel TVM commun.
 
 La fiche et le PDF de **Mise en service** présentent séparément le matériel, le site, le client final, le contact et la date de réalisation. Ils ne sont pas comptés comme une visite préventive ; une date manquante reste explicitement non renseignée.
+
+## Échange : remplacement et facturation
+
+Passer une demande à **Échange** l'affiche dans la file correspondante, sans devoir créer d'abord une visite de type échange. Le classement permet de commencer le traitement ; il ne vaut pas validation technique. Le dossier reste suivi dans cette file au fil de ses étapes, y compris lorsqu'il devient prêt à être livré.
+
+1. Dans **Échange**, ouvrir le dossier puis **Préparer l'échange**. Renseigner le numéro de série, le modèle et la marque du remplacement ; **Enregistrer la préparation** conserve un brouillon, sans créer d'équipement. La recherche catalogue reste une aide facultative avec choix explicite.
+2. Un administrateur ou responsable vérifie le numéro de série et le modèle, confirme leur contrôle puis clique sur **Valider l'échange**. Cet acte technique est distinct du statut terminé d'une visite. Il enregistre le nouvel équipement si nécessaire et le réserve pour ce dossier, sans remplacer l'identité de l'ancien onduleur.
+3. L'administrateur ou responsable utilise ensuite le bouton séparé **Prêt à être livré** lorsque le matériel est prêt. Ce statut ne constitue pas une preuve de livraison physique.
+4. Dans **Échanges à facturer**, un compte autorisé renseigne la référence et la date de la facture émise dans le système de l'entreprise, puis clique sur **Confirmer la facturation**.
+5. Utiliser **Clôturer le dossier** lorsque les validations requises sont enregistrées. Une facture non confirmée bloque la clôture ; classer le dossier ou terminer une visite ne contourne pas ce contrôle.
+
+La file **Échanges à facturer** est proposée à l'administrateur et aux comptes internes autorisés. Dans **Comptes**, l'administrateur règle **Peut valider la facturation** pour les personnes choisies. Un responsable ou technicien n'en dispose pas automatiquement ; les clients n'y ont jamais accès. Le numéro d'appel TVM reste celui du dossier pendant ces étapes, et les visites gardent leurs références secondaires.
+
+Un technicien affecté peut préparer le remplacement ; les validations technique et de disponibilité restent au responsable ou à l'administrateur. Le matériel doit être distinct de l'ancien et appartenir au même client ; il ne peut pas être réservé pour deux échanges ouverts à la fois. Avant facturation, une reprise de préparation avec motif permet de retirer une validation et d'effectuer une nouvelle vérification, en conservant l'historique.
+
+Cette confirmation enregistre **une facture externe**. TVM ne crée ni n'envoie la facture dans un ERP et ne déclare pas son paiement. Les commentaires internes de facturation ne sont pas imprimés. Les références et dates de facture sont réservées au PDF interne ; le portail reçoit une confirmation générique.
+
+Un ancien dossier ou une ancienne visite terminée conserve ses données, avec **validation non enregistrée** si aucun acte de validation n'est connu. La mise à jour ne transforme pas ces états historiques en approbation technique ou financière.
 
 ## Fiche de suivi et documents du dossier
 

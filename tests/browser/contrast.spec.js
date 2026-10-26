@@ -145,6 +145,17 @@ test('les textes de connexion et des listes SAV ont un contraste minimal de 4,5:
   await expectNormalTextContrast(page, 'Formulaire import clients');
   await clientImport.getByRole('button', { name: 'Fermer', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  for (const queue of [
+    { navigation: 'Échange', heading: 'Échanges d’onduleurs', path: '/api/exchanges/' },
+    { navigation: 'Échanges à facturer', heading: 'Échanges à facturer', path: '/api/exchanges/billing/' },
+  ]) {
+    const loaded = page.waitForResponse(result => new URL(result.url()).pathname === queue.path && result.request().method() === 'GET' && result.ok());
+    await navigation.getByText(queue.navigation, { exact: true }).click();
+    await expect(page.getByRole('heading', { name: queue.heading, exact: true })).toBeVisible();
+    await loaded;
+    await expect(page.locator('.exchange-queue .loading-state')).toHaveCount(0);
+    await expectNormalTextContrast(page, queue.heading);
+  }
   await navigation.getByText('Contrats & garanties', { exact: true }).click();
   await page.getByRole('button', { name: /^Garanties\s+\d+$/ }).click();
   await expectNormalTextContrast(page, 'Garanties');

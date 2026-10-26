@@ -68,6 +68,7 @@ class EquipmentSerializer(LegacySerializer):
 
 
 class ServiceRequestSerializer(LegacySerializer):
+    exchange = serializers.SerializerMethodField()
     call_number = serializers.CharField(source='reference', read_only=True)
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
@@ -84,7 +85,7 @@ class ServiceRequestSerializer(LegacySerializer):
     preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', *FOLLOWUP_FIELD_NAMES]
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -106,6 +107,12 @@ class ServiceRequestSerializer(LegacySerializer):
         return validate_followup(attrs, instance=self.instance, user=user, initial_data=self.initial_data)
     def get_assigned_technician_name(self, obj):
         return (obj.assigned_technician.get_full_name() or obj.assigned_technician.username) if obj.assigned_technician else 'Non affecté'
+    def get_exchange(self, obj):
+        request = self.context.get('request')
+        if request is None:
+            return None
+        from .exchange_workflow import exchange_payload
+        return exchange_payload(obj, request.user)
     def get_category(self, obj):
         return request_category(obj)
     def get_is_overdue(self, obj):
@@ -246,18 +253,24 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, min_length=10, trim_whitespace=False)
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'client', 'is_active', 'password']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'client', 'is_active', 'can_validate_billing', 'password']
     def to_representation(self, instance):
         result = super().to_representation(instance)
         result['role'] = instance.effective_role
         return result
     def validate(self, attrs):
+        actor = getattr(self.context.get('request'), 'user', None)
+        if 'can_validate_billing' in attrs and (not actor or not actor.is_authenticated or not actor.is_active or actor.effective_role != 'admin'):
+            raise serializers.ValidationError({'can_validate_billing': 'Seul un administrateur peut attribuer ou retirer la validation de facturation.'})
         role = attrs.get('role', getattr(self.instance, 'role', 'technician'))
         if self.instance and self.instance.is_superuser and 'role' in attrs and role != 'admin':
             raise serializers.ValidationError({'role': 'Les droits de superutilisateur se gèrent via la console serveur ; ce compte reste administrateur.'})
         client = attrs.get('client', getattr(self.instance, 'client', None))
         if (role == 'client') != (client is not None):
             raise serializers.ValidationError({'client': 'Un compte client doit être lié à un client ; un compte interne ne doit pas l’être.'})
+        billing_permission = attrs.get('can_validate_billing', getattr(self.instance, 'can_validate_billing', False))
+        if role == 'client' and billing_permission:
+            raise serializers.ValidationError({'can_validate_billing': 'Un compte client ne peut pas valider la facturation. Retirez cette autorisation avant de convertir le compte.'})
         if not self.instance and not attrs.get('password'):
             raise serializers.ValidationError({'password': 'Mot de passe obligatoire à la création.'})
         if attrs.get('password'):

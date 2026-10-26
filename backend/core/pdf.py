@@ -5,6 +5,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 import reportlab
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils import timezone
 from reportlab.lib import colors
@@ -153,7 +154,47 @@ def _preventive_summary(service_request, styles, *, counts_source=None):
     ], styles)
 
 
-def intervention_report(intervention):
+def _exchange_summary(service_request, styles, *, for_client=False, force=False):
+    """Print explicit workflow facts; a completed visit is not an approval.
+
+    Billing details are private fields. The client copy exposes the confirmation
+    alone, and neither copy prints billing notes or validation-actor identities.
+    """
+    try:
+        process = service_request.exchange_process
+    except (ObjectDoesNotExist, AttributeError):
+        process = None
+    if not (process or force or service_request.status == 'exchange'):
+        has_exchange = service_request.interventions.filter(kind='exchange').exists()
+        if not has_exchange:
+            has_exchange = service_request.operation_events.filter(Q(status_before='exchange') | Q(status_after='exchange')).exists()
+        if not has_exchange:
+            return []
+    replacement = process.replacement_equipment if process and process.replacement_equipment_id else None
+    if replacement and replacement.client_id != service_request.equipment.client_id:
+        replacement = None
+    validated = bool(process and process.validated_at and replacement)
+    ready = bool(validated and process.ready_at)
+    billed = bool(ready and process.billing_validated_at and process.invoice_reference and process.invoiced_on)
+    rows = [
+        ('SN d’origine du dossier', service_request.equipment.serial_number),
+        ('Validation technique', f'Enregistrée le {_date(process.validated_at, True)}' if validated else 'Non enregistrée'),
+        ('SN de remplacement validé', replacement.serial_number if validated else 'Non enregistré'),
+        ('Prêt à livrer', f'Confirmé le {_date(process.ready_at, True)}' if ready else 'Non confirmé'),
+        ('Facturation', 'Confirmée — enregistrement manuel' if billed else 'Non confirmée'),
+    ]
+    if process and not validated and not for_client and process.replacement_serial_number:
+        rows.insert(2, ('SN proposé, non validé', process.replacement_serial_number))
+    if billed and not for_client:
+        rows += [('Référence de facture', process.invoice_reference), ('Date de facture', _date(process.invoiced_on))]
+    story = [Spacer(1, 7), _bar('ÉCHANGE — VALIDATION ET FACTURATION', styles), _fields(rows, styles)]
+    if not validated:
+        story.append(_p('Une ancienne fiche d’échange ou une visite terminée ne vaut pas validation technique enregistrée.', styles, 'small'))
+    story.append(_p('La confirmation de facturation est saisie manuellement à partir d’une facture émise dans l’outil de facturation. Ce document reste un rapport SAV.', styles, 'small'))
+    return story
+
+
+def intervention_report(intervention, *, for_client=False):
     """TVM reference form rebuilt from public database fields."""
     styles = _styles()
     request = intervention.service_request
@@ -218,6 +259,7 @@ def intervention_report(intervention):
     details.append(('Matériel', f'{equipment.brand} {equipment.model} · {equipment.power_kva} kVA · Batteries : {intervention.battery_count if intervention.battery_count is not None else "non renseignées"}'))
     if intervention.kind == 'exchange':
         details.insert(0, ('Fiche d’échange', f'Ancien numéro de série : {equipment.serial_number}\nNouveau numéro de série : {replacement.serial_number if replacement else "non renseigné"}'))
+    story += _exchange_summary(request, styles, for_client=for_client, force=intervention.kind == 'exchange')
     story += [Spacer(1, 8), _bar('INFORMATIONS COMPLÉMENTAIRES', styles)]
     for title, value in details:
         if value:
@@ -229,7 +271,7 @@ def intervention_report(intervention):
     return output.getvalue()
 
 
-def service_request_report(request, *, now=None):
+def service_request_report(request, *, now=None, for_client=False):
     """Public follow-up; the HTTP caller must scope the request beforehand."""
     from .request_timing import request_timing
     styles = _styles()
@@ -260,6 +302,7 @@ def service_request_report(request, *, now=None):
     progress = preventive_visit_progress(request)
     if progress['planned_visit_count'] is not None or progress['preventive_total_visit_count']:
         story += [Spacer(1, 7), _bar('SUIVI DES VISITES PRÉVENTIVES DU DOSSIER', styles), _preventive_summary(request, styles)]
+    story += _exchange_summary(request, styles, for_client=for_client)
     if timing['warning']:
         story += [_p('Information sur le compteur', styles), _p(timing['warning'], styles)]
     story += [Spacer(1, 7), _bar('SUIVI CHRONOLOGIQUE PUBLIC', styles)]

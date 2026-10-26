@@ -1,6 +1,13 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
+def can_validate_billing(user):
+    """Billing validation is an explicit internal permission, implicit for admins."""
+    if not user or not user.is_authenticated or not user.is_active or user.role == 'client':
+        return False
+    return user.effective_role == 'admin' or bool(user.can_validate_billing)
+
+
 class BusinessPermission(BasePermission):
     message = 'Votre rôle ne permet pas cette opération.'
     def has_permission(self, request, view):

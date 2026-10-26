@@ -46,7 +46,7 @@ test('les sous-catégories et la recherche retrouvent les états réels, y compr
   const calendar = await api(page, 'requests/categories/');
   const yesterday = new Date(`${calendar.as_of}T12:00:00Z`);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const states = ['new', 'maintenance', 'testing', 'resolved', 'quotation', 'pending', 'approved', 'rejected', 'exchange', 'closed', 'scheduled', 'in_progress'];
+  const states = ['new', 'maintenance', 'testing', 'resolved', 'quotation', 'pending', 'approved', 'rejected', 'exchange', 'ready_for_delivery', 'closed', 'scheduled', 'in_progress'];
   const records = [];
   for (const status of states) records.push(await api(page, 'requests/', 'POST', {
     equipment: equipment.id, subject: `${marker} ${status}`, status, arrived_at: new Date(Date.now() - 7 * 86400_000).toISOString(), due_on: yesterday.toISOString().slice(0, 10),
@@ -55,7 +55,7 @@ test('les sous-catégories et la recherche retrouvent les états réels, y compr
     unassigned: ['new'], maintenance: ['maintenance', 'in_progress'], testing: ['testing'],
     overdue: states.filter(status => status !== 'closed'),
     processed: ['resolved'], quotation: ['quotation'], pending: ['pending', 'scheduled'],
-    approved: ['approved'], rejected: ['rejected'], exchange: ['exchange'], closed: ['closed'], all: states,
+    approved: ['approved'], rejected: ['rejected'], exchange: ['exchange'], ready_for_delivery: ['ready_for_delivery'], closed: ['closed'], all: states,
   };
   const filteredCounts = await api(page, `requests/categories/?q=${marker}`);
   expect(filteredCounts.total).toBe(states.length);

@@ -26,12 +26,13 @@ from .workflow import CATEGORIES, overdue_filter
 from .workflow_api import timeline_response
 from .request_numbering import reference_query_value
 from .preventive_visits import with_preventive_counts
+from .exchange_workflow import exchange_related
 
 User = get_user_model()
 
 
 def user_payload(user):
-    return {'id': user.pk, 'username': user.username, 'first_name': user.first_name, 'last_name': user.last_name, 'email': user.email, 'role': user.effective_role, 'client': user.client_id}
+    return {'id': user.pk, 'username': user.username, 'first_name': user.first_name, 'last_name': user.last_name, 'email': user.email, 'role': user.effective_role, 'client': user.client_id, 'can_validate_billing': user.can_validate_billing}
 
 
 @ensure_csrf_cookie
@@ -168,7 +169,7 @@ class EquipmentViewSet(BusinessViewSet):
 
 
 class ServiceRequestViewSet(BusinessViewSet):
-    queryset = with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all())
+    queryset = exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all()))
     serializer_class = ServiceRequestSerializer
     owner_path = 'equipment__client_id'
     def get_queryset(self):
@@ -223,7 +224,7 @@ class ServiceRequestViewSet(BusinessViewSet):
     def report(self, request, pk=None):
         from .pdf import service_request_report
         instance = self.get_object()
-        response = HttpResponse(service_request_report(instance), content_type='application/pdf')
+        response = HttpResponse(service_request_report(instance, for_client=request.user.effective_role == 'client'), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Rapport-suivi-{instance.reference}.pdf"'
         response['Cache-Control'] = 'private, no-store'
         self.audit(instance, 'download_report')
@@ -253,7 +254,7 @@ class InterventionViewSet(BusinessViewSet):
     @action(detail=True, methods=['get'])
     def report(self, request, pk=None):
         instance = self.get_object()
-        response = HttpResponse(intervention_report(instance), content_type='application/pdf')
+        response = HttpResponse(intervention_report(instance, for_client=request.user.effective_role == 'client'), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Rapport-{instance.reference}.pdf"'
         response['Cache-Control'] = 'private, no-store'
         self.audit(instance, 'download_report')

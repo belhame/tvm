@@ -19,6 +19,8 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Arrivée et durée de suivi | Arrivée explicite, jours cumulés du lundi au vendredi, alerte après 48 heures et compteur figé à la clôture | Samedi/dimanche exclus ; ni calendrier de jours fériés ni plages d'heures de bureau ; arrivée ancienne inconnue conservée comme telle |
 | Historique métier | Suivi des événements réellement enregistrés autour des demandes et des équipements, avec observations et synthèse du dossier | État de référence des anciennes fiches distinct d'un changement utilisateur ; aucun ancien journal HFSQL importé automatiquement |
 | Interventions | Affectation, dates, durée, diagnostic, travaux, recommandations, état et fiches de maintenance, échange, mise en service ou préventive | Cases et conclusions déclaratives ; aucun mouvement de stock, décision de garantie ou facturation déclenchés par une case |
+| Échanges | File automatique des demandes classées Échange, remplacement et validation technique explicites, passage Prêt à être livré | Un classement ou une visite terminée ne constitue pas une validation ; aucune ancienne approbation inventée |
+| Échanges à facturer | Confirmation financière séparée avec référence et date de facture externe ; contrôle avant clôture | Droit délégué par l'administrateur ; aucun ERP, envoi de facture ou paiement confirmé par cette saisie |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
 | Visites préventives | Objectif par dossier et nombre réalisé calculé depuis ses fiches préventives terminées ; progression sur la fiche et le PDF | L'objectif ne crée pas de visites ; aucune date ou ancienne prévision inventée, aucun autre dossier inclus |
 | Rapports | Rapport PDF d'intervention structuré d'après le modèle fourni et fiche PDF de suivi du dossier, soumis aux droits d'accès | Documents générés depuis la base ; pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
@@ -37,12 +39,14 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 
 | Rôle | Autorisations métier |
 |---|---|
-| Administrateur | Création et modification des données métier ; gestion des comptes et de leurs rôles |
+| Administrateur | Création et modification des données métier ; gestion des comptes, rôles et délégations de validation financière ; autorisation financière implicite |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
 | Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
 | Client | Lecture seule des ressources de sa société, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
+
+La validation de facturation des échanges est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif. Le rôle Responsable SAV ou Technicien ne l'accorde pas automatiquement. Un client ne peut jamais en bénéficier ; la gestion de ce droit reste réservée à l'administrateur.
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
 
@@ -59,6 +63,8 @@ Les fiches préexistantes disposent d'un état de référence distinct des nouve
 La conservation des événements protège aussi leurs liens : supprimer un compte auteur, un équipement ou un dossier historisé peut être refusé. Désactiver le compte ou utiliser les états Hors service / Clôturé permet d'arrêter leur utilisation en conservant le suivi.
 
 Les fiches d'intervention structurées enregistrent les vérifications propres au type d'opération, le matériel de remplacement pour un échange, les références de contrat ou d'extension et une synthèse/conclusion. Le PDF reprend ces données connues sans notes internes. Une conclusion « non applicable / facturable » exige une justification humaine ; elle ne résulte pas d'une déduction automatique depuis la garantie.
+
+Le parcours d'échange distingue la validation technique du remplacement, l'état Prêt à être livré et la confirmation de facturation. La clôture attend une facture confirmée ; aucune case de fiche ou ancienne opération terminée ne remplace cette validation. Voir [le guide des échanges](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation).
 
 ## Scan sur téléphone
 

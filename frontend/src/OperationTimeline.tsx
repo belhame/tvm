@@ -66,6 +66,12 @@ const kindLabels: Record<string, string> = {
   part_used: "Pièce utilisée",
   attachment_added: "Pièce jointe ajoutée",
   attachment_deleted: "Pièce jointe supprimée",
+  exchange_prepared: "Remplacement préparé",
+  exchange_validated: "Échange validé",
+  exchange_ready: "Échange prêt à être livré",
+  exchange_invoiced: "Facturation de l’échange confirmée",
+  exchange_closed: "Échange clôturé",
+  exchange_reset: "Préparation de l’échange rouverte",
   observation: "Observation",
   summary: "Synthèse",
 };

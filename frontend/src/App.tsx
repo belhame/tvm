@@ -93,6 +93,7 @@ import RequestReceptionFields from "./RequestReceptionFields";
 import CallReference, { callIdentity, callPrimary } from "./CallReference";
 import ClientsDirectory from "./ClientsDirectory";
 import PreventiveProgress from "./PreventiveProgress";
+import ExchangeWorkspace from "./ExchangeWorkspace";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -117,6 +118,11 @@ const navGroups = [
       { id: "equipment", label: "Équipements", icon: Zap },
       { id: "requests", label: "Demandes SAV", icon: ClipboardList },
       { id: "exchange", label: "Échange", icon: Truck },
+      {
+        id: "exchange-billing",
+        label: "Échanges à facturer",
+        icon: FileCheck2,
+      },
       { id: "commissioning", label: "Mise en service", icon: CheckCircle2 },
       { id: "preventive", label: "Préventive", icon: ShieldCheck },
       { id: "planning", label: "Planning", icon: CalendarDays },
@@ -146,6 +152,7 @@ const clientPages = new Set([
   "interventions",
   "equipment",
   "requests",
+  "exchange",
   "contracts",
   "delivery-notes",
   "reports",
@@ -522,6 +529,9 @@ function EditForm({
     setValues((previous) => ({
       ...previous,
       [name]: entry,
+      ...(modal.resource === "users" && name === "role" && entry === "client"
+        ? { can_validate_billing: "false" }
+        : {}),
       ...(modal.resource === "interventions" && name === "service_request"
         ? { replacement_equipment: "", contract: "", extension_warranty: "" }
         : {}),
@@ -622,7 +632,11 @@ function EditForm({
                 ? new Date(value).toISOString()
                 : null;
         else if (field.type === "date") value = value || null;
-        else if (field.name === "is_active" || field.name === "return_flag")
+        else if (
+          ["is_active", "return_flag", "can_validate_billing"].includes(
+            field.name,
+          )
+        )
           value = value === true || value === "true";
         payload[field.name] = value;
       }
@@ -638,6 +652,8 @@ function EditForm({
       }
       if (modal.resource === "users" && payload.role !== "client")
         payload.client = null;
+      if (modal.resource === "users" && payload.role === "client")
+        payload.can_validate_billing = false;
       if (modal.resource === "delivery-notes")
         payload.lines = lines
           .filter((l) => l.description.trim())
@@ -787,6 +803,9 @@ function EditForm({
                           className="input"
                           disabled={
                             readonly ||
+                            (modal.resource === "users" &&
+                              field.name === "can_validate_billing" &&
+                              values.role === "client") ||
                             (field.name === "technician" &&
                               user.role === "technician")
                           }
@@ -2950,6 +2969,11 @@ export default function App() {
     : "all";
   const allowedPage =
     (user.role === "client" && !clientPages.has(basePage)) ||
+    (basePage === "exchange-billing" &&
+      !(
+        user.role !== "client" &&
+        (user.role === "admin" || user.can_validate_billing === true)
+      )) ||
     (basePage === "users" && user.role !== "admin")
       ? "dashboard"
       : basePage;
@@ -2987,6 +3011,10 @@ export default function App() {
             const items = group.items.filter(
               (item) =>
                 (user.role !== "client" || clientPages.has(item.id)) &&
+                (item.id !== "exchange-billing" ||
+                  (user.role !== "client" &&
+                    (user.role === "admin" ||
+                      user.can_validate_billing === true))) &&
                 (item.id !== "users" || user.role === "admin"),
             );
             return items.length ? (
@@ -2996,9 +3024,7 @@ export default function App() {
                   <Fragment key={item.id}>
                     <button
                       className={`nav-item ${allowedPage === item.id ? "active" : ""}`}
-                      aria-label={
-                        item.id === "exchange" ? "Fiches d’échange" : item.label
-                      }
+                      aria-label={item.label}
                       aria-expanded={
                         item.id === "requests"
                           ? allowedPage === "requests"
@@ -3198,9 +3224,21 @@ export default function App() {
               refreshKey={data.requests}
               initialSearch={externalSearch}
             />
-          ) : ["exchange", "commissioning", "preventive"].includes(
-              allowedPage,
-            ) ? (
+          ) : ["exchange", "exchange-billing"].includes(allowedPage) ? (
+            <ExchangeWorkspace
+              key={`${allowedPage}:${user.id}:${user.role}`}
+              user={user}
+              equipment={data.equipment || []}
+              interventions={data.interventions || []}
+              refreshKey={data.requests}
+              onChanged={saved}
+              onOpenRequest={setRequestDetail}
+              onIntervention={setDetail}
+              Dialog={Modal}
+              billing={allowedPage === "exchange-billing"}
+              initialSearch={externalSearch}
+            />
+          ) : ["commissioning", "preventive"].includes(allowedPage) ? (
             <ResourcePage
               {...common}
               resource="interventions"
@@ -3396,6 +3434,10 @@ export default function App() {
             data={data}
             user={user}
             onChanged={reload}
+            onOpenExchange={() => {
+              setRequestDetail(null);
+              navigate("exchange", currentRequestDetail.reference);
+            }}
             onEditRequest={(freshRecord) => {
               setRequestDetail(null);
               setModal({ resource: "requests", record: freshRecord });

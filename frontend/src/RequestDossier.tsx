@@ -8,6 +8,7 @@ import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import RequestDocuments from "./RequestDocuments";
 import CallReference, { callIdentity } from "./CallReference";
 import PreventiveProgress from "./PreventiveProgress";
+import { ExchangePanel } from "./ExchangeWorkspace";
 
 const tabs = [
   ["followup", "Suivi"],
@@ -48,6 +49,7 @@ export default function RequestDossier({
   onOpenIntervention,
   onEditIntervention,
   onChanged,
+  onOpenExchange,
 }: {
   record: RecordData;
   data: Record<string, RecordData[]>;
@@ -57,6 +59,7 @@ export default function RequestDossier({
   onOpenIntervention: (record: RecordData) => void;
   onEditIntervention: (record: RecordData) => void;
   onChanged: () => Promise<void>;
+  onOpenExchange?: () => void;
 }) {
   const tabId = useId();
   const [record, setRecord] = useState<RecordData>(initialRecord);
@@ -467,6 +470,38 @@ export default function RequestDossier({
                   </button>
                 )}
               </div>
+              {tab === "exchange" && (
+                <>
+                  <ExchangePanel
+                    key={`${record.id}:${user.id}`}
+                    record={record}
+                    equipment={data.equipment || []}
+                    user={user}
+                    onChanged={async (updated) => {
+                      setRecord(updated);
+                      await onChanged();
+                    }}
+                  />
+                  {onOpenExchange && (
+                    <button
+                      type="button"
+                      className="button secondary small exchange-open-dossier"
+                      onClick={onOpenExchange}
+                    >
+                      Ouvrir l’espace Échange
+                    </button>
+                  )}
+                  <h4 className="exchange-visit-history-title">
+                    Fiches de visite d’échange
+                  </h4>
+                  <p className="operation-tab-description">
+                    Les fiches de visite conservent l’historique des
+                    interventions. La validation du remplacement et la
+                    disponibilité pour livraison sont suivies séparément
+                    ci-dessus.
+                  </p>
+                </>
+              )}
               {tab === "preventive" && <PreventiveProgress record={record} />}
               {tab === "commissioning" && (
                 <p className="operation-tab-description">

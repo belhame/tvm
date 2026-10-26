@@ -18,6 +18,7 @@ CATEGORIES = (
     ('approved', 'Validé', ('approved',)),
     ('rejected', 'Refusé', ('rejected',)),
     ('exchange', 'Échange', ('exchange',)),
+    ('ready_for_delivery', 'Prêt à être livré', ('ready_for_delivery',)),
     ('closed', 'Clôturé', ('closed',)),
     ('all', 'Tous', ()),
 )

@@ -14,6 +14,8 @@ L'annuaire clients propose un import CSV avec prévisualisation, sans écraser l
 
 Pour la prévention, l'objectif de visites du dossier reste distinct du nombre calculé de fiches réellement terminées. Les visites conservent le même appel TVM et leurs références secondaires ; la mise en service dispose de sa fiche et de son PDF dédiés.
 
+Les demandes classées **Échange** alimentent automatiquement leur file de suivi. La validation technique du remplacement et la confirmation financière sont distinctes ; la clôture attend la confirmation d'une facture émise dans le système externe de l'entreprise.
+
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 
 ## Essayer la version de démonstration

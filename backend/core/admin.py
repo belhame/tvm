@@ -6,9 +6,15 @@ from .models import AuditLog, Client, Contract, DeliveryNote, Equipment, Interve
 
 @admin.register(User)
 class PowerCareUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (('PowerCare', {'fields': ('role', 'client', 'legacy_id')}),)
-    add_fieldsets = UserAdmin.add_fieldsets + (('PowerCare', {'fields': ('role', 'client')}),)
-    list_display = ('username', 'email', 'role', 'client', 'is_active')
+    fieldsets = UserAdmin.fieldsets + (('PowerCare', {'fields': ('role', 'client', 'can_validate_billing', 'legacy_id')}),)
+    add_fieldsets = UserAdmin.add_fieldsets + (('PowerCare', {'fields': ('role', 'client', 'can_validate_billing')}),)
+    list_display = ('username', 'email', 'role', 'client', 'is_active', 'can_validate_billing')
+    def has_add_permission(self, request):
+        return request.user.effective_role == 'admin' and super().has_add_permission(request)
+    def has_change_permission(self, request, obj=None):
+        return request.user.effective_role == 'admin' and super().has_change_permission(request, obj)
+    def has_delete_permission(self, request, obj=None):
+        return request.user.effective_role == 'admin' and super().has_delete_permission(request, obj)
 
 
 # L'administration avancée est réservée aux superutilisateurs. Le stock ne s'y

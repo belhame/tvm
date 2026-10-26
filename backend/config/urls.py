@@ -8,6 +8,7 @@ from core import intake_views
 from core.serial_lookup_views import serial_lookup_view
 from core import attachment_views
 from core.client_import_views import client_import
+from core import exchange_views
 
 router = DefaultRouter()
 router.register('clients', views.ClientViewSet, basename='client')
@@ -34,6 +35,14 @@ urlpatterns = [
     path('api/catalogue/import/', catalogue_views.catalogue_import),
     path('api/clients/import/', client_import),
     path('api/requests/intake/', intake_views.request_intake),
+    path('api/exchanges/', exchange_views.exchange_list),
+    path('api/exchanges/billing/', exchange_views.exchange_list, {'billing': True}),
+    path('api/requests/<int:request_id>/exchange/', exchange_views.exchange_detail),
+    path('api/requests/<int:request_id>/exchange/validate/', exchange_views.exchange_action, {'operation': 'validate'}),
+    path('api/requests/<int:request_id>/exchange/ready/', exchange_views.exchange_action, {'operation': 'ready'}),
+    path('api/requests/<int:request_id>/exchange/billing/', exchange_views.exchange_action, {'operation': 'billing'}),
+    path('api/requests/<int:request_id>/exchange/close/', exchange_views.exchange_action, {'operation': 'close'}),
+    path('api/requests/<int:request_id>/exchange/reset/', exchange_views.exchange_action, {'operation': 'reset'}),
     path('api/requests/<int:request_id>/documents/', attachment_views.request_documents),
     path('api/documents/<int:document_id>/download/', attachment_views.document_download),
     path('api/documents/<int:document_id>/', attachment_views.document_delete),

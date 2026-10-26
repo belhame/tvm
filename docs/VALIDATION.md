@@ -2,7 +2,7 @@
 
 Contrôles exécutés le **22 octobre 2026** dans l'environnement cloud, sur PostgreSQL 16 et Chromium 154. Les données utilisées sont fictives. Le serveur et les données de démonstration sont distincts de la base réservée aux essais navigateur.
 
-Ce document conserve les validations successives, datées ci-dessous. [L'étape annuaire et visites préventives](#annuaire-clients-import-csv-et-visites-préventives--26-octobre-2026) distingue les essais automatisés fictifs de l'import privé réalisé dans la base cloud ; aucune donnée nominative de cet import n'est publiée.
+Ce document conserve les validations successives, datées ci-dessous. [L'étape échanges et validation financière](#échanges-préparation-de-livraison-et-validation-financière--26-octobre-2026) présente les derniers contrôles. [L'import privé de l'annuaire](#annuaire-clients-import-csv-et-visites-préventives--26-octobre-2026) reste distinct des essais automatisés fictifs ; aucune donnée nominative de cet import n'est publiée.
 
 | Contrôle exécuté | Résultat |
 |---|---|
@@ -160,3 +160,16 @@ Les limites Windows natives, caméra et reprise HFSQL décrites plus haut resten
 - L'image Docker finale a été construite et démarrée : santé PostgreSQL et ressources de production identiques au build navigateur vérifiées. Sa suite découvre **346 tests : 336 exécutés avec succès, 10 contrôles PDF ignorés faute de Poppler** ; ces dix contrôles passent dans les 346 tests PostgreSQL exécutés sur l'hôte. Aucun essai n'installe l'application sur le PC de l'utilisateur.
 
 Le ZIP public contient le code générique. Le CSV réel reste séparé pour une importation dans l'instance Windows via **Clients → Importer des clients**, après mise à jour conservant `.env`, `.local` et les volumes. L'import cloud ne modifie pas la base du PC.
+
+## Échanges, préparation de livraison et validation financière — 26 octobre 2026
+
+- **397 tests Django réussis sur PostgreSQL, aucun échec ni test ignoré.** Le journal de la suite complète confirme ce résultat ; les données d'essai sont fictives.
+- Le parcours positif couvre une demande classée Échange sans visite préalable, sa préparation sans équipement créé, la validation explicite du remplacement, le passage Prêt à être livré, la confirmation d'une facture externe et la clôture. Les numéros du dossier et les références de visite restent distincts et conservés.
+- Les cas négatifs contrôlent les étapes manquantes, les matériels incohérents, les droits insuffisants, les tentatives de contournement par modification du dossier et la conservation des justificatifs après confirmation. La permission financière est distincte du rôle, réservée aux comptes internes autorisés, avec gestion par l'administrateur et refus des comptes clients.
+- **Deux tests de concurrence PostgreSQL réussissent** sur les opérations simultanées du parcours. Ils vérifient la protection des réservations et validations concurrentes, sans remplacements actifs incompatibles ni données partielles dans les scénarios exercés.
+- Les validations anciennes ne sont pas déduites d'une visite terminée. Les rapports distinguent preuve technique explicite et état non enregistré ; les données de facturation détaillées restent internes et ne constituent ni émission de facture ERP ni preuve de paiement.
+- **26 scénarios Chromium réussis**, dont le parcours complet en deux niveaux de validation, les accès du technicien et du valideur financier, les brouillons cachés au portail et le blocage de la clôture prématurée. Les contrôles de contraste à 4,5:1 couvrent aussi les deux nouvelles listes Échange et Échanges à facturer.
+- L'image Docker finale a été construite et démarrée : santé PostgreSQL et ressources de production identiques au build testé vérifiées. **397 tests découverts : 387 exécutés avec succès et 10 contrôles PDF ignorés faute de Poppler**, tous réussis dans la suite PostgreSQL sur l'hôte.
+- Les migrations **0012 et 0013** ont été appliquées après sauvegarde. Les effectifs et les empreintes SHA-256 des lignes et colonnes préexistantes des **21 tables** contrôlées restent identiques : les **61 clients**, les numéros et les relations sont conservés. Aucune approbation, facture ou opération d'échange réelle n'a été inventée. La permission financière reste désactivée par défaut, avec autorisation implicite pour l'administrateur.
+
+Les noms, contacts, factures réelles et captures privés ne sont pas inclus dans ce compte rendu ni dans les sources publiques. Le lancement natif Windows n'est pas déclaré vérifié ; une mise à jour du PC reste une opération distincte de celle de l'instance cloud.

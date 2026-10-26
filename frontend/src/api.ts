@@ -7,6 +7,7 @@ export type User = {
   email: string;
   role: "admin" | "manager" | "technician" | "client";
   client: number | null;
+  can_validate_billing?: boolean;
 };
 let csrfToken = "";
 export function setCsrf(value: string) {
