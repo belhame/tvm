@@ -24,6 +24,7 @@ from .serial_numbers import analyze_serial_number
 from .serializers import AuditSerializer, ClientSerializer, ContractSerializer, DeliveryNoteSerializer, EquipmentSerializer, InterventionSerializer, PartSerializer, ServiceRequestSerializer, StaffSerializer, StockMovementSerializer, UserSerializer, WarrantySerializer
 from .workflow import CATEGORIES, overdue_filter
 from .workflow_api import timeline_response
+from .request_numbering import reference_query_value
 
 User = get_user_model()
 
@@ -168,11 +169,13 @@ class ServiceRequestViewSet(BusinessViewSet):
                 if not value.isascii() or not value.isdecimal() or len(value) > 19:
                     raise ValidationError({field: 'Identifiant invalide.'})
                 qs = qs.filter(**{lookup: int(value)})
-        query = params.get('q', '').strip()
-        if len(query) > 200:
-            raise ValidationError({'q': 'La recherche est limitée à 200 caractères.'})
+        query = reference_query_value(params, 'q')
         if query:
-            qs = qs.filter(Q(reference__icontains=query) | Q(subject__icontains=query) | Q(equipment__serial_number__icontains=query) | Q(equipment__client__name__icontains=query))
+            qs = qs.filter(Q(reference__icontains=query) | Q(client_reference__icontains=query) | Q(subject__icontains=query) | Q(equipment__serial_number__icontains=query) | Q(equipment__client__name__icontains=query))
+        for key, lookup in [('call_number', 'reference__icontains'), ('client_reference', 'client_reference__icontains')]:
+            value = reference_query_value(params, key)
+            if value:
+                qs = qs.filter(**{lookup: value})
         state = params.get('status')
         if state:
             if state not in ServiceRequest.Status.values:
@@ -222,6 +225,14 @@ class InterventionViewSet(BusinessViewSet):
     owner_path = 'service_request__equipment__client_id'
     def get_queryset(self):
         qs = super().get_queryset()
+        params = self.request.query_params
+        query = reference_query_value(params, 'q')
+        if query:
+            qs = qs.filter(Q(reference__icontains=query) | Q(service_request__reference__icontains=query) | Q(service_request__client_reference__icontains=query) | Q(service_request__subject__icontains=query) | Q(service_request__equipment__serial_number__icontains=query) | Q(service_request__equipment__client__name__icontains=query))
+        for key, lookup in [('call_number', 'service_request__reference__icontains'), ('client_reference', 'service_request__client_reference__icontains')]:
+            value = reference_query_value(params, key)
+            if value:
+                qs = qs.filter(**{lookup: value})
         kind = self.request.query_params.get('kind')
         if kind:
             if kind not in Intervention.Kind.values:
@@ -356,14 +367,19 @@ def dashboard_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_view(request):
-    q = request.query_params.get('q', '').strip()[:150]
-    if len(q) < 2:
+    q = reference_query_value(request.query_params, 'q')
+    if not q:
         return Response({'equipment': [], 'clients': [], 'requests': [], 'interventions': []})
     user = request.user
+    if len(q) == 1:
+        requests = scope_queryset(ServiceRequest.objects.select_related('equipment__client'), user, 'equipment__client_id').filter(Q(reference__iexact=q) | Q(client_reference__iexact=q))[:20]
+        interventions = scope_queryset(Intervention.objects.select_related('service_request__equipment__client', 'technician'), user, 'service_request__equipment__client_id').filter(Q(reference__iexact=q) | Q(service_request__reference__iexact=q) | Q(service_request__client_reference__iexact=q))[:20]
+        ctx = {'request': request}
+        return Response({'equipment': [], 'clients': [], 'requests': ServiceRequestSerializer(requests, many=True, context=ctx).data, 'interventions': InterventionSerializer(interventions, many=True, context=ctx).data})
     equipment = scope_queryset(Equipment.objects.select_related('client'), user, 'client_id').filter(Q(serial_number__icontains=q) | Q(model__icontains=q) | Q(client__name__icontains=q))[:20]
     clients = scope_queryset(Client.objects.all(), user, 'id').filter(Q(name__icontains=q) | Q(contact_name__icontains=q))[:20]
-    requests = scope_queryset(ServiceRequest.objects.select_related('equipment__client'), user, 'equipment__client_id').filter(Q(reference__icontains=q) | Q(subject__icontains=q) | Q(equipment__serial_number__icontains=q) | Q(equipment__client__name__icontains=q))[:20]
-    interventions = scope_queryset(Intervention.objects.select_related('service_request__equipment__client', 'technician'), user, 'service_request__equipment__client_id').filter(Q(reference__icontains=q) | Q(service_request__equipment__serial_number__icontains=q) | Q(service_request__equipment__client__name__icontains=q))[:20]
+    requests = scope_queryset(ServiceRequest.objects.select_related('equipment__client'), user, 'equipment__client_id').filter(Q(reference__icontains=q) | Q(client_reference__icontains=q) | Q(subject__icontains=q) | Q(equipment__serial_number__icontains=q) | Q(equipment__client__name__icontains=q))[:20]
+    interventions = scope_queryset(Intervention.objects.select_related('service_request__equipment__client', 'technician'), user, 'service_request__equipment__client_id').filter(Q(reference__icontains=q) | Q(service_request__reference__icontains=q) | Q(service_request__client_reference__icontains=q) | Q(service_request__subject__icontains=q) | Q(service_request__equipment__serial_number__icontains=q) | Q(service_request__equipment__client__name__icontains=q))[:20]
     ctx = {'request': request}
     return Response({'equipment': EquipmentSerializer(equipment, many=True, context=ctx).data, 'clients': ClientSerializer(clients, many=True, context=ctx).data, 'requests': ServiceRequestSerializer(requests, many=True, context=ctx).data, 'interventions': InterventionSerializer(interventions, many=True, context=ctx).data})
 

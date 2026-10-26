@@ -117,6 +117,28 @@ La liste complète des 239 rubriques figure dans [ANALYSE_WINDEV.md](ANALYSE_WIN
 
 Les identifiants sont **propres à chaque table** : `JM.IDjoints="12"` et `JG.IDjoints="12"` sont deux enregistrements distincts. De même, un même numéro peut exister dans `Demande` et `BL` sans être le même objet. La clé de conservation brute est donc `(table_source, id_source)`.
 
+### Distinguer numéro TVM, numéro du centre client et visites
+
+Le modèle cible distingue désormais :
+
+- **N° d'intervention / appel TVM** : numéro métier du dossier, stocké dans `ServiceRequest.reference` et commun à ses visites ;
+- **N° d'appel client** : référence du centre SAV qui confie la réparation, stockée dans `client_reference` ;
+- **Réf. de visite** : référence secondaire propre à une fiche ou visite, liée au dossier par sa clé, sans fusionner les visites.
+
+Dans l'export brut, conserver intégralement **`Demande.Numero_appel` et `Demande.Numero_appel_interne`**, ainsi que `IDDemande` et `IDClient`. Le développeur doit confirmer explicitement lequel des deux champs joue chaque rôle dans la base de production ; ne pas décider le mapping par le seul nom d'une colonne. Garder également les champs de numéros présents dans `BL` et `item_bl`, avec leurs clés de relation, pour contrôler la concordance des documents.
+
+Toutes ces références restent des **chaînes exactes**, avec leurs zéros initiaux, lettres, barres obliques et tirets. Ne pas les convertir en nombres ni supprimer leur ponctuation. Un numéro de centre n'est pas unique globalement et ne permet pas d'identifier le client : le rattachement doit venir des clés et des correspondances validées. Ne jamais joindre deux dossiers de centres différents sur la seule égalité de ce numéro.
+
+Fournir en complément `documentation/correspondance_numeros.csv` :
+
+```text
+source_table,source_id,source_client_id,tvm_number,client_reference,visit_reference,parent_request_source_id,validation_status,notes
+```
+
+Ce fichier documente les correspondances ; il ne remplace pas les colonnes brutes et n'est pas un format de promotion automatique accepté par la commande de staging. Signaler les numéros TVM historiques dupliqués, absents ou trop longs pour le nouveau champ, sans troncature ni renumérotation silencieuse.
+
+Les nouvelles demandes web utilisent une numérotation serveur annuelle `YY-NNNNN`. Cette règle ne doit pas être appliquée rétroactivement aux références importées. Conserver les anciens numéros et IDs ; si plusieurs visites résultent d'une ancienne demande, préserver la relation un dossier → plusieurs visites au lieu de fusionner leurs données. Voir [la convention des deux numéros](GUIDE_SUIVI_SAV.md#identifier-un-dossier-avec-les-deux-numéros).
+
 ## 4. Pièces jointes et mémos
 
 Extraire les colonnes suivantes avec l’API HFSQL/WINDEV supportée, jamais en découpant les `.mmo` à la main :

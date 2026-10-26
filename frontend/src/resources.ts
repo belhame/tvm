@@ -1,4 +1,5 @@
 import type { RecordData } from "./api";
+import { callIdentity } from "./CallReference";
 
 export type Field = {
   name: string;
@@ -307,7 +308,7 @@ export const resources: Record<string, Resource> = {
       "Du premier signalement à la résolution : aucun dossier ne se perd.",
     button: "Nouvelle demande",
     columns: [
-      { key: "reference", label: "N° de dossier", secondary: "subject" },
+      { key: "call_number", label: "N° d’appel TVM", secondary: "subject" },
       { key: "client_name", label: "Client" },
       { key: "equipment_serial", label: "N° de série", type: "serial" },
       { key: "priority", label: "Priorité", type: "status" },
@@ -362,7 +363,7 @@ export const resources: Record<string, Resource> = {
       "Planifiez, diagnostiquez et suivez les interventions de votre équipe.",
     button: "Nouvelle intervention",
     columns: [
-      { key: "reference", label: "N°", secondary: "request_reference" },
+      { key: "call_number", label: "N° d’appel TVM / visite" },
       { key: "client_name", label: "Client / site" },
       {
         key: "equipment_model",
@@ -779,9 +780,9 @@ export function optionLabel(resource: string, item: RecordData) {
   if (resource === "equipment")
     return `${item.serial_number} · ${item.model} · ${item.client_name || ""}`;
   if (resource === "requests")
-    return `${item.reference} · ${item.subject} · ${item.client_name || ""}`;
+    return `N° TVM ${callIdentity(item).tvm || "non renseigné"}${callIdentity(item).client ? ` · N° client ${callIdentity(item).client}` : ""} · ${item.subject} · ${item.client_name || ""}`;
   if (resource === "interventions")
-    return `${item.reference} · ${item.client_name || ""}`;
+    return `N° TVM ${callIdentity(item, true).tvm || "non renseigné"} · Visite ${callIdentity(item, true).visit || "non renseignée"} · ${item.client_name || ""}`;
   if (resource === "users")
     return (
       `${item.first_name || ""} ${item.last_name || ""}`.trim() || item.username

@@ -581,6 +581,7 @@ export default function RequestIntake({
                   )}
                 <SerialLookupSummary
                   result={lookup}
+                  role={user.role}
                   candidate={selectedProduct || undefined}
                 />
               </>

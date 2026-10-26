@@ -56,12 +56,14 @@ export default function RequestReceptionFields({
   readonly = false,
   includeClosure = false,
   canBackfillClosure = false,
+  callNumber,
 }: {
   value: RecordData;
   onChange: (name: string, entry: string | boolean) => void;
   readonly?: boolean;
   includeClosure?: boolean;
   canBackfillClosure?: boolean;
+  callNumber?: string;
 }) {
   const id = useId();
   return (
@@ -75,6 +77,13 @@ export default function RequestReceptionFields({
           Le compteur part de la date d’arrivée renseignée, selon les heures
           ouvrées calculées par le serveur.
         </p>
+      </div>
+      <div className="request-call-number-note">
+        <strong>N° d’appel TVM / n° d’intervention métier</strong>
+        <span>
+          {callNumber ||
+            "Attribué par TVM à l’enregistrement ; il est commun à toutes les visites de ce dossier."}
+        </span>
       </div>
       <div className="form-grid">
         <div className="form-field">
@@ -133,8 +142,19 @@ export default function RequestReceptionFields({
               }
               disabled={readonly}
               value={value[name] || ""}
+              aria-describedby={
+                name === "client_reference"
+                  ? `${id}-client-reference-help`
+                  : undefined
+              }
               onChange={(event) => onChange(name, event.target.value)}
             />
+            {name === "client_reference" && (
+              <small id={`${id}-client-reference-help`}>
+                Référence fournie par le centre partenaire. Elle reste distincte
+                du numéro d’appel TVM et peut être laissée vide.
+              </small>
+            )}
           </div>
         ))}
         {choices.map((field) => (

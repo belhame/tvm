@@ -55,6 +55,7 @@ class EquipmentSerializer(LegacySerializer):
 
 
 class ServiceRequestSerializer(LegacySerializer):
+    call_number = serializers.CharField(source='reference', read_only=True)
     equipment_serial = serializers.CharField(source='equipment.serial_number', read_only=True)
     client_name = serializers.CharField(source='equipment.client.name', read_only=True)
     assigned_technician = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True).exclude(role='client'), required=False, allow_null=True)
@@ -66,7 +67,7 @@ class ServiceRequestSerializer(LegacySerializer):
     accessories = serializers.CharField(max_length=4000, allow_blank=True, required=False)
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', *FOLLOWUP_FIELD_NAMES]
         read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
     def get_fields(self):
         fields = super().get_fields()
@@ -111,6 +112,8 @@ class ServiceRequestSerializer(LegacySerializer):
 
 
 class InterventionSerializer(LegacySerializer):
+    call_number = serializers.CharField(source='service_request.reference', read_only=True)
+    client_reference = serializers.CharField(source='service_request.client_reference', read_only=True)
     request_reference = serializers.CharField(source='service_request.reference', read_only=True)
     equipment_serial = serializers.CharField(source='service_request.equipment.serial_number', read_only=True)
     equipment_model = serializers.CharField(source='service_request.equipment.model', read_only=True)
@@ -126,7 +129,7 @@ class InterventionSerializer(LegacySerializer):
     extension_scope = serializers.CharField(source='extension_warranty.scope', read_only=True, default=None)
     class Meta:
         model = Intervention
-        fields = ['id', 'reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'kind', 'performed_on', 'replacement_equipment', 'replacement_equipment_serial', 'contract', 'contract_number', 'contract_starts_on', 'contract_ends_on', 'extension_warranty', 'extension_starts_on', 'extension_ends_on', 'extension_scope', 'cabinet_serial', 'battery_count', 'site', 'end_customer', 'contact_name', 'contact_phone', 'summary', 'conclusion', 'conclusion_notes', 'structured_data', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'legacy_id']
+        fields = ['id', 'reference', 'call_number', 'client_reference', 'service_request', 'request_reference', 'equipment_serial', 'equipment_model', 'client_name', 'technician', 'technician_name', 'scheduled_at', 'duration_minutes', 'status', 'kind', 'performed_on', 'replacement_equipment', 'replacement_equipment_serial', 'contract', 'contract_number', 'contract_starts_on', 'contract_ends_on', 'extension_warranty', 'extension_starts_on', 'extension_ends_on', 'extension_scope', 'cabinet_serial', 'battery_count', 'site', 'end_customer', 'contact_name', 'contact_phone', 'summary', 'conclusion', 'conclusion_notes', 'structured_data', 'diagnosis', 'work_done', 'recommendations', 'internal_notes', 'completed_at', 'created_at', 'legacy_id']
         read_only_fields = ['reference', 'completed_at', 'created_at']
     def get_technician_name(self, obj):
         return (obj.technician.get_full_name() or obj.technician.username) if obj.technician else 'Non affecté'

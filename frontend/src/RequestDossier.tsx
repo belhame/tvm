@@ -6,6 +6,7 @@ import InterventionWorksheet from "./InterventionWorksheet";
 import OperationTimeline, { type OperationEvent } from "./OperationTimeline";
 import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import RequestDocuments from "./RequestDocuments";
+import CallReference, { callIdentity } from "./CallReference";
 
 const tabs = [
   ["followup", "Suivi"],
@@ -174,7 +175,9 @@ export default function RequestDossier({
       <div className="modal-content">
         <div className="request-dossier-heading">
           <div>
-            <h2 className="request-dossier-reference">{record.reference}</h2>
+            <div className="request-dossier-reference">
+              <CallReference record={record} role={user.role} />
+            </div>
             <p>{record.subject}</p>
           </div>
           <span className={`badge status-${record.status}`}>
@@ -264,6 +267,10 @@ export default function RequestDossier({
                       ? dateFR(record.closed_at, true)
                       : "Non renseignée"
                   }
+                />
+                <Fact
+                  label="N° d’appel TVM / n° d’intervention métier"
+                  value={callIdentity(record).tvm}
                 />
                 <Fact
                   label="N° d’appel client / référence client"
@@ -466,7 +473,12 @@ export default function RequestDossier({
                     key={intervention.id}
                   >
                     <div className="request-dossier-actions">
-                      <strong>{intervention.reference}</strong>
+                      <CallReference
+                        record={intervention}
+                        role={user.role}
+                        visit
+                        compact
+                      />
                       <span className={`badge status-${intervention.status}`}>
                         {statuses[intervention.status] || intervention.status}
                       </span>
@@ -637,7 +649,12 @@ export default function RequestDossier({
                 .map((row) => (
                   <article className="request-dossier-related" key={row.id}>
                     <strong>
-                      {row.reference} ·{" "}
+                      <CallReference
+                        record={row}
+                        role={user.role}
+                        visit
+                        compact
+                      />
                       {statuses[row.conclusion] ||
                         row.conclusion ||
                         "Conclusion renseignée"}
@@ -700,7 +717,7 @@ export default function RequestDossier({
           PDF de suivi du dossier
         </a>
         <span className="form-secure">
-          Dossier partagé · {record.reference}
+          N° d’appel TVM · {callIdentity(record).tvm || "Non renseigné"}
         </span>
         {canManage && (
           <button

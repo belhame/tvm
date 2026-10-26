@@ -6,6 +6,8 @@ Le premier parcours fonctionnel est **client → onduleur / numéro de série �
 
 Le compteur de prise en charge utilise la date d’arrivée réelle et passe en retard après deux jours ouvrés, samedi et dimanche exclus. Il se fige à la clôture. Les fiches de réception, les pièces jointes privées ou explicitement partagées et les PDF reprennent les dossiers enregistrés.
 
+Chaque dossier possède un **N° d'intervention / appel TVM** commun à ses visites et un **N° d'appel client** distinct, fourni par le centre SAV client. L'équipe peut rechercher les deux ; le portail client privilégie la référence de son centre, dans le périmètre de sa société. Les `INT-…` restent des références secondaires de visite. Voir [le guide des numéros et du suivi](docs/GUIDE_SUIVI_SAV.md#identifier-un-dossier-avec-les-deux-numéros).
+
 Le suivi SAV ajoute des catégories de demandes avec compteurs, des fiches d'échange, de mise en service et de prévention, ainsi qu'une chronologie des événements enregistrés. [Le guide de suivi](docs/GUIDE_SUIVI_SAV.md) distingue cet historique web de l'ancien journal HFSQL, qui n'est pas repris automatiquement.
 
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).

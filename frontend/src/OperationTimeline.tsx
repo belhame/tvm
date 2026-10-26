@@ -727,14 +727,16 @@ function ScopedOperationTimeline({
                 </time>
                 {!isRequest && event.service_request !== null && (
                   <span>
-                    {event.request_reference ||
-                      `Dossier SAV n° ${event.service_request}`}
+                    {event.request_reference
+                      ? `N° d’appel TVM ${event.request_reference}`
+                      : `Dossier SAV n° ${event.service_request}`}
                   </span>
                 )}
                 {event.intervention !== null && (
                   <span>
-                    {event.intervention_reference ||
-                      `Intervention n° ${event.intervention}`}
+                    {event.intervention_reference
+                      ? `Référence de visite ${event.intervention_reference}`
+                      : `Visite n° ${event.intervention}`}
                   </span>
                 )}
               </div>

@@ -7732,3 +7732,146 @@ td,
     font-size: 13px;
   }
 }
+.call-reference {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+  line-height: 1.5;
+  white-space: normal;
+}
+.call-reference-primary,
+.call-reference-secondary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.call-reference-label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #52627b;
+  font-weight: 400;
+  white-space: normal;
+}
+.call-reference-value {
+  display: block;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #263f62;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-weight: 600;
+}
+.call-reference-secondary .call-reference-value {
+  color: #405774;
+  font-size: 12px;
+  font-weight: 400;
+}
+.call-reference-compact {
+  gap: 4px;
+}
+.request-client-reference {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 125px;
+  max-width: 230px;
+}
+.request-call-number-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 15px;
+  margin-bottom: 18px;
+  border: 1px solid #d8e4f4;
+  border-radius: 8px;
+  background: #f4f8ff;
+  color: #3e5472;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.request-call-number-note > strong {
+  color: #263e5f;
+  font-size: 12px;
+}
+.request-dossier-reference .call-reference-primary .call-reference-value,
+.detail-reference .call-reference-primary .call-reference-value {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.3px;
+  color: #203957;
+}
+.request-dossier-reference .call-reference-primary .call-reference-label,
+.detail-reference .call-reference-primary .call-reference-label {
+  font-size: 12px;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.calendar-event .call-reference {
+  margin-top: 5px;
+  gap: 4px;
+}
+.calendar-event .call-reference .call-reference-label,
+.upcoming-item .call-reference .call-reference-label,
+.report-title .call-reference .call-reference-label,
+.search-results .call-reference .call-reference-label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4a6080;
+  margin-top: 0;
+}
+.calendar-event .call-reference .call-reference-value,
+.upcoming-item .call-reference .call-reference-value,
+.report-title .call-reference .call-reference-value,
+.search-results .call-reference .call-reference-value {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #29466d;
+  font-weight: 600;
+  margin-top: 0;
+}
+.calendar-event .call-reference .call-reference-secondary .call-reference-value,
+.upcoming-item .call-reference .call-reference-secondary .call-reference-value,
+.report-title .call-reference .call-reference-secondary .call-reference-value,
+.search-results
+  .call-reference
+  .call-reference-secondary
+  .call-reference-value {
+  font-size: 12px;
+  font-weight: 400;
+}
+.report-title > .call-reference {
+  margin-bottom: 4px;
+}
+.search-results button > div {
+  min-width: 0;
+}
+.agenda-item > .call-reference {
+  flex: 1 1 180px;
+}
+.request-dossier-related .call-reference {
+  margin-bottom: 5px;
+}
+@media (max-width: 540px) {
+  .request-dossier-reference .call-reference-primary .call-reference-value,
+  .detail-reference .call-reference-primary .call-reference-value {
+    font-size: 19px;
+  }
+  .call-reference-label,
+  .call-reference-secondary .call-reference-value {
+    font-size: 12px;
+  }
+  .request-call-number-note {
+    padding: 12px;
+    font-size: 12px;
+  }
+}

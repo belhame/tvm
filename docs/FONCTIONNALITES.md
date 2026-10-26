@@ -13,6 +13,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
 | Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
 | Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
+| Numéros de dossier | N° d'intervention / appel TVM unique et commun aux visites ; N° d'appel client distinct, recherché dans le périmètre du compte | Références des centres conservées comme texte et non uniques globalement ; aucun client déduit du numéro |
 | Demande à partir d'une série | Recherche interne du modèle et de la garantie, puis création transactionnelle de la demande et, si nécessaire, de l'équipement et de sa garantie | Création d'équipement administrateur/responsable ; données existantes prioritaires ; cas ambigus ou dates imprécises à compléter explicitement |
 | Suivi et classement SAV | Vues par type d'opération et état, avec compteurs calculés depuis les dossiers accessibles | Les états web ne constituent pas une conversion automatique de tous les anciens codes WINDEV |
 | Arrivée et durée de suivi | Arrivée explicite, jours cumulés du lundi au vendredi, alerte après 48 heures et compteur figé à la clôture | Samedi/dimanche exclus ; ni calendrier de jours fériés ni plages d'heures de bureau ; arrivée ancienne inconnue conservée comme telle |
@@ -38,9 +39,11 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 | Administrateur | Création et modification des données métier ; gestion des comptes et de leurs rôles |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
 | Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
-| Client | Lecture seule des ressources de sa société ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
+| Client | Lecture seule des ressources de sa société, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
+
+Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
 
 ## Catégories et historique SAV
 

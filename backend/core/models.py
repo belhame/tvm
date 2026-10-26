@@ -2,7 +2,7 @@ import secrets
 
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models.functions import Lower
 from django.utils import timezone
 
@@ -87,6 +87,13 @@ class ReferencedModel(LegacyModel):
         return super().save(*args, **kwargs)
 
 
+class RequestNumberSequence(models.Model):
+    year = models.PositiveSmallIntegerField(primary_key=True)
+    last_value = models.PositiveIntegerField(default=0)
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(last_value__lte=99999), name='request_number_sequence_maximum')]
+
+
 class ServiceRequest(ReferencedModel):
     class ServiceLocation(models.TextChoices):
         UNKNOWN = '', 'Non renseigné'
@@ -156,12 +163,22 @@ class ServiceRequest(ReferencedModel):
         ]
     def __str__(self):
         return self.reference
+    @transaction.atomic
     def save(self, *args, **kwargs):
         # The pre-save lifecycle handler must persist its closure timestamp even
         # when a status-only workflow update supplies update_fields.
         if kwargs.get('update_fields'):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
-        return super().save(*args, **kwargs)
+        allocated = not self.reference
+        if allocated:
+            from .request_numbering import next_request_number
+            self.reference = next_request_number()
+        try:
+            return super().save(*args, **kwargs)
+        except Exception:
+            if allocated:
+                self.reference = ''
+            raise
 
 
 class Intervention(ReferencedModel):

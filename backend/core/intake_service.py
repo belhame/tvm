@@ -225,7 +225,9 @@ def _perform_intake(data, *, actor, fingerprint):
         return _replay(previous, actor, fingerprint)
 
     supplied_equipment_id = data.get('equipment')
-    equipment_qs = Equipment.objects.select_for_update().select_related('client')
+    # Keep concurrent intakes serialized while permitting FK KEY SHARE locks
+    # from another request waiting behind the annual call-number allocation.
+    equipment_qs = Equipment.objects.select_for_update(no_key=True).select_related('client')
     if supplied_equipment_id:
         equipment = equipment_qs.filter(pk=supplied_equipment_id).first()
         if equipment is None or equipment.serial_number.lower() != data['serial_number'].lower():

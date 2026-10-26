@@ -35,6 +35,7 @@ def _styles():
         'head': ParagraphStyle('TVMHead', fontName='TVM-Bold', fontSize=15, leading=19, alignment=1, textColor=colors.black),
         'section': ParagraphStyle('TVMSection', fontName='TVM-Bold', fontSize=8, leading=10, alignment=1, textColor=colors.white),
         'danger': ParagraphStyle('TVMDanger', fontName='TVM-Bold', fontSize=8, leading=10.2, textColor=colors.HexColor('#ad172e')),
+        'number': ParagraphStyle('TVMNumber', fontName='TVM-Bold', fontSize=10, leading=13, textColor=INK),
     }
 
 
@@ -109,11 +110,19 @@ def _document(output, title, reference):
     return document, footer
 
 
-def _header(title, reference, date, styles):
+def _header(title, reference, date, styles, *, client_reference='', visit_reference=None):
     header = _table([[TVMMark(), _p(title, styles, 'head')]], [140, WIDTH - 140], grid=False, padding=0)
-    call = _table([[_p('Appel', styles, 'white'), _p(reference, styles), _p('Date', styles, 'white'), _p(_date(date), styles)]], [22 * mm, 71 * mm, 22 * mm, 71 * mm])
-    call.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, 0), BLUE), ('BACKGROUND', (2, 0), (2, 0), BLUE)]))
-    return [header, Spacer(1, 4), call, Spacer(1, 6)]
+    numbers = _table([
+        [_p('N° d’intervention / appel TVM', styles, 'white'), _p(reference, styles, 'number')],
+        [_p('N° d’appel client', styles, 'white'), _p(client_reference, styles, 'number')],
+    ], [55 * mm, 131 * mm])
+    numbers.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, -1), BLUE)]))
+    if visit_reference is not None:
+        metadata = _table([[_p('Date', styles, 'white'), _p(_date(date), styles), _p('Réf. de visite', styles, 'white'), _p(visit_reference, styles)]], [18 * mm, 50 * mm, 28 * mm, 90 * mm])
+        metadata.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, 0), BLUE), ('BACKGROUND', (2, 0), (2, 0), BLUE)]))
+    else:
+        metadata = _fields([('Date', _date(date))], styles, [18 * mm, 168 * mm])
+    return [header, Spacer(1, 4), numbers, metadata, Spacer(1, 6)]
 
 
 def _check(label, value, styles):
@@ -138,7 +147,8 @@ def intervention_report(intervention):
     equipment, client = request.equipment, request.equipment.client
     output = BytesIO()
     document, footer = _document(output, 'Rapport d’intervention', intervention.reference)
-    story = _header('Rapport d’intervention', request.reference, intervention.performed_on, styles)
+    story = _header('Rapport d’intervention', request.reference, intervention.performed_on, styles,
+                    client_reference=request.client_reference, visit_reference=intervention.reference)
     company = _table([
         [_p('SOCIÉTÉ', styles, 'white'), _p(client.name, styles), _p('Contact', styles, 'white'), _p(intervention.contact_name or request.contact_name or client.contact_name, styles)],
         [_p('Client final', styles, 'white'), _p(intervention.end_customer or request.end_customer, styles), _p('Ville', styles, 'white'), _p(client.city, styles)],
@@ -177,7 +187,7 @@ def intervention_report(intervention):
     story += [columns, Spacer(1, 6), summary_box, Spacer(1, 6), _bar('VALIDATION', styles), validation, Spacer(1, 5), _p('Cases : [X] cochée ; [ ] non cochée ; [-] non renseignée. Aucun contrôle absent n’est présumé réalisé.', styles, 'small')]
     if intervention.status != 'completed':
         story.append(_p('RAPPORT PROVISOIRE — intervention non terminée.', styles, 'small'))
-    story.append(_p(f'{INTERVENTION_KINDS.get(intervention.kind, "Intervention")} · {intervention.reference} · État : {intervention.get_status_display()}', styles, 'small'))
+    story.append(_p(f'Réf. de visite : {intervention.reference} · {INTERVENTION_KINDS.get(intervention.kind, "Intervention")} · État : {intervention.get_status_display()}', styles, 'small'))
     details = [('Référence client', request.client_reference), ('Arrivée du matériel', _date(request.arrived_at, True) if request.arrived_at else ''), ('Clôture du dossier', _date(request.closed_at, True) if request.closed_at else ''), ('Signalement', request.description or request.subject), ('Date planifiée', _date(intervention.scheduled_at, True) if intervention.scheduled_at else ''), ('Diagnostic', intervention.diagnosis), ('Travaux réalisés', intervention.work_done), ('Recommandations', intervention.recommendations), ('Synthèse intégrale', synthesis if len(synthesis or '') > 400 else ''), ('Précisions de conclusion', intervention.conclusion_notes), ('Site de l’opération', intervention.site or equipment.location), ('Téléphone du contact', intervention.contact_phone or request.contact_phone or client.phone)]
     for section in report_checklists(intervention.structured_data):
         if section['comment']:
@@ -203,7 +213,7 @@ def service_request_report(request, *, now=None):
     output = BytesIO()
     document, footer = _document(output, 'Fiche de suivi SAV', request.reference)
     client, equipment = request.equipment.client, request.equipment
-    story = _header('Fiche de suivi SAV', request.reference, request.created_at, styles)
+    story = _header('Fiche de suivi SAV', request.reference, request.created_at, styles, client_reference=request.client_reference)
     timing = request_timing(request.arrived_at, request.closed_at, request.status, now=now)
     elapsed = 'Inconnu' if timing['elapsed_hours'] is None else f'{timing["elapsed_hours"]:.2f} heures ouvrées · {timing["elapsed_days"]} jour(s) ouvré(s)'
     state = {'unknown': 'Arrivée / clôture non suffisamment renseignée', 'running': 'En cours', 'closed': 'Arrêté à la clôture'}[timing['timer_state']]
@@ -256,7 +266,7 @@ def service_request_report(request, *, now=None):
     if interventions.exists():
         story += [Spacer(1, 7), _bar('INTERVENTIONS ET RAPPORTS ASSOCIÉS', styles)]
         for intervention in interventions:
-            story += [_p(f'{intervention.reference} · {INTERVENTION_KINDS.get(intervention.kind, intervention.kind)} · {intervention.get_status_display()}', styles), _p(f'Rapport détaillé : /api/interventions/{intervention.pk}/report/', styles, 'small')]
+            story += [_p(f'Réf. de visite : {intervention.reference} · {INTERVENTION_KINDS.get(intervention.kind, intervention.kind)} · {intervention.get_status_display()}', styles), _p(f'Rapport détaillé : /api/interventions/{intervention.pk}/report/', styles, 'small')]
             for title, value in [('Diagnostic', intervention.diagnosis), ('Travaux réalisés', intervention.work_done), ('Recommandations', intervention.recommendations), ('Synthèse', intervention.summary), ('Conclusion', intervention.conclusion_notes)]:
                 if value:
                     story += [_p(title, styles), _p(value, styles)]

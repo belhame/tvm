@@ -115,6 +115,8 @@ def record_change(sender, instance, created, raw=False, update_fields=None, **kw
                     if section == 'maintenance' and current_section.get('battery_replaced_count') != previous_section.get('battery_replaced_count'):
                         details.append(f'Batteries remplacées : {current_section.get("battery_replaced_count", 0)}.')
         if sender is ServiceRequest and not created:
+            if 'client_reference' in changed:
+                details.append(f'Numéro d’appel client : {old.get("client_reference") or "non renseigné"} → {instance.client_reference or "non renseigné"}.')
             if 'assigned_technician' in changed:
                 assigned = instance.assigned_technician
                 assigned_name = (assigned.get_full_name() or assigned.username) if assigned else 'Non affecté'

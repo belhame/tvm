@@ -89,6 +89,7 @@ import RequestDossier from "./RequestDossier";
 import OperationTimeline from "./OperationTimeline";
 import InterventionWorksheet from "./InterventionWorksheet";
 import RequestReceptionFields from "./RequestReceptionFields";
+import CallReference, { callIdentity, callPrimary } from "./CallReference";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -650,8 +651,10 @@ function EditForm({
             : config.button
       }
       subtitle={
-        modal.record?.reference ||
-        "Les données sont enregistrées dans la base partagée."
+        modal.record && ["requests", "interventions"].includes(modal.resource)
+          ? `${user.role === "client" ? callPrimary(modal.record, user.role, modal.resource === "interventions") : `N° d’appel TVM ${callIdentity(modal.record, modal.resource === "interventions").tvm || "non renseigné"}`}${modal.resource === "interventions" ? ` · Référence de visite ${modal.record.reference}` : ""}`
+          : modal.record?.reference ||
+            "Les données sont enregistrées dans la base partagée."
       }
       onClose={onClose}
       wide
@@ -852,6 +855,9 @@ function EditForm({
             {modal.resource === "requests" && (
               <RequestReceptionFields
                 value={values}
+                callNumber={
+                  modal.record ? callIdentity(modal.record).tvm : undefined
+                }
                 onChange={updateField}
                 readonly={readonly}
                 includeClosure
@@ -863,6 +869,23 @@ function EditForm({
                 {sourceEquipment && (
                   <div className="request-dossier-card">
                     <dl className="request-dossier-facts">
+                      <div>
+                        <dt>N° d’appel TVM</dt>
+                        <dd>
+                          {sourceRequest
+                            ? callIdentity(sourceRequest).tvm
+                            : "Non renseigné"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>N° d’appel client</dt>
+                        <dd>
+                          {sourceRequest
+                            ? callIdentity(sourceRequest).client ||
+                              "Non renseigné"
+                            : "Non renseigné"}
+                        </dd>
+                      </div>
                       <div>
                         <dt>Ancien numéro de série</dt>
                         <dd>{sourceEquipment.serial_number}</dd>
@@ -1065,7 +1088,11 @@ function RecordTable({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key}>{c.label}</th>
+              <th key={c.key}>
+                {c.key === "call_number" && user.role === "client"
+                  ? "Votre n° d’appel client / TVM"
+                  : c.label}
+              </th>
             ))}
             <th className="action-cell">
               <span className="sr-only">Actions</span>
@@ -1085,7 +1112,16 @@ function RecordTable({
                 const val = row[c.key];
                 return (
                   <td key={c.key}>
-                    {c.type === "status" ? (
+                    {c.key === "call_number" &&
+                    (resource === "requests" ||
+                      resource === "interventions") ? (
+                      <CallReference
+                        record={row}
+                        role={user.role}
+                        visit={resource === "interventions"}
+                        compact
+                      />
+                    ) : c.type === "status" ? (
                       <Badge
                         value={val}
                         label={
@@ -1159,7 +1195,7 @@ function RecordTable({
                     className="icon-button row-action"
                     title={
                       resource === "interventions"
-                        ? "Voir l’intervention"
+                        ? "Ouvrir la visite de ce dossier"
                         : canManage(user, resource, row)
                           ? "Modifier"
                           : "Consulter"
@@ -1711,7 +1747,7 @@ function Dashboard({
                     </span>
                   </div>
                   <div>
-                    <strong>{r.reference}</strong>
+                    <CallReference record={r} role={user.role} visit compact />
                     <span>
                       {r.client_name} ·{" "}
                       {r.equipment_model || r.equipment_serial}
@@ -1843,7 +1879,7 @@ function InterventionDetail({
               <Wrench size={21} />
             </span>
             <div>
-              <h2>{record.reference}</h2>
+              <CallReference record={record} role={user.role} visit />
               <p>{request?.subject || "Maintenance de votre onduleur"}</p>
             </div>
           </div>
@@ -2207,7 +2243,7 @@ function Planning({
                     <CalendarDays size={18} />
                     {dateFR(r.scheduled_at, true)}
                   </span>
-                  <strong>{r.reference}</strong>
+                  <CallReference record={r} role={user.role} visit compact />
                   <span>{r.client_name}</span>
                   <span>{r.technician_name || "Non assigné"}</span>
                   <Badge value={r.status} />
@@ -2251,7 +2287,12 @@ function Planning({
                             { hour: "2-digit", minute: "2-digit" },
                           )}
                         </time>
-                        <strong>{r.reference}</strong>
+                        <CallReference
+                          record={r}
+                          role={user.role}
+                          visit
+                          compact
+                        />
                         <span>{r.client_name}</span>
                         <small>{r.technician_name || "Non assigné"}</small>
                       </button>
@@ -2279,7 +2320,7 @@ function Planning({
               onClick={() => onIntervention(r)}
             >
               <Clock3 size={18} />
-              <strong>{r.reference}</strong>
+              <CallReference record={r} role={user.role} visit compact />
               <span>{r.client_name}</span>
               <Badge value={r.status} />
               <ChevronRight size={17} />
@@ -2293,9 +2334,11 @@ function Planning({
 
 function Reports({
   data,
+  user,
   onIntervention,
 }: {
   data: DataMap;
+  user: User;
   onIntervention: (r: RecordData) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -2327,7 +2370,7 @@ function Reports({
               value={search}
               aria-label="Rechercher un rapport"
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un numéro, un client, un équipement…"
+              placeholder="N° d’appel TVM, n° d’appel client, référence de visite…"
             />
           </div>
         </div>
@@ -2343,7 +2386,7 @@ function Reports({
                   className="report-title"
                   onClick={() => onIntervention(r)}
                 >
-                  <strong>Rapport · {r.reference}</strong>
+                  <CallReference record={r} role={user.role} visit />
                   <span>
                     {r.client_name} · {r.equipment_model || r.equipment_serial}
                   </span>
@@ -2382,11 +2425,13 @@ function Reports({
 
 function GlobalSearch({
   query,
+  user,
   onClose,
   onNavigate,
   onIntervention,
 }: {
   query: string;
+  user: User;
   onClose: () => void;
   onNavigate: (p: string, q?: string) => void;
   onIntervention: (r: RecordData) => void;
@@ -2395,10 +2440,21 @@ function GlobalSearch({
     [busy, setBusy] = useState(true),
     [error, setError] = useState("");
   useEffect(() => {
-    api(`search/?q=${encodeURIComponent(query)}`)
-      .then(setResults)
-      .catch((err) => setError(err.message))
-      .finally(() => setBusy(false));
+    const controller = new AbortController();
+    setBusy(true);
+    setError("");
+    setResults({});
+    api(`search/?q=${encodeURIComponent(query)}`, { signal: controller.signal })
+      .then((value) => {
+        if (!controller.signal.aborted) setResults(value);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(err.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBusy(false);
+      });
+    return () => controller.abort();
   }, [query]);
   return (
     <Modal
@@ -2443,9 +2499,19 @@ function GlobalSearch({
                       )}
                     </span>
                     <div>
-                      <strong>
-                        {row.name || row.serial_number || row.reference}
-                      </strong>
+                      {resource === "requests" ||
+                      resource === "interventions" ? (
+                        <CallReference
+                          record={row}
+                          role={user.role}
+                          visit={resource === "interventions"}
+                          compact
+                        />
+                      ) : (
+                        <strong>
+                          {row.name || row.serial_number || row.reference}
+                        </strong>
+                      )}
                       <span>
                         {row.model ||
                           row.subject ||
@@ -2838,7 +2904,11 @@ export default function App() {
               aria-label="Recherche globale"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Rechercher un numéro de série, un client, une intervention…"
+              placeholder={
+                user.role === "client"
+                  ? "Rechercher votre n° d’appel client, un n° TVM, une série…"
+                  : "Rechercher un n° d’appel TVM, un n° d’appel client, une série…"
+              }
             />
             <kbd>↵</kbd>
           </form>
@@ -2929,7 +2999,7 @@ export default function App() {
           ) : allowedPage === "planning" ? (
             <Planning {...common} />
           ) : allowedPage === "reports" ? (
-            <Reports data={data} onIntervention={setDetail} />
+            <Reports data={data} user={user} onIntervention={setDetail} />
           ) : allowedPage === "contracts" ? (
             <>
               <div className="page-heading">
@@ -3096,7 +3166,11 @@ export default function App() {
       {currentRequestDetail && (
         <Modal
           title="Dossier SAV"
-          subtitle={currentRequestDetail.reference}
+          subtitle={
+            user.role === "client"
+              ? callPrimary(currentRequestDetail, user.role)
+              : `N° d’appel TVM ${callIdentity(currentRequestDetail).tvm || "non renseigné"}`
+          }
           onClose={closeRequestDetail}
           wide
         >
@@ -3150,6 +3224,7 @@ export default function App() {
       {searchQuery && (
         <GlobalSearch
           query={searchQuery}
+          user={user}
           onClose={closeSearch}
           onNavigate={navigate}
           onIntervention={setDetail}

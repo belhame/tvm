@@ -10,6 +10,7 @@ import {
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import { requestCategories, requestStatusLabels, statuses } from "./resources";
 import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
+import { callIdentity, callPrimary } from "./CallReference";
 
 export type RequestCategoryCount = {
   key: string;
@@ -178,7 +179,11 @@ export default function RequestsWorkspace({
               aria-label="Rechercher une demande"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Référence, client, numéro de série ou objet…"
+              placeholder={
+                user.role === "client"
+                  ? "Rechercher votre n° d’appel client, un n° TVM, une série…"
+                  : "N° d’appel TVM, n° d’appel client, client, série ou objet…"
+              }
             />
           </div>
           <button type="submit" className="button secondary small">
@@ -213,7 +218,16 @@ export default function RequestsWorkspace({
             <table>
               <thead>
                 <tr>
-                  <th>N° de dossier / objet</th>
+                  <th>
+                    {user.role === "client"
+                      ? "N° d’appel client"
+                      : "N° d’appel TVM"}
+                  </th>
+                  <th>
+                    {user.role === "client"
+                      ? "N° d’appel TVM"
+                      : "N° d’appel client"}
+                  </th>
                   <th>Client</th>
                   <th>Équipement</th>
                   <th>Date d’arrivée</th>
@@ -236,9 +250,14 @@ export default function RequestsWorkspace({
                   >
                     <td>
                       <div className="primary-cell">
-                        <span>{row.reference}</span>
+                        <span>{callPrimary(row, user.role)}</span>
                         <small>{row.subject}</small>
                       </div>
+                    </td>
+                    <td className="request-client-reference">
+                      {user.role === "client"
+                        ? callIdentity(row).tvm || "Non renseigné"
+                        : callIdentity(row).client || "Non renseigné"}
                     </td>
                     <td>{row.client_name}</td>
                     <td>

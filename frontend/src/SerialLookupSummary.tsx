@@ -9,7 +9,8 @@ import {
   ShieldCheck,
   Wrench,
 } from "lucide-react";
-import { dateFR } from "./api";
+import { dateFR, type User } from "./api";
+import CallReference from "./CallReference";
 
 export type SerialLookupProduct = {
   id: number;
@@ -301,9 +302,11 @@ function Fact({
 export default function SerialLookupSummary({
   result,
   candidate,
+  role = "manager",
 }: {
   result: SerialLookupResult;
   candidate?: SerialLookupCandidate | null;
+  role?: User["role"];
 }) {
   const product =
     candidate ??
@@ -629,7 +632,7 @@ export default function SerialLookupSummary({
                 {result.history.requests.map((request) => (
                   <li key={request.id}>
                     <div>
-                      <strong>{request.reference}</strong>
+                      <CallReference record={request} role={role} compact />
                       <span className="badge">
                         {requestStatuses[request.status] || request.status}
                       </span>
@@ -655,16 +658,20 @@ export default function SerialLookupSummary({
                 {result.history.interventions.map((intervention) => (
                   <li key={intervention.id}>
                     <div>
-                      <strong>{intervention.reference}</strong>
+                      <CallReference
+                        record={intervention}
+                        role={role}
+                        visit
+                        compact
+                      />
                       <span className="badge">
                         {interventionStatuses[intervention.status] ||
                           intervention.status}
                       </span>
                     </div>
                     <p>
-                      {intervention.request_reference}
                       {intervention.technician_name
-                        ? ` · ${intervention.technician_name}`
+                        ? intervention.technician_name
                         : ""}
                     </p>
                     <span>

@@ -1,5 +1,27 @@
 # Suivre les demandes et l'historique SAV
 
+## Identifier un dossier avec les deux numéros
+
+Le **N° d'intervention / appel TVM** est le numéro métier du dossier SAV. Il reste commun à toutes les visites et opérations de ce dossier. Le **N° d'appel client** est la référence donnée par le centre SAV ou l'organisation qui confie la réparation à TVM.
+
+| Référence | Rôle |
+|---|---|
+| N° d'intervention / appel TVM | Numéro unique du dossier dans TVM, attribué par le serveur |
+| N° d'appel client | Référence du dossier chez le centre client, saisie comme du texte |
+| Réf. de visite `INT-…` | Référence secondaire d'une visite ou fiche d'intervention liée au dossier |
+
+Un dossier peut avoir plusieurs visites : elles gardent le même numéro TVM, avec des références de visite distinctes. Les visites ne sont pas fusionnées pour obtenir un seul numéro métier.
+
+Pour les nouvelles demandes, le serveur attribue un numéro **`YY-NNNNN`**, par exemple `26-00123` dans un exemple entièrement fictif. L'année est celle du fuseau de l'application. Les anciennes références restent inchangées ; la mise à jour ne renumérote pas les anciens dossiers.
+
+Le numéro du centre peut contenir des zéros initiaux, lettres, barres obliques et tirets, par exemple `0007/DEMO-AB` pour une référence entièrement fictive. Ne pas le convertir en nombre. Deux centres peuvent utiliser la même référence : elle ne permet pas de déduire le client ni de réunir automatiquement leurs dossiers.
+
+Lors d'une nouvelle demande, sélectionner le centre client et renseigner son numéro dans **N° d'appel client**. Le numéro TVM est attribué à l'enregistrement ; il ne remplace pas la référence du centre.
+
+L'équipe interne peut rechercher un dossier par l'un ou l'autre numéro. Dans le portail client, la recherche met en avant le **N° d'appel client** du centre ; le client n'a pas besoin de connaître la référence TVM pour retrouver son dossier. Les résultats restent limités à la société du compte connecté, même si un autre centre utilise le même numéro. Si plusieurs dossiers correspondent, utiliser le matériel et les autres informations affichées pour les distinguer.
+
+Les deux PDF présentent clairement **N° d'intervention / appel TVM** et **N° d'appel client**. Les `INT-…` y figurent sous **Réf. de visite**. Une référence client absente reste **Non renseigné**.
+
 ## Retrouver les dossiers
 
 Le suivi SAV utilise les dossiers enregistrés dans la base commune. Les vues par type d'opération et par état servent à retrouver les demandes à traiter, les échanges, les mises en service et les opérations préventives. Les compteurs sont calculés sur le serveur à partir des données accessibles au compte connecté.
@@ -104,7 +126,7 @@ Le PDF utilise les cadres et rubriques du modèle fourni, avec une identité typ
 
 ## Fiche de suivi et documents du dossier
 
-L'onglet **Suivi** rassemble aussi les informations d'accueil du dossier : **N° d'appel client / référence client**, client final, arrivée et clôture, retour, emballage, lieu Atelier / Dépôt / Sur site, livraison par Livreur / Client, nom du livreur, accessoires et contact. La référence client est un identifiant externe ; elle ne déclenche pas un appel téléphonique ou une notification.
+L'onglet **Suivi** rassemble aussi les informations d'accueil du dossier : **N° d'appel client**, client final, arrivée et clôture, retour, emballage, lieu Atelier / Dépôt / Sur site, livraison par Livreur / Client, nom du livreur, accessoires et contact. La référence client est le numéro du centre qui confie la réparation ; elle ne déclenche pas un appel téléphonique ou une notification.
 
 L'appréciation Garantie / Devis / Contrat / Hors garantie est une information de suivi renseignée par l'équipe. Elle ne déclenche pas une décision automatique de prise en charge ou de facturation. Les données manquantes restent à compléter ; les informations d'un dossier ou d'un modèle privé ne sont pas recopiées comme valeurs par défaut.
 
@@ -130,6 +152,8 @@ Pour arrêter l'utilisation sans perdre le suivi, l'administrateur peut **désac
 ## Mettre à jour une installation Windows
 
 Arrêter l'application avec `ARRETER_TVM.cmd`. Remplacer les sources dans le dossier TVM déjà utilisé, en conservant **`.env`, `.local` et les données Docker**, puis relancer `INSTALLER_TVM.cmd` pour reconstruire l'application et appliquer les migrations.
+
+La nouvelle numérotation s'applique aux prochaines demandes. Les références déjà enregistrées, les numéros des centres et les visites existantes restent conservés ; la mise à jour ne doit pas les reformater pour leur donner l'apparence des nouveaux numéros.
 
 Un nouveau dossier extrait n'est pas une nouvelle base indépendante. Si vous changez de dossier, récupérer d'abord la configuration de l'installation existante selon [le guide Windows](INSTALLATION_WINDOWS.md#mettre-à-jour-lapplication-sans-perdre-la-configuration). Ne pas supprimer les volumes Docker pour obtenir les nouvelles vues ou l'historique.
 

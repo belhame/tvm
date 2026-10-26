@@ -200,3 +200,21 @@ class PDFFormTests(TestCase):
         text = ' '.join(self.text(intervention_report(intervention)).split())
         self.assertIn('CONTACT-CLIENT-FALLBACK', text)
         self.assertIn('PHONE-CLIENT-FALLBACK', text)
+
+    @skipUnless(shutil.which('pdftotext'), 'Poppler requis pour contrôler les numéros réellement imprimés.')
+    def test_both_call_numbers_are_explicit_and_client_reference_preserves_zeroes_and_hyphens(self):
+        request = ServiceRequest.objects.get(pk=self.request.pk)
+        request.reference = '26-00042'
+        request.client_reference = '0000-CLIENT-007'
+        intervention = Intervention.objects.get(pk=self.intervention.pk)
+        intervention.service_request = request
+        for data in [intervention_report(intervention), service_request_report(request)]:
+            text = ' '.join(self.text(data).split())
+            self.assertIn('N° d’intervention / appel TVM 26-00042', text)
+            self.assertIn('N° d’appel client 0000-CLIENT-007', text)
+            self.assertIn(f'Réf. de visite : {intervention.reference}', text)
+        request.client_reference = ''
+        for data in [intervention_report(intervention), service_request_report(request)]:
+            text = ' '.join(self.text(data).split())
+            self.assertIn('N° d’appel client Non renseigné', text)
+            self.assertNotIn('N° d’appel client 26-00042', text)

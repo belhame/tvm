@@ -11,8 +11,8 @@ Application React TypeScript (frontend) + Django 5.2 / Django REST Framework (ba
 Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création POST, modification PATCH. Réponses d'erreur JSON, code HTTP conservé.
 - `/api/clients/` : `id,name,contact_name,email,phone,address,city,postal_code,country,legacy_id`.
 - `/api/equipment/` : `id,client,client_name,serial_number,brand,model,power_kva,location,commissioned_on,manufactured_on,catalogue_product,warranty_until,status,legacy_id`. Statuts `active,maintenance,inactive`. `manufactured_on` et `catalogue_product` sont en lecture seule dans ce CRUD ; leur création contrôlée passe par le parcours d'admission SAV. `catalogue_product` est absent des réponses du portail client.
-- `/api/requests/` : `id,reference,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,created_at,legacy_id,intake_key,intake_data`. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `assigned_technician_name`, `timing`, `category`, `is_overdue` et `is_due_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
-- `/api/interventions/` : `id,reference,service_request,request_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
+- `/api/requests/` : `id,reference,call_number,equipment,equipment_serial,client_name,subject,description,priority,status,assigned_technician,assigned_technician_name,due_on,arrived_at,closed_at,timing,category,is_overdue,is_due_overdue,created_at,legacy_id,intake_key,intake_data`, complétés par les champs de suivi, dont `client_reference`, ci-dessous. Priorités `low,normal,high,urgent`. Statuts métier `new,maintenance,testing,resolved,quotation,pending,approved,rejected,exchange,closed` ; les anciennes valeurs `scheduled` et `in_progress` restent acceptées pour compatibilité et sont classées respectivement dans `pending` et `maintenance`. `call_number`, `assigned_technician_name`, `timing`, `category`, `is_overdue` et `is_due_overdue` sont calculés en lecture seule. Les métadonnées d'admission `intake_key` et `intake_data` sont en lecture seule et absentes du portail client.
+- `/api/interventions/` : `id,reference,service_request,request_reference,call_number,client_reference,equipment_serial,equipment_model,client_name,technician,technician_name,scheduled_at,duration_minutes,status,diagnosis,work_done,recommendations,internal_notes,completed_at,created_at,legacy_id`, complétés par les champs de fiche structurée ci-dessous. `request_reference`, `call_number` et `client_reference` sont des valeurs liées en lecture seule. Statuts `scheduled,in_progress,testing,completed,cancelled`. Les notes internes sont absentes du portail client. PDF : `GET /api/interventions/{id}/report/`. Pièces utilisées : `POST /api/interventions/{id}/use-part/` avec `{part,quantity}`.
 - `/api/users/` : admin CRUD `id,username,first_name,last_name,email,role,client,is_active,password` (password écriture seulement). Autres internes : lecture liste limitée aux employés actifs pour affectation, aucun compte client. Client : interdit.
 - `/api/parts/` : `id,sku,name,category,unit_price,stock_quantity,min_stock,legacy_id`. Quantité initiale zéro ; le stock s'ajuste via mouvements. Catégories `battery,board,ventilation,other`.
 - `/api/stock-movements/` : `id,part,part_name,quantity,kind,reference,intervention,created_at` ; POST atomique (quantité signée : entrée positive, sortie négative) sans stock négatif. Types `in,out,adjustment`.
@@ -24,6 +24,20 @@ Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création P
 - `/api/search/?q=...` : recherche autorisée `{equipment,clients,requests,interventions}`.
 - `POST /api/serial-analysis/` : analyse consultative du format Eaton décrit dans le classeur fourni, avec `{serial_number: string}` (1–120 caractères), session et CSRF obligatoires. Réponse `{status: "matches" | "not_applicable", normalized_serial_number, rule_id, source, segments: null | {manufacturing_location_code, product_identification_code, year_code, week_code, week_number, unit_order_code}, calendar_year: null, warnings: string[]}`. Aucune recherche d'équipement ni écriture ; un résultat compatible n'authentifie pas le matériel. Voir [les règles et leurs limites](NUMEROS_SERIE_EATON.md).
 - `/api/dashboard/` : `{metrics:{active_interventions,open_requests,critical_stock,equipment_count,client_count,completed_interventions},recent_interventions:[],activity:[{label,interventions,requests}],status_distribution:[{name,value}],upcoming:[]}`. Données réellement en base et filtrées par utilisateur.
+
+## Numéro TVM, référence du centre client et visites
+
+Le numéro métier du dossier est `ServiceRequest.reference`, également exposé en lecture seule sous `call_number`. Il correspond au libellé **N° d'intervention / appel TVM** et reste commun aux visites liées par `Intervention.service_request`. `Intervention.reference` demeure la **Réf. de visite** secondaire `INT-…` ; aucune fusion des visites n'est effectuée. Sur une visite, `request_reference` et `call_number` reflètent le numéro du dossier, et `client_reference` reflète sa référence centre.
+
+Les nouvelles demandes reçoivent un numéro `YY-NNNNN`, année locale selon `TVM_TIMEZONE`, séquence annuelle sur cinq chiffres. L'allocation est transactionnelle, avec verrouillage de la séquence en PostgreSQL. Le plus grand numéro déjà stocké au format exact du même préfixe annuel est réservé pour éviter une collision. Les anciennes références ne sont pas modifiées. La séquence ne prend aucune valeur depuis une capture d'écran ou un exemple documentaire.
+
+Après `99999`, la création est refusée avec HTTP `400` pour intervention administrative ; il n'y a ni bouclage ni passage implicite à six chiffres. Le client API ne choisit pas ce numéro serveur. Un rejeu idempotent de l'admission conserve le même dossier et le même numéro.
+
+`client_reference` est une chaîne de 120 caractères maximum représentant le numéro du centre SAV ou de l'organisation cliente. Zéros initiaux, lettres, `/` et `-` sont conservés comme texte. Ce champ n'est pas unique globalement : une même référence peut appartenir à plusieurs centres. Il ne remplace ni la clé primaire, ni le numéro TVM, ni la relation client qui définit les droits.
+
+`GET /api/requests/` et `GET /api/interventions/` acceptent les filtres `call_number` et `client_reference`, ainsi que `q`, limités à 200 caractères. Ces filtres recherchent des fragments sans distinction de casse, dans le périmètre autorisé. La recherche globale `GET /api/search/?q=...` inclut les deux numéros ; avec un seul caractère, seuls les numéros exactement correspondants sont recherchés, sans recherche générale par fragment. À partir de deux caractères, les recherches générales par fragment restent disponibles.
+
+Les relations client sont appliquées avant la recherche : un compte de centre ne découvre pas le dossier d'un autre centre possédant le même numéro. Aucun client n'est déduit du préfixe ou du contenu d'une référence. Voir [le guide des deux numéros](GUIDE_SUIVI_SAV.md#identifier-un-dossier-avec-les-deux-numéros).
 
 ## Catalogue Eaton BN
 
@@ -95,7 +109,7 @@ Voir [le parcours utilisateur, la règle des six mois et les limites par profil]
 
 ### Catégories et filtres
 
-`GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans la référence, le sujet, la série et le client.
+`GET /api/requests/?category=...` accepte `unassigned`, `maintenance`, `testing`, `overdue`, `processed`, `quotation`, `pending`, `approved`, `rejected`, `exchange`, `closed` ou `all`. Les catégories principales suivent les états du dossier : `unassigned` correspond à `new`, `processed` à `resolved`, `pending` inclut aussi l'ancien `scheduled` et `maintenance` inclut l'ancien `in_progress`. Le paramètre `status` filtre un état exact. `q` recherche dans les deux numéros de dossier, le sujet, la série et le client.
 
 `GET /api/requests/categories/` retourne `{categories: [{key,label,count}], total, as_of}` dans le périmètre autorisé. `overdue` et `is_overdue` correspondent au chronomètre en cours dépassant strictement 48 heures cumulées du lundi au vendredi ; ce n'est pas une valeur de `status`. Ce compteur peut recouper d'autres catégories. `is_due_overdue` décrit séparément le dépassement d'une échéance `due_on` manuelle. `assigned_technician` et `due_on` sont modifiables par administrateur ou responsable via le CRUD des demandes.
 
@@ -121,7 +135,7 @@ Les demandes et leur admission acceptent les champs de suivi ci-dessous, en plus
 
 | Champ | Type et limite |
 |---|---|
-| `client_reference` | Texte, 120 caractères |
+| `client_reference` | N° d'appel du centre client, texte conservé, 120 caractères, sans unicité globale |
 | `end_customer` | Texte, 200 caractères |
 | `return_flag` | Booléen JSON strict |
 | `packaging` | Texte, 250 caractères |
@@ -137,6 +151,8 @@ Les demandes et leur admission acceptent les champs de suivi ci-dessous, en plus
 Ces données sont saisies pour le dossier ; `warranty_status` n'est pas une décision automatique de garantie ou une facturation. Une arrivée future est refusée. Une arrivée ou clôture absente reste inconnue pour le compteur.
 
 `GET /api/requests/{id}/report/` génère la fiche de suivi PDF du dossier autorisé, avec réception, arrivée/clôture, durée calculée, historique public, synthèses et références d'intervention. Cette route est distincte du rapport d'intervention `GET /api/interventions/{id}/report/` ; les informations internes ne sont pas imprimées dans le document partagé. Les deux PDF sont privés et servis avec `Cache-Control: private, no-store`.
+
+Les deux en-têtes affichent **N° d'intervention / appel TVM** (`ServiceRequest.reference`) et **N° d'appel client** (`client_reference`). Les références `INT-…` sont identifiées comme **Réf. de visite**. Une référence client vide est imprimée « Non renseigné » ; les valeurs non vides restent textuelles.
 
 ### Chronologies
 
