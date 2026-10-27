@@ -22,6 +22,8 @@ Le portail permet de demander un enlèvement ; le responsable affecte les transp
 
 Les notifications sont enregistrées dans TVM. Le livreur peut activer son rappel interne de 08:00. Un journal prépare aussi les messages e-mail/WhatsApp du responsable du centre pour les affectations et collectes. **Ces canaux restent désactivés et à connecter** ; les adaptateurs fournis ne relancent pas automatiquement les anciens messages bloqués. Voir [les notifications et leurs réglages](docs/GUIDE_SUIVI_SAV.md#notifications-et-rappels-du-livreur).
 
+L’**Assistant diagnostic** s’appuie sur une bibliothèque technique privée et des retours d’interventions terminées, soumis à validation humaine et filtrés par marque et modèle exacts. La recherche locale fonctionne sans clé IA. L’analyse OpenAI reste à configurer sur le serveur ; elle ne certifie pas une panne et ne modifie aucun dossier automatiquement. Voir [le parcours documents, cas et diagnostic](docs/ASSISTANT_DIAGNOSTIC.md).
+
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 
 ## Essayer la version de démonstration
@@ -51,6 +53,18 @@ Sur une installation neuve, les comptes fictifs sont `admin`, `responsable`, `te
 
 `setup.sh --demo` initialise `.env`, installe les dépendances, démarre PostgreSQL, compile le frontend, applique les migrations et ajoute les données fictives. Un `.env` existant est conservé. Si ce fichier désactive la démo, le script n'y active pas silencieusement les comptes fictifs.
 
+### Activer l’analyse IA, si souhaité
+
+La bibliothèque et sa recherche n’exigent aucune clé. Pour autoriser l’analyse OpenAI, l’administrateur renseigne **uniquement dans le `.env` privé du serveur** `TVM_AI_API_KEY`, `TVM_AI_ENABLED=1`, `TVM_AI_MODEL=gpt-4.1-mini` et `TVM_AI_TIMEOUT=20`. La clé ne doit jamais être placée dans le navigateur, un fichier `VITE_*`, les sources ou une conversation.
+
+Après modification de `.env`, recréer le service Docker pour charger les nouvelles valeurs, depuis le dossier du projet :
+
+```bash
+docker compose --profile container up -d --no-build --force-recreate --wait web
+```
+
+En mode Python local, arrêter Gunicorn puis relancer `bash scripts/start.sh`. Conserver les volumes de données. Une clé renseignée ne prouve pas une connexion réussie ; les appels réels peuvent être payants. `store: false` est demandé à OpenAI sans garantir une rétention nulle. Le [guide de l’assistant](docs/ASSISTANT_DIAGNOSTIC.md#activer-lanalyse-openai-sur-le-serveur) décrit l’activation et les limites.
+
 ## Documents et commandes
 
 | Besoin | Document ou commande |
@@ -64,6 +78,7 @@ Sur une installation neuve, les comptes fictifs sont `admin`, `responsable`, `te
 | Importer le catalogue Eaton BN dans sa propre instance TVM | [Import du catalogue Eaton](docs/IMPORT_CATALOGUE_EATON.md) |
 | Retrouver modèle et garantie depuis la série pendant une nouvelle demande | [Parcours de demande SAV par numéro de série](docs/PARCOURS_DEMANDE_SERIE.md) |
 | Suivre les dossiers, opérations et événements enregistrés | [Guide du suivi SAV et de l'historique](docs/GUIDE_SUIVI_SAV.md) |
+| Ajouter des manuels et retours validés, rechercher puis activer l’IA côté serveur | [Assistant diagnostic](docs/ASSISTANT_DIAGNOSTIC.md) |
 | Voir deux fiches PDF entièrement fictives | [Exemples de fiches](docs/exemples/README.md) |
 | Contrat HTTP des ressources | [API](docs/API_CONTRACT.md) |
 | Résultats des tests et limites vérifiées | [Validation](docs/VALIDATION.md) |

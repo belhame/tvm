@@ -36,6 +36,8 @@ urlpatterns = [
     path('api/catalogue/warranties/', catalogue_views.catalogue_warranties),
     path('api/catalogue/import/', catalogue_views.catalogue_import),
     path('api/clients/import/', client_import),
+    path('api/knowledge/', include('core.knowledge_urls')),
+    path('api/diagnostics/', include('core.diagnostic_urls')),
     path('api/logistics/recognize-serial/', recognize_serial),
     path('api/logistics/', include('core.logistics_urls')),
     path('api/logistics/', include('core.notification_urls')),

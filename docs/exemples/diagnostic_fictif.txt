@@ -1,0 +1,22 @@
+DOCUMENT FICTIF — ESSAI DU PARCOURS, SANS VALEUR TECHNIQUE
+
+Marque de test : TVM-LAB
+Modèle exact de test : MODELE-LAB-1500
+Révision : DEMO-1
+
+Ce texte sert uniquement à essayer l'import, la validation humaine, la
+recherche et les citations de l'assistant PowerCare. Il ne décrit aucun
+produit réel et ne doit servir à aucune réparation ou mesure électrique.
+
+Code défaut fictif LAB01 : autonomie de démonstration réduite.
+Symptôme fictif : une alerte batterie apparaît sur un équipement simulé.
+
+Dans cet essai, l'assistant doit demander le code d'alerte exact, le modèle
+et les constats déjà relevés par le technicien. Le symptôme seul ne permet
+pas de confirmer une cause. La documentation réelle du constructeur et
+la validation d'un technicien habilité sont nécessaires pour tout appareil.
+
+Résultat attendu du test logiciel : la recherche « autonomie batterie »
+pour TVM-LAB / MODELE-LAB-1500 retrouve ce passage seulement après
+approbation du document par un administrateur ou responsable SAV.
+L'archivage doit le retirer des recherches suivantes.

@@ -9,7 +9,7 @@ from .attachment_validation import MAX_FILE_SIZE
 
 
 MAX_MULTIPART_BODY = 11 * 1024 * 1024
-DOCUMENT_UPLOAD = re.compile(r'^/api/requests/[0-9]+/documents/$')
+DOCUMENT_UPLOAD = re.compile(r'^/api/(?:requests/[0-9]+/documents/|knowledge/documents/)$')
 
 
 class BoundedDocumentUploadHandler(FileUploadHandler):

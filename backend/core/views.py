@@ -401,12 +401,13 @@ def search_view(request):
 @permission_classes([InternalPermission])
 def integrations_view(request):
     from .outbox_service import channel_status
+    from .diagnostic_service import diagnostic_status
     whatsapp = channel_status('whatsapp')
     email = channel_status('email')
     return Response({
         'whatsapp': {**whatsapp, 'message': 'Les messages de collecte et de livraison visent le responsable du centre client, selon sa préférence. Configurez et activez WhatsApp Business pour permettre les envois ; leur acceptation réelle se consulte dans le journal. Le rappel personnel de 08:00 reste dans TVM.', 'requirements': ['Compte Meta WhatsApp Business et numéro validé', 'Jeton API et identifiant du numéro dans la configuration privée', 'Modèle approuvé et notifications activées pour le client']},
         'email': {**email, 'message': 'Notifications au responsable du centre via le serveur SMTP configuré et la préférence du client. Le journal distingue les messages en attente, bloqués ou acceptés par le serveur.'},
-        'ai': {'configured': False, 'operational': False, 'status': 'requires_credentials', 'message': 'Assistant non connecté. Aucune réponse de diagnostic n’est simulée et aucun dossier n’est transmis à un fournisseur.', 'requirements': ['Fournisseur et modèle IA approuvés', 'Clé API fournie par canal sécurisé', 'Politique de conservation, localisation et traitement des données', 'Recherche filtrée selon les droits de l’utilisateur et audit des accès']},
+        'ai': {**diagnostic_status(), 'requirements': ['Sources techniques approuvées pour le modèle exact', 'Clé API OpenAI conservée sur le serveur et activation explicite', 'Vérification du traitement des données et du budget fournisseur', 'Saisie technique relue et validation humaine des hypothèses citées']},
         'scanner': {'operational': True, 'requires_https': True, 'message': 'Recherche par numéro de série opérationnelle. Le scan caméra nécessite HTTPS et une caméra autorisée ; prise en charge selon navigateur, saisie manuelle disponible.'},
     })
 

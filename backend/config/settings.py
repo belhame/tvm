@@ -105,3 +105,10 @@ TVM_WHATSAPP_PHONE_ID = os.environ.get('TVM_WHATSAPP_PHONE_ID', '')
 TVM_WHATSAPP_API_VERSION = os.environ.get('TVM_WHATSAPP_API_VERSION', '')
 TVM_WHATSAPP_TEMPLATE = os.environ.get('TVM_WHATSAPP_TEMPLATE', '')
 TVM_WHATSAPP_LANGUAGE = os.environ.get('TVM_WHATSAPP_LANGUAGE', 'fr')
+
+# The local technical library works without a provider. External diagnosis is
+# opt-in and credentials stay on the server, never in frontend configuration.
+TVM_AI_ENABLED = os.environ.get('TVM_AI_ENABLED', '0') == '1'
+TVM_AI_API_KEY = os.environ.get('TVM_AI_API_KEY', '')
+TVM_AI_MODEL = os.environ.get('TVM_AI_MODEL', 'gpt-4.1-mini')
+TVM_AI_TIMEOUT = max(5, min(30, int(os.environ.get('TVM_AI_TIMEOUT', '20'))))

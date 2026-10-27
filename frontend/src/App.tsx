@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   Activity,
+  Bot,
   BookOpen,
   ArrowDownLeft,
   ArrowRight,
@@ -81,6 +82,7 @@ import {
 import Scanner from "./Scanner";
 import SerialAnalysis from "./SerialAnalysis";
 import Integrations from "./Integrations";
+import DiagnosticAssistant from "./DiagnosticAssistant";
 import EatonCatalogue from "./EatonCatalogue";
 import CatalogueModelPicker from "./CatalogueModelPicker";
 import RequestIntake from "./RequestIntake";
@@ -157,6 +159,7 @@ const navGroups = [
     label: "OUTILS",
     items: [
       { id: "scanner", label: "Scanner un équipement", icon: ScanLine },
+      { id: "diagnostic", label: "Assistant diagnostic", icon: Bot },
       { id: "integrations", label: "WhatsApp & assistant IA", icon: PlugZap },
       { id: "users", label: "Comptes & accès", icon: Settings2 },
     ],
@@ -2030,6 +2033,7 @@ function InterventionDetail({
   onClose,
   onEdit,
   onSaved,
+  onDiagnostic,
 }: {
   record: RecordData;
   user: User;
@@ -2037,6 +2041,7 @@ function InterventionDetail({
   onClose: () => void;
   onEdit: (m: ModalState) => void;
   onSaved: () => Promise<void>;
+  onDiagnostic: (requestId: number, interventionId: number) => void;
 }) {
   const [tab, setTab] = useState("suivi"),
     [part, setPart] = useState(""),
@@ -2419,6 +2424,18 @@ function InterventionDetail({
           <FileText size={16} />
           Rapport PDF
         </a>
+        {["admin", "manager", "technician"].includes(user.role) && (
+          <button
+            className="button secondary"
+            onClick={() => {
+              onClose();
+              onDiagnostic(record.service_request, record.id);
+            }}
+          >
+            <Bot size={16} />
+            Assistant diagnostic
+          </button>
+        )}
         {canManage(user, "interventions", record) && (
           <button
             className="button primary"
@@ -2868,7 +2885,11 @@ export default function App() {
     [contractTab, setContractTab] = useState("contracts"),
     [stockTab, setStockTab] = useState("parts"),
     [logoutBusy, setLogoutBusy] = useState(false),
-    [toast, setToast] = useState("");
+    [toast, setToast] = useState(""),
+    [diagnosticContext, setDiagnosticContext] = useState<{
+      requestId?: number;
+      interventionId?: number;
+    }>({});
   useEffect(() => {
     api("session/")
       .then((s) => {
@@ -3013,6 +3034,7 @@ export default function App() {
     setDetail(null);
     setRequestDetail(null);
     setRequestCounts(null);
+    setDiagnosticContext({});
     setModal(null);
     setSearchQuery("");
     setQuery("");
@@ -3561,8 +3583,26 @@ export default function App() {
             />
           ) : allowedPage === "catalogue" ? (
             <EatonCatalogue user={user} />
+          ) : allowedPage === "diagnostic" ? (
+            <DiagnosticAssistant
+              key={`${user.id}:${diagnosticContext.requestId || ""}:${diagnosticContext.interventionId || ""}`}
+              user={user}
+              requests={data.requests || []}
+              equipment={data.equipment || []}
+              interventions={data.interventions || []}
+              Dialog={Modal}
+              initialRequestId={diagnosticContext.requestId}
+              initialInterventionId={diagnosticContext.interventionId}
+            />
           ) : allowedPage === "integrations" ? (
-            <Integrations user={user} clients={data.clients || []} />
+            <Integrations
+              user={user}
+              clients={data.clients || []}
+              onOpenDiagnostic={() => {
+                setDiagnosticContext({});
+                navigate("diagnostic");
+              }}
+            />
           ) : resources[allowedPage] ? (
             <ResourcePage
               key={allowedPage}
@@ -3658,6 +3698,10 @@ export default function App() {
           onClose={closeDetail}
           onEdit={openModal}
           onSaved={saved}
+          onDiagnostic={(requestId, interventionId) => {
+            setDiagnosticContext({ requestId, interventionId });
+            navigate("diagnostic");
+          }}
         />
       )}{" "}
       {searchQuery && (

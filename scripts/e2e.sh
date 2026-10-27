@@ -8,6 +8,12 @@ source .env
 set +a
 export npm_config_cache="$task_root/.local/npm-cache"
 export TVM_DEMO_MODE=1
+# Browser acceptance must never invoke a paid provider or send notifications,
+# even if the operator has configured credentials in their private .env.
+export TVM_AI_ENABLED=0
+export TVM_AI_API_KEY=
+export TVM_EMAIL_ENABLED=0
+export TVM_WHATSAPP_ENABLED=0
 export TVM_MEDIA_ROOT="$task_root/.local/e2e-media"
 TVM_DEMO_PASSWORD="$("$task_root/.venv/bin/python" - <<'PY'
 import os, secrets

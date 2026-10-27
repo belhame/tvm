@@ -9,7 +9,8 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
-import type { RecordData, User } from "./api";
+import { api, type RecordData, type User } from "./api";
+import type { DiagnosticStatus } from "./diagnostics";
 import NotificationCenter from "./NotificationCenter";
 import NotificationOutbox from "./NotificationOutbox";
 
@@ -32,13 +33,28 @@ type IntegrationsPayload = {
 export default function Integrations({
   user,
   clients = [],
+  onOpenDiagnostic,
 }: {
   user: User;
   clients?: RecordData[];
+  onOpenDiagnostic: () => void;
 }) {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [diagnostic, setDiagnostic] = useState<DiagnosticStatus | null>(null);
+  const [diagnosticError, setDiagnosticError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    api<DiagnosticStatus>("diagnostics/status/", { signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted) setDiagnostic(response);
+      })
+      .catch((failure: Error) => {
+        if (!controller.signal.aborted) setDiagnosticError(failure.message);
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -98,7 +114,22 @@ export default function Integrations({
     );
   };
   const whatsapp = data?.whatsapp;
-  const ai = data?.ai || data?.assistant;
+  const renderDiagnosticStatus = () => {
+    if (diagnosticError)
+      return <span className="badge">État IA non vérifié</span>;
+    if (!diagnostic) return <span className="badge">Vérification…</span>;
+    return (
+      <span
+        className={`diagnostic-state ${diagnostic.configured && diagnostic.enabled ? "diagnostic-state-approved" : "diagnostic-state-draft"}`}
+      >
+        {diagnostic.configured
+          ? diagnostic.enabled
+            ? "IA activée par configuration · non testée"
+            : "IA configurée · désactivée"
+          : "IA à connecter"}
+      </span>
+    );
+  };
 
   return (
     <div>
@@ -265,10 +296,10 @@ export default function Integrations({
             >
               <Bot size={27} />
             </div>
-            {renderStatus(ai)}
+            {renderDiagnosticStatus()}
           </div>
           <h2 style={{ fontSize: 20, margin: "0 0 9px" }}>
-            Assistant IA connecté aux dossiers
+            Assistant diagnostic et bibliothèque
           </h2>
           <p
             style={{
@@ -278,8 +309,9 @@ export default function Integrations({
               margin: "0 0 18px",
             }}
           >
-            Préparez une synthèse d’intervention et retrouvez l’historique utile
-            au diagnostic, dans le périmètre de votre compte.
+            Recherchez dans les sources techniques approuvées. L’analyse IA est
+            demandée explicitement et ne reçoit que la saisie technique et les
+            extraits autorisés.
           </p>
           <div
             style={{
@@ -291,9 +323,9 @@ export default function Integrations({
               lineHeight: 1.7,
             }}
           >
-            {ai?.message ||
-              ai?.detail ||
-              "Aucun modèle IA n’est connecté actuellement. Les recommandations et diagnostics ne sont pas simulés : ils seront disponibles après configuration et validation du fournisseur."}
+            {diagnosticError ||
+              diagnostic?.message ||
+              "La bibliothèque et la recherche documentaire fonctionnent sans clé IA. La disponibilité du fournisseur sera vérifiée lors d’une demande d’analyse explicite."}
           </div>
           <h3 style={{ fontSize: 13, marginTop: 24 }}>
             Conditions de mise en service
@@ -309,14 +341,11 @@ export default function Integrations({
               color: "#6a7e9b",
             }}
           >
-            {(ai?.requirements?.length
-              ? ai.requirements
-              : [
-                  "Fournisseur et modèle validés, clé API conservée côté serveur",
-                  "Politique de confidentialité et durée de conservation définies",
-                  "Contrôle des droits sur chaque dossier et validation humaine des conseils",
-                ]
-            ).map((requirement) => (
+            {[
+              "Sources techniques approuvées par un responsable avant leur utilisation",
+              "Clé et modèle IA configurés sur le serveur, jamais dans le navigateur",
+              "Partage technique explicite et vérification humaine des hypothèses",
+            ].map((requirement) => (
               <li
                 key={requirement}
                 style={{ display: "flex", gap: 9, alignItems: "start" }}
@@ -329,6 +358,14 @@ export default function Integrations({
               </li>
             ))}
           </ul>
+          <button
+            className="button primary"
+            style={{ marginTop: 24 }}
+            onClick={onOpenDiagnostic}
+          >
+            <Bot size={17} />
+            Ouvrir l’assistant diagnostic
+          </button>
         </section>
       </div>
       {(user.role === "admin" || user.role === "manager") && (

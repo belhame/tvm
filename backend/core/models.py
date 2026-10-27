@@ -446,3 +446,5 @@ from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, Dispos
 from .notification_models import DailyReminderPreferences, InAppNotification  # noqa: E402,F401
 from .logistics_models import CourierReceipt, OutboundJob, PickupRequest  # noqa: E402,F401
 from .outbox_models import ExternalNotification  # noqa: E402,F401
+from .knowledge_models import KnowledgeChunk, RepairCase, TechnicalDocument  # noqa: E402,F401
+from .diagnostic_models import DiagnosticGate, DiagnosticRun  # noqa: E402,F401
