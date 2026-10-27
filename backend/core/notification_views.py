@@ -2,6 +2,7 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
@@ -49,7 +50,9 @@ def _private(data):
 def _inbox(user):
     queryset = InAppNotification.objects.filter(recipient=user)
     if user.effective_role == 'client':
-        queryset = queryset.exclude(kind=InAppNotification.Kind.DAILY).filter(service_request__equipment__client_id=user.client_id)
+        queryset = queryset.exclude(kind=InAppNotification.Kind.DAILY).filter(
+            Q(service_request__equipment__client_id=user.client_id) |
+            Q(kind=InAppNotification.Kind.LOGISTICS, client_id=user.client_id))
     return queryset.select_related('service_request__equipment__client')
 
 

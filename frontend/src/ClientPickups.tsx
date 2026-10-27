@@ -20,6 +20,7 @@ import {
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import CallReference from "./CallReference";
 import NotificationCenter from "./NotificationCenter";
+import { NotificationChannels } from "./NotificationOutbox";
 import {
   logisticsReference,
   logisticsUuid,
@@ -233,6 +234,15 @@ export default function ClientPickups({
                     {pickupLabels[pickup.status]}
                   </span>
                 </div>
+                {pickup.pickup_scope === "end_customer" && (
+                  <div className="pickup-final-customer">
+                    <MapPin size={16} />
+                    <span>
+                      Chez votre client final :{" "}
+                      <strong>{pickup.end_customer_name}</strong>
+                    </span>
+                  </div>
+                )}
                 <dl className="logistics-facts">
                   <div>
                     <dt>Votre n° d’appel client</dt>
@@ -381,6 +391,9 @@ export default function ClientPickups({
           )}
         </div>
       )}
+      <div className="card client-pickup-channels">
+        <NotificationChannels personal />
+      </div>
       <details className="card client-pickup-notifications">
         <summary>Mes notifications de prise en charge</summary>
         <NotificationCenter key={user.id} user={user} compact />
@@ -461,19 +474,24 @@ export default function ClientPickups({
   );
 }
 
-function PickupForm({
+export function PickupForm({
   equipment,
   client,
+  managerClients,
   onClose,
   onSaved,
 }: {
   equipment: RecordData[];
   client?: RecordData;
+  managerClients?: RecordData[];
   onClose: () => void;
   onSaved: (pickup: Pickup) => void;
 }) {
   const id = useId();
   const [equipmentId, setEquipmentId] = useState("");
+  const [centreId, setCentreId] = useState(client ? String(client.id) : "");
+  const [scope, setScope] = useState<"direct" | "end_customer">("direct");
+  const [finalCustomer, setFinalCustomer] = useState("");
   const [serial, setSerial] = useState("");
   const [model, setModel] = useState("");
   const [brand, setBrand] = useState("");
@@ -492,6 +510,49 @@ function PickupForm({
   const controller = useRef<AbortController | null>(null);
   const attempt = useRef<{ signature: string; key: string } | null>(null);
   const submitting = useRef(false);
+  const selectedCentre =
+    managerClients?.find((row) => row.id === Number(centreId)) || client;
+  const ownEquipment = equipment.filter(
+    (row) => !managerClients || row.client === Number(centreId),
+  );
+  function changeCentre(value: string) {
+    const centre = managerClients?.find((row) => row.id === Number(value));
+    setCentreId(value);
+    setEquipmentId("");
+    setSerial("");
+    setModel("");
+    setBrand("");
+    if (scope === "direct") {
+      setAddress(
+        [centre?.address, centre?.postal_code, centre?.city, centre?.country]
+          .filter(Boolean)
+          .join(", "),
+      );
+      setContactName(centre?.contact_name || "");
+      setContactPhone(centre?.phone || "");
+    }
+  }
+  function changeScope(value: "direct" | "end_customer") {
+    setScope(value);
+    if (value === "end_customer") {
+      setAddress("");
+      setContactName("");
+      setContactPhone("");
+    } else {
+      setAddress(
+        [
+          selectedCentre?.address,
+          selectedCentre?.postal_code,
+          selectedCentre?.city,
+          selectedCentre?.country,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      );
+      setContactName(selectedCentre?.contact_name || "");
+      setContactPhone(selectedCentre?.phone || "");
+    }
+  }
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -515,6 +576,9 @@ function PickupForm({
       pickup_address: address.trim(),
       contact_name: contactName.trim(),
       contact_phone: contactPhone.trim(),
+      pickup_scope: scope,
+      end_customer_name: scope === "end_customer" ? finalCustomer.trim() : "",
+      ...(managerClients ? { client: Number(centreId) } : {}),
     };
     const signature = JSON.stringify(payload);
     if (!attempt.current || attempt.current.signature !== signature)
@@ -563,6 +627,63 @@ function PickupForm({
         </div>
         <fieldset disabled={saving}>
           <div className="form-grid">
+            {managerClients && (
+              <div className="form-field span-2">
+                <label htmlFor={`${id}-centre`}>Centre client demandeur</label>
+                <select
+                  id={`${id}-centre`}
+                  className="input"
+                  required
+                  value={centreId}
+                  onChange={(event) => changeCentre(event.target.value)}
+                >
+                  <option value="">Choisir le centre client…</option>
+                  {managerClients.map((centre) => (
+                    <option value={centre.id} key={centre.id}>
+                      {centre.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="form-field span-2">
+              <label htmlFor={`${id}-scope`}>Lieu de collecte</label>
+              <select
+                id={`${id}-scope`}
+                className="input"
+                value={scope}
+                onChange={(event) =>
+                  changeScope(event.target.value as "direct" | "end_customer")
+                }
+              >
+                <option value="direct">
+                  {managerClients ? "Au centre client" : "Dans votre centre"}
+                </option>
+                <option value="end_customer">Chez vos clients finaux</option>
+              </select>
+            </div>
+            {scope === "end_customer" && (
+              <>
+                <div className="form-field span-2">
+                  <label htmlFor={`${id}-final-customer`}>
+                    Nom du client final
+                  </label>
+                  <input
+                    id={`${id}-final-customer`}
+                    className="input"
+                    required
+                    maxLength={200}
+                    value={finalCustomer}
+                    onChange={(event) => setFinalCustomer(event.target.value)}
+                  />
+                </div>
+                <p className="pickup-scope-help span-2">
+                  La collecte reste rattachée au centre client demandeur.
+                  Renseignez ci-dessous l’adresse et le contact du client final
+                  ; seuls les livreurs TVM peuvent effectuer cette collecte.
+                </p>
+              </>
+            )}
             <div className="form-field span-2">
               <label htmlFor={`${id}-equipment`}>Équipement à envoyer</label>
               <select
@@ -572,7 +693,7 @@ function PickupForm({
                 onChange={(event) => setEquipmentId(event.target.value)}
               >
                 <option value="">Renseigner un autre onduleur…</option>
-                {equipment.map((item) => (
+                {ownEquipment.map((item) => (
                   <option value={item.id} key={item.id}>
                     {item.serial_number} · {item.model}
                   </option>
@@ -691,6 +812,8 @@ function PickupForm({
           className="button primary"
           disabled={
             saving ||
+            (managerClients && !centreId) ||
+            (scope === "end_customer" && !finalCustomer.trim()) ||
             (!equipmentId && (!serial.trim() || !model.trim())) ||
             !fault.trim() ||
             !address.trim() ||

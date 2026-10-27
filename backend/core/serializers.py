@@ -20,19 +20,33 @@ class LegacySerializer(serializers.ModelSerializer):
 
 
 class ClientSerializer(LegacySerializer):
+    default_courier_name = serializers.SerializerMethodField()
+    internal_courier_name = serializers.SerializerMethodField()
+    def get_default_courier_name(self, obj):
+        return (obj.default_courier.get_full_name() or obj.default_courier.username) if obj.default_courier_id else ''
+    def get_internal_courier_name(self, obj):
+        return (obj.internal_courier.get_full_name() or obj.internal_courier.username) if obj.internal_courier_id else ''
+    def validate(self, attrs):
+        from .logistics_service import validate_client_routing
+        instance = Client(pk=self.instance.pk if self.instance else None)
+        for field in ('default_courier', 'internal_courier'):
+            setattr(instance, field, attrs.get(field, getattr(self.instance, field, None)))
+        with transaction.atomic():
+            validate_client_routing(instance)
+        return attrs
     equipment_count = serializers.IntegerField(read_only=True)
     open_requests_count = serializers.IntegerField(read_only=True)
     portal_users_count = serializers.IntegerField(read_only=True)
     notes = serializers.CharField(max_length=4000, allow_blank=True, required=False)
     class Meta:
         model = Client
-        fields = ['id', 'name', 'contact_name', 'tax_id', 'email', 'phone', 'address', 'city', 'postal_code', 'country', 'notes', 'legacy_id', 'created_at', 'equipment_count', 'open_requests_count', 'portal_users_count']
+        fields = ['id', 'name', 'contact_name', 'tax_id', 'email', 'phone', 'address', 'city', 'postal_code', 'country', 'notes', 'legacy_id', 'created_at', 'equipment_count', 'open_requests_count', 'portal_users_count', 'default_courier', 'default_courier_name', 'internal_courier', 'internal_courier_name', 'notify_email', 'notify_whatsapp']
         read_only_fields = ['created_at']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.is_authenticated and user.effective_role == 'client':
-            for key in ('notes', 'portal_users_count'):
+            for key in ('notes', 'portal_users_count', 'default_courier', 'default_courier_name', 'internal_courier', 'internal_courier_name', 'notify_email', 'notify_whatsapp'):
                 fields.pop(key, None)
         return fields
 
@@ -266,7 +280,7 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, min_length=10, trim_whitespace=False)
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'client', 'is_active', 'can_validate_billing', 'password']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'courier_kind', 'client', 'is_active', 'can_validate_billing', 'password']
     def to_representation(self, instance):
         result = super().to_representation(instance)
         result['role'] = instance.effective_role
@@ -279,8 +293,18 @@ class UserSerializer(serializers.ModelSerializer):
         if self.instance and self.instance.is_superuser and 'role' in attrs and role != 'admin':
             raise serializers.ValidationError({'role': 'Les droits de superutilisateur se gèrent via la console serveur ; ce compte reste administrateur.'})
         client = attrs.get('client', getattr(self.instance, 'client', None))
-        if (role == 'client') != (client is not None):
-            raise serializers.ValidationError({'client': 'Un compte client doit être lié à un client ; un compte interne ne doit pas l’être.'})
+        kind = attrs.get('courier_kind', getattr(self.instance, 'courier_kind', 'internal'))
+        if kind != 'internal' and role != 'courier':
+            raise serializers.ValidationError({'courier_kind': 'Le type Livreur client est réservé aux comptes livreurs.'})
+        linked_client = role == 'client' or (role == 'courier' and kind == 'client')
+        if linked_client != (client is not None):
+            raise serializers.ValidationError({'client': 'Un compte client ou livreur client doit être lié à sa société ; un compte TVM ne doit pas l’être.'})
+        if self.instance:
+            from .logistics_service import guard_courier_identity_update
+            candidate = User(pk=self.instance.pk, role=role, courier_kind=kind, client=client)
+            candidate._state.adding = False
+            with transaction.atomic():
+                guard_courier_identity_update(candidate)
         billing_permission = attrs.get('can_validate_billing', getattr(self.instance, 'can_validate_billing', False))
         if role in ('client', 'courier') and billing_permission:
             raise serializers.ValidationError({'can_validate_billing': 'Un compte client ou livreur ne peut pas valider la facturation. Retirez cette autorisation avant de convertir le compte.'})
@@ -318,7 +342,7 @@ class UserSerializer(serializers.ModelSerializer):
 class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'role']
+        fields = ['id', 'username', 'first_name', 'last_name', 'role', 'courier_kind', 'client']
 
 
 class PartSerializer(LegacySerializer):

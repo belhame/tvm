@@ -10634,6 +10634,345 @@ td,
   font-family: ui-monospace, SFMono-Regular, monospace;
   font-size: 13px;
 }
+.client-courier-settings {
+  margin-top: 16px;
+}
+.client-courier-settings h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.client-courier-settings > p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #4d6583;
+  margin: 15px 0 0;
+}
+.courier-metrics.courier-metrics-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.courier-company-scope {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #edf4ff;
+  border: 1px solid #d4e3f9;
+  padding: 12px 15px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  color: #355b8c;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.courier-company-scope > svg {
+  flex-shrink: 0;
+}
+.pickup-final-customer {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #395f88;
+  background: #eef5ff;
+  border-radius: 8px;
+  padding: 9px 10px;
+  margin: 10px 0 13px;
+  white-space: normal;
+}
+.pickup-final-customer > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.pickup-scope-help {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #4c6584;
+  background: #f2f7ff;
+  border: 1px solid #dde8f8;
+  border-radius: 10px;
+  padding: 13px;
+  margin: 0;
+}
+.courier-routing-badge {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.8;
+  border-radius: 9px;
+  padding: 8px 10px;
+  margin: 11px 0;
+  background: #eef3fa;
+  color: #405e83;
+  max-width: 100%;
+  white-space: normal;
+}
+.courier-routing-badge > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.courier-routing-badge small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.9;
+  margin-top: 4px;
+}
+.routing-automatic,
+.routing-proposed {
+  background: #eaf3ff;
+  color: #2f5f9e;
+}
+.routing-missing {
+  background: #fff2df;
+  color: #825025;
+}
+.logistics-auto-routing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  border: 1px solid #d8e5f8;
+  background: #f0f6ff;
+  padding: 16px;
+  border-radius: 13px;
+  margin-bottom: 20px;
+}
+.logistics-auto-routing > div {
+  flex: 1 1 270px;
+}
+.logistics-auto-routing strong {
+  color: #2d527f;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.logistics-auto-routing p {
+  color: #4c6585;
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 5px 0 0;
+}
+.notification-outbox {
+  padding: 23px;
+  margin-top: 24px;
+}
+.notification-outbox-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.notification-outbox-heading h2 {
+  color: #2d4f77;
+  font-size: 19px;
+  line-height: 1.8;
+  margin: 0 0 6px;
+}
+.notification-outbox-heading p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #4d6685;
+  margin: 0;
+}
+.notification-outbox-filters {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 11px;
+  margin-bottom: 19px;
+}
+.notification-channels h2 {
+  color: #31547d;
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 0 0 13px;
+}
+.notification-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+.notification-channel-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  background: #f4f8ff;
+  border: 1px solid #dce7f7;
+  border-radius: 12px;
+  padding: 16px;
+  color: #356394;
+}
+.notification-channel-card > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.notification-channel-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.notification-channel-card strong {
+  color: #31557d;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.notification-channel-card span,
+.notification-channel-card small {
+  color: #4d6786;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.notification-channels > p {
+  color: #4d6583;
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 12px 0 19px;
+}
+.notification-outbox-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: #4c6584;
+  line-height: 1.9;
+  margin: 16px 0;
+}
+.notification-outbox-counts strong {
+  color: #31567f;
+}
+.notification-outbox table {
+  min-width: 1030px;
+}
+.notification-outbox td {
+  vertical-align: top;
+}
+.notification-outbox-state {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.9;
+  font-weight: 600;
+  color: #3d5a7e;
+  background: #edf2f9;
+  white-space: nowrap;
+}
+.outbox-blocked,
+.outbox-uncertain {
+  color: #835025;
+  background: #fff1df;
+}
+.outbox-sent {
+  color: #1f6746;
+  background: #e6f5ed;
+}
+.outbox-failed {
+  color: #9a3549;
+  background: #fff0f3;
+}
+.notification-outbox-reason {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #4e6583;
+  margin-top: 6px;
+  max-width: 250px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.notification-outbox-preview {
+  margin-top: 21px;
+  border: 1px solid #d5e3f8;
+  border-radius: 13px;
+  background: #f5f9ff;
+  padding: 19px;
+}
+.notification-outbox-preview > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.notification-outbox-preview h3 {
+  color: #315780;
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 0;
+}
+.notification-outbox-preview p {
+  color: #4a6585;
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.notification-outbox-preview pre {
+  color: #355576;
+  background: #fff;
+  padding: 17px;
+  border: 1px solid #dce6f5;
+  border-radius: 10px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 16px 0;
+}
+.notification-outbox-preview > small {
+  display: block;
+  color: #506986;
+  font-size: 12px;
+  line-height: 1.9;
+  margin-top: 13px;
+}
+.notification-uncertain-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #785428;
+  font-size: 13px;
+  line-height: 1.9;
+  padding: 13px;
+  border: 1px solid #eadcc8;
+  background: #fff7e9;
+  border-radius: 11px;
+  margin: 15px 0;
+}
+.notification-uncertain-confirm > input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  accent-color: #215fce;
+}
+.client-pickup-channels {
+  padding: 21px;
+  margin-top: 22px;
+}
+@media (max-width: 640px) {
+  .notification-outbox {
+    padding: 16px;
+  }
+  .notification-outbox-filters,
+  .notification-channel-grid {
+    grid-template-columns: 1fr;
+  }
+  .notification-outbox-heading h2 {
+    font-size: 17px;
+  }
+  .notification-outbox-preview {
+    padding: 14px;
+  }
+  .notification-outbox-preview pre {
+    padding: 13px;
+  }
+  .logistics-auto-routing .button {
+    width: 100%;
+  }
+}
 .client-import-summary {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 18px 0 14px;

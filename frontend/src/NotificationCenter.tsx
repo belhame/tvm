@@ -140,7 +140,7 @@ export default function NotificationCenter({
         setEnabled(result.enabled);
         setTimezone(result.timezone);
         setNotice(
-          "Préférences enregistrées. Le rappel est disponible dans l’application ; WhatsApp reste à connecter.",
+          "Préférences enregistrées. Le rappel personnel de 08:00 reste dans TVM ; les messages clients ont leur journal séparé.",
         );
       }
     } catch (error) {
@@ -311,10 +311,11 @@ export default function NotificationCenter({
               <div className="notification-whatsapp-state">
                 <MessageCircle size={19} />
                 <div>
-                  <strong>WhatsApp à connecter</strong>
+                  <strong>Rappel WhatsApp personnel non connecté</strong>
                   <p>
-                    Aucune notification WhatsApp n’est envoyée. Les accès au
-                    service seront configurés séparément.
+                    Ce rappel de 08:00 reste dans TVM. Les messages clients par
+                    e-mail ou WhatsApp ont leur journal séparé ; cet écran ne
+                    déclenche aucun envoi externe.
                   </p>
                   {preference.whatsapp_preview?.text && (
                     <details>

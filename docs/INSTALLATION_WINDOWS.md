@@ -89,7 +89,7 @@ Les anciens échanges et visites restent conservés sans approbation technique o
 
 Le suivi commun **Prêt à être livré** et les devis de diagnostic TVM utilisent aussi cette mise à jour. Les anciens dossiers ne reçoivent pas de tests validés ou de gratuité par déduction. Après installation, saisir le résultat réel, les données du devis et les décisions financières dans votre instance, selon [le parcours prêt / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
-Le nouveau service Docker `reminders` est démarré avec l'application après les migrations. Il prépare les rappels **dans TVM** pour les comptes livreurs qui les activent à 08:00 ; il ne connecte pas WhatsApp et n'envoie aucun message externe. `ARRETER_TVM.cmd` suspend aussi ce worker. Les notifications et préférences restent dans la base conservée ; mettre à jour les sources ne configure pas les préférences d'un utilisateur à sa place.
+Le service Docker `reminders` démarre avec l'application après les migrations. Il prépare les rappels internes de 08:00 et traite le journal des messages du responsable client. Les canaux e-mail/WhatsApp restent désactivés tant que leurs accès serveur et l'option de la société ne sont pas configurés. Une mise à jour ne provoque pas l'envoi des anciennes entrées bloquées. `ARRETER_TVM.cmd` suspend aussi ce worker ; notifications et préférences restent dans la base conservée. Voir [la connexion des canaux](DEPLOIEMENT.md#connecter-les-notifications-externes-du-responsable-client).
 
 ## Importer son annuaire clients après la mise à jour
 

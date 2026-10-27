@@ -194,9 +194,11 @@ Avant émission du devis, le responsable ou l'administrateur peut reprendre la q
 
 ## Enlèvement, réception atelier et remise au client
 
-L'administrateur crée un compte **Livreur** dans **Comptes & accès**. Ce rôle ouvre un espace logistique adapté au téléphone : **Accueil**, **Tournées**, **Réception**, **Prêts** et **Retours**. Il ne donne accès ni à la finance, ni aux comptes, ni aux diagnostics techniques internes. Les clients proposés lors d'une réception servent à identifier le propriétaire ; le livreur ne peut pas créer une société ou modifier les données d'un équipement connu.
+L'administrateur crée un compte **Livreur** dans **Comptes & accès**, puis choisit son type. Le **livreur TVM** n'est rattaché à aucune société cliente : il assure les collectes et la réception atelier. Le **livreur client** est obligatoirement lié à son centre et ne voit que ses livraisons/retours affectés dans ce centre ; il n'a ni collecte, ni recherche de séries, ni réception ou photo OCR. Aucun des deux types n'accède à la finance, aux comptes ou aux diagnostics techniques internes.
 
-Depuis son portail, le client ouvre **Mes enlèvements → Demander un enlèvement** pour sa société : choisir son équipement ou renseigner sa série et son modèle, décrire le problème et préciser l'adresse, le contact et son téléphone. Cette demande de transport ne prouve pas encore l'arrivée physique et ne crée pas automatiquement une réception SAV. Le responsable retrouve ces demandes dans **Logistique** et leur affecte un livreur. Le livreur voit ses propres missions et enregistre leur prise en charge.
+L'espace TVM adapté au téléphone regroupe **Accueil**, **Tournées**, **Réception**, **Prêts** et **Retours** ; celui du livreur client affiche seulement ses actions autorisées. Les noms de sociétés proposés lors d'une réception servent à identifier le propriétaire. Le livreur ne peut pas créer une société ou modifier les données d'un équipement connu.
+
+Depuis son portail, le client ouvre **Mes enlèvements → Demander un enlèvement** pour sa société : choisir son équipement ou renseigner sa série et son modèle, décrire le problème et préciser l'adresse, le contact et son téléphone. Le responsable peut aussi demander une collecte **chez un client final** en conservant le centre propriétaire ; renseigner alors le nom du client final et les coordonnées de collecte. Cette demande de transport ne prouve pas encore l'arrivée physique et ne crée pas automatiquement une réception SAV. Les collectes sont affectées à l'équipe TVM, jamais au livreur du centre client.
 
 À l'arrivée à l'atelier, ouvrir **Réception** ou **Réception atelier** :
 
@@ -209,7 +211,9 @@ Si un ancien dossier déjà traité n'a pas de date d'arrivée, demander au resp
 
 Les photos JPEG/PNG/WEBP sont analysées localement sur le serveur, avec une limite de 8 Mio et 12 millions de pixels. La lecture de code-barres puis l'OCR peuvent échouer selon l'étiquette ; les fichiers temporaires sont supprimés et la photo n'est pas ajoutée au dossier. La saisie manuelle reste possible. La caméra d'un téléphone réel et les étiquettes de l'entreprise doivent encore être essayées dans leur environnement HTTPS.
 
-Pour la sortie, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact de livraison, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve les missions affectées dans **Prêts** ou **Retours**, avec leur destination et leur contact. Avant une remise, le responsable peut annuler une affectation avec un motif puis la réaffecter si nécessaire, en conservant la trace de l'annulation. Une remise déjà enregistrée reste conservée et ne se réaffecte pas.
+Dans la fiche société, **Livreur client par défaut** désigne son livreur externe actif ; **Référent livreur TVM** sert de repli. Une nouvelle mise à disposition prête utilise d'abord le référent client valide, sinon le référent TVM. Sans référent disponible, le dossier reste dans les transports à affecter : aucun livreur n'est choisi par supposition. Les anciens dossiers prêts se reprennent avec l'action d'application du routage ; les affectations manuelles sont conservées.
+
+Pour une affectation manuelle, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve ses missions dans **Prêts** ou **Retours**. Avant remise, le responsable peut annuler puis réaffecter avec motif, en conservant la trace de l'annulation. Une remise enregistrée ne se réaffecte pas.
 
 Après remise physique, ouvrir **Confirmer la remise au client**, saisir le nom du destinataire, cocher **Je confirme avoir remis physiquement cet onduleur au destinataire indiqué**, puis **Enregistrer la remise**. L'heure et l'auteur viennent du serveur. Cette saisie atteste ce que le livreur déclare ; elle n'est ni une signature électronique ni un accusé de réception envoyé par le client. Le client consulte la remise de son propre dossier et reçoit une notification interne.
 
@@ -223,7 +227,17 @@ Le livreur et l'administrateur disposent, pour leur propre compte, de **Rappel q
 
 Le serveur contrôle les rappels chaque minute : la notification est créée au premier contrôle à partir de 08:00, même si le navigateur est fermé, et sera consultable à sa réouverture. Un arrêt du serveur peut retarder le rappel jusqu'à sa reprise le même jour ; il ne crée pas toute une série de rappels anciens. Une désactivation arrête les créations suivantes ; réactiver le même jour ne crée pas de doublon.
 
-**WhatsApp à connecter** et **Aperçu du message prévu** préparent une intégration future. Aucun accès WhatsApp n'a été fourni et l'utilisateur a choisi de connecter ce canal plus tard : aucun message, aucun envoi programmé et aucun ancien rappel en attente d'envoi WhatsApp n'est créé. Les rappels opérationnels de cette version sont ceux de la boîte de réception TVM.
+Le rappel de 08:00 reste une notification interne du livreur. Son **Aperçu du message prévu** ne crée aucun envoi WhatsApp. Les notifications externes destinées au responsable du centre utilisent un journal et des réglages distincts, décrits ci-dessous.
+
+### Prévenir le responsable du centre client
+
+Une affectation de livraison et les nouvelles étapes de collecte alimentent les notifications du centre propriétaire. Une collecte chez un client final reste liée à ce centre ; les coordonnées du destinataire final ne deviennent pas celles du responsable à prévenir.
+
+Dans la fiche client, l'administrateur ou le responsable choisit les options e-mail et WhatsApp. Les messages utilisent le nom du contact, l'e-mail et le téléphone de cette société. Les deux options sont désactivées au départ. Les accès SMTP et WhatsApp sont aussi absents de l'installation de travail : **un canal non connecté reste bloqué, sans message envoyé**. La connexion se prépare sur le serveur selon [le guide de déploiement](DEPLOIEMENT.md#connecter-les-notifications-externes-du-responsable-client).
+
+Le **Journal des notifications client**, réservé aux administrateurs et responsables, distingue les entrées bloquées, à traiter, en cours, acceptées, en échec ou incertaines. L'aperçu permet de vérifier les références, la série, la destination et le destinataire masqué. Une ancienne entrée bloquée ne part pas à l'activation du canal : utiliser **Prévisualiser avant relance**, puis la relance explicite si la mission et le contact sont encore corrects. Un aperçu trop ancien ou un contact modifié oblige à prévisualiser à nouveau.
+
+**Accepté par le fournisseur** ne signifie ni reçu ni lu par le client. Un résultat incertain peut correspondre à un message déjà accepté : vérifier chez le fournisseur avant de confirmer une nouvelle tentative. La remise physique, les étapes SAV et la facturation restent des opérations distinctes. Les messages indiquent le livreur réellement affecté et son type ; l'heure d'affectation n'est pas présentée comme un rendez-vous convenu.
 
 ## Échange : remplacement et facturation
 

@@ -3,8 +3,8 @@ from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
 from .logistics_models import OutboundJob
-from .logistics_permissions import logistics_manager, logistics_operator
-from .logistics_service import canonical_outbound, outbound_for, pickups_for, _manager, _name
+from .logistics_permissions import external_courier, logistics_manager, logistics_operator, logistics_receiver
+from .logistics_service import canonical_outbound, outbound_for, pickups_for, recommended_courier, _manager, _name
 from .models import Client, ServiceRequest, User
 
 
@@ -31,6 +31,7 @@ def pickup_payload(pickup, actor):
     client = actor.effective_role == 'client' and pickup.client_id == actor.client_id
     return {'id': pickup.pk, 'status': pickup.status, 'client': _client(pickup.client), 'equipment': pickup.equipment_id,
         'serial_number': pickup.serial_number, 'brand': pickup.brand, 'model': pickup.model,
+        'pickup_scope': pickup.pickup_scope, 'end_customer_name': pickup.end_customer_name, 'assignment_revision': pickup.assignment_revision,
         'client_reference': pickup.client_reference, 'fault_description': pickup.fault_description,
         'pickup_address': pickup.pickup_address, 'contact_name': pickup.contact_name, 'contact_phone': pickup.contact_phone,
         'assigned_courier': pickup.assigned_courier_id,
@@ -56,7 +57,8 @@ def outbound_payload(job, actor):
             blocking = 'Le dossier ne permet plus une remise ; un responsable doit vérifier la mission.'
     unit = job.delivery_equipment
     return {'id': job.pk, 'kind': job.kind, 'status': 'completed' if job.handed_over_at else 'cancelled' if job.cancelled_at else 'assigned',
-        'active': job.active, 'service_request': job.service_request_id, 'call_number': job.service_request.reference,
+        'active': job.active, 'assignment_mode': job.assignment_mode, 'routing_source': job.routing_source,
+        'assignment_revision': job.assignment_revision, 'assigned_courier_kind': job.assigned_courier.courier_kind, 'service_request': job.service_request_id, 'call_number': job.service_request.reference,
         'client_reference': job.service_request.client_reference, 'client': _client(job.client), 'equipment': unit.pk,
         'serial_number': job.handed_over_serial if job.handed_over_at else unit.serial_number,
         'brand': job.handed_over_brand if job.handed_over_at else unit.brand,
@@ -74,14 +76,15 @@ def bootstrap_payload(actor, q=''):
     if not logistics_operator(actor):
         from rest_framework.exceptions import PermissionDenied
         raise PermissionDenied()
-    clients = Client.objects.all()
+    clients = Client.objects.filter(pk=actor.client_id) if external_courier(actor) else Client.objects.all()
     if q:
         clients = clients.filter(name__icontains=q)
     missions = outbound_for(actor).filter(active=True)
     return {'user': {'id': actor.pk, 'username': actor.username, 'first_name': actor.first_name, 'last_name': actor.last_name,
-                     'email': actor.email, 'role': actor.effective_role, 'client': actor.client_id, 'can_validate_billing': actor.can_validate_billing},
+                     'email': actor.email, 'role': actor.effective_role, 'courier_kind': actor.courier_kind, 'client': actor.client_id, 'can_validate_billing': actor.can_validate_billing},
+            'capabilities': {'can_receive': logistics_receiver(actor), 'can_lookup': logistics_receiver(actor), 'can_pickups': logistics_receiver(actor)},
             'clients': list(clients.values('id', 'name')),
-            'couriers': [{'id': user.pk, 'name': _name(user)} for user in User.objects.filter(role='courier', is_active=True).order_by('username')] if logistics_manager(actor) else [],
+            'couriers': [{'id': user.pk, 'name': _name(user), 'courier_kind': user.courier_kind, 'client': user.client_id} for user in User.objects.filter(role='courier', is_active=True).order_by('username')] if logistics_manager(actor) else [],
             'metrics': {'pickups': pickups_for(actor).filter(status__in=['requested', 'assigned', 'collected']).count(),
                         'ready': missions.filter(kind='delivery').count(), 'returns': missions.filter(kind='return').count()}}
 
@@ -98,7 +101,11 @@ def dispatch_candidates(actor, q=''):
             unit, kind = canonical_outbound(record)
         except ValidationError:
             continue
-        rows.append({'id': record.pk, 'call_number': record.reference, 'client_reference': record.client_reference,
+        courier, source = recommended_courier(record.equipment.client)
+        active_job = OutboundJob.objects.filter(service_request=record, active=True).first()
+        recommendation = {'id': courier.pk, 'name': _name(courier), 'courier_kind': courier.courier_kind, 'client': courier.client_id} if courier else None
+        rows.append({'recommended_courier': recommendation, 'routing_source': active_job.routing_source if active_job else source,
+                     'routing_status': 'assigned' if active_job else 'unassigned', 'id': record.pk, 'call_number': record.reference, 'client_reference': record.client_reference,
                      'client': _client(record.equipment.client), 'equipment': unit.pk, 'serial_number': unit.serial_number,
                      'brand': unit.brand, 'model': unit.model, 'kind': kind, 'status': record.status, 'arrived_at': record.arrived_at})
     return rows

@@ -1,12 +1,22 @@
 import type { User } from "./api";
 
 export type LogisticsClient = { id: number; name: string };
-export type CourierOption = { id: number; name: string };
+export type CourierOption = {
+  id: number;
+  name: string;
+  courier_kind?: "internal" | "client";
+  client?: number | null;
+};
 export type LogisticsBootstrap = {
   user: User;
   clients: LogisticsClient[];
   couriers: CourierOption[];
   metrics: { pickups: number; ready: number; returns: number };
+  capabilities?: {
+    can_receive: boolean;
+    can_lookup: boolean;
+    can_pickups: boolean;
+  };
 };
 export type Pickup = {
   id: number;
@@ -32,6 +42,8 @@ export type Pickup = {
   can_collect: boolean;
   can_receive: boolean;
   can_cancel: boolean;
+  pickup_scope?: "direct" | "end_customer";
+  end_customer_name?: string;
 };
 export type OutboundJob = {
   id: number;
@@ -60,6 +72,10 @@ export type OutboundJob = {
   cancelled_at?: string | null;
   can_cancel?: boolean;
   blocking_reason?: string | null;
+  assignment_mode?: "manual" | "automatic";
+  routing_source?: "manual" | "default_courier" | "internal_courier" | "";
+  assignment_revision?: number;
+  assigned_courier_kind?: "internal" | "client";
 };
 export type ReceptionCandidate = {
   product_id: number;

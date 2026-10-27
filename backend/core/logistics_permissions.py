@@ -13,6 +13,19 @@ def logistics_manager(user):
     return bool(user and user.is_authenticated and user.is_active and user.role != 'courier' and user.effective_role in ('admin', 'manager'))
 
 
+def external_courier(user):
+    return bool(user and user.is_authenticated and user.role == 'courier' and user.courier_kind == 'client')
+
+
+def logistics_receiver(user):
+    return logistics_operator(user) and not external_courier(user)
+
+
+class LogisticsReceiverPermission(BasePermission):
+    def has_permission(self, request, view):
+        return logistics_receiver(request.user)
+
+
 class LogisticsOperatorPermission(BasePermission):
     def has_permission(self, request, view):
         return logistics_operator(request.user)

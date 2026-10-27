@@ -85,3 +85,23 @@ if os.environ.get('DJANGO_TRUST_PROXY_HEADERS', '0') == '1':
 TVM_DEMO_MODE = os.environ.get('TVM_DEMO_MODE', '0') == '1'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+
+# External delivery remains disabled until both server configuration and each
+# client's opt-in are explicitly supplied. No secret is returned by the API.
+TVM_EMAIL_ENABLED = os.environ.get('TVM_EMAIL_ENABLED', '0') == '1'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('TVM_SMTP_HOST', '')
+EMAIL_PORT = int(os.environ.get('TVM_SMTP_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('TVM_SMTP_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('TVM_SMTP_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('TVM_SMTP_USE_TLS', '1') == '1'
+EMAIL_USE_SSL = os.environ.get('TVM_SMTP_USE_SSL', '0') == '1'
+DEFAULT_FROM_EMAIL = os.environ.get('TVM_SMTP_FROM_EMAIL', '')
+TVM_NOTIFICATION_TIMEOUT = max(1, min(30, int(os.environ.get('TVM_NOTIFICATION_TIMEOUT', '10'))))
+EMAIL_TIMEOUT = TVM_NOTIFICATION_TIMEOUT
+TVM_WHATSAPP_ENABLED = os.environ.get('TVM_WHATSAPP_ENABLED', '0') == '1'
+TVM_WHATSAPP_TOKEN = os.environ.get('TVM_WHATSAPP_TOKEN', '')
+TVM_WHATSAPP_PHONE_ID = os.environ.get('TVM_WHATSAPP_PHONE_ID', '')
+TVM_WHATSAPP_API_VERSION = os.environ.get('TVM_WHATSAPP_API_VERSION', '')
+TVM_WHATSAPP_TEMPLATE = os.environ.get('TVM_WHATSAPP_TEMPLATE', '')
+TVM_WHATSAPP_LANGUAGE = os.environ.get('TVM_WHATSAPP_LANGUAGE', 'fr')

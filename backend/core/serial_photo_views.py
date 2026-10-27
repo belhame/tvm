@@ -6,11 +6,12 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from .serial_photo import MAX_PHOTO_BYTES, SerialPhotoTooLarge, recognize_serial_photo
+from .logistics_permissions import logistics_receiver
 
 
 class SerialPhotoPermission(BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user.is_authenticated and request.user.is_active and request.user.effective_role in ('admin', 'manager', 'courier'))
+        return logistics_receiver(request.user)
 
 
 @api_view(['POST'])

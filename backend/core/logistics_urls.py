@@ -19,4 +19,5 @@ urlpatterns = [
     path('outbound/<int:job_id>/handoff/', views.outbound_handoff),
     path('outbound/<int:job_id>/cancel/', views.outbound_cancel),
     path('dispatch-candidates/', views.dispatch_candidates),
+    path('reconcile/', views.reconcile),
 ]

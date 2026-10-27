@@ -20,7 +20,7 @@ Le menu **Livraisons & retours** réunit les réparations testées et les échan
 
 Le portail permet de demander un enlèvement ; le responsable affecte les transports et le livreur enregistre la réception atelier puis la remise au client dans [son espace logistique](docs/GUIDE_SUIVI_SAV.md#enlèvement-réception-atelier-et-remise-au-client). La série peut venir d'une saisie, d'une douchette, d'une caméra compatible ou d'une photo, toujours vérifiée avant confirmation.
 
-Les notifications sont enregistrées dans TVM. Le livreur peut activer un rappel quotidien de ses missions à 08:00 dans le fuseau choisi ; les clients voient les événements de réception/remise de leur société. **WhatsApp reste à connecter**, avec un aperçu uniquement et aucun envoi externe. Voir [les rappels](docs/GUIDE_SUIVI_SAV.md#notifications-et-rappels-du-livreur).
+Les notifications sont enregistrées dans TVM. Le livreur peut activer son rappel interne de 08:00. Un journal prépare aussi les messages e-mail/WhatsApp du responsable du centre pour les affectations et collectes. **Ces canaux restent désactivés et à connecter** ; les adaptateurs fournis ne relancent pas automatiquement les anciens messages bloqués. Voir [les notifications et leurs réglages](docs/GUIDE_SUIVI_SAV.md#notifications-et-rappels-du-livreur).
 
 [Aperçu du tableau de bord](docs/screenshots/tableau-de-bord.png) · [Détail d'une intervention](docs/screenshots/intervention.png) · [Affichage mobile](docs/screenshots/mobile.png).
 

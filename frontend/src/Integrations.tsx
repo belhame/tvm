@@ -9,8 +9,9 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
-import type { User } from "./api";
+import type { RecordData, User } from "./api";
 import NotificationCenter from "./NotificationCenter";
+import NotificationOutbox from "./NotificationOutbox";
 
 type IntegrationStatus = {
   configured?: boolean;
@@ -28,7 +29,13 @@ type IntegrationsPayload = {
   assistant?: IntegrationStatus;
 };
 
-export default function Integrations({ user }: { user: User }) {
+export default function Integrations({
+  user,
+  clients = [],
+}: {
+  user: User;
+  clients?: RecordData[];
+}) {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -68,7 +75,7 @@ export default function Integrations({ user }: { user: User }) {
           style={{ background: "#e5faf0", color: "#159760" }}
         >
           <CheckCircle2 size={12} />
-          Service opérationnel
+          Envoi activé · résultats au journal
         </span>
       );
     if (status.configured === true)
@@ -324,6 +331,9 @@ export default function Integrations({ user }: { user: User }) {
           </ul>
         </section>
       </div>
+      {(user.role === "admin" || user.role === "manager") && (
+        <NotificationOutbox clients={clients} />
+      )}
       {user.role === "admin" && (
         <div className="card integration-reminders">
           <NotificationCenter key={user.id} user={user} />

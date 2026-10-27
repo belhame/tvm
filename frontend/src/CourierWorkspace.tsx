@@ -29,6 +29,7 @@ import CallReference from "./CallReference";
 import CourierReception from "./CourierReception";
 import { HandoffReceipt } from "./ClientPickups";
 import NotificationCenter from "./NotificationCenter";
+import CourierRouting from "./CourierRouting";
 import {
   logisticsReference,
   pickupLabels,
@@ -76,7 +77,16 @@ export default function CourierWorkspace({
   Dialog: ComponentType<DialogProps>;
   demo: boolean;
 }) {
-  const view = courierNavigation.some((item) => `courier/${item.key}` === page)
+  const external = (bootstrap?.user || user).courier_kind === "client";
+  const canPickups = !external && bootstrap?.capabilities?.can_pickups === true;
+  const canReceive =
+    !external &&
+    bootstrap?.capabilities?.can_receive === true &&
+    bootstrap?.capabilities?.can_lookup === true;
+  const navigation = courierNavigation.filter(
+    (item) => item.key !== "receive" || canReceive,
+  );
+  const view = navigation.some((item) => `courier/${item.key}` === page)
     ? page.split("/")[1]
     : "home";
   const [pickups, setPickups] = useState<Pickup[]>([]);
@@ -102,16 +112,31 @@ export default function CourierWorkspace({
     const pending = new AbortController();
     setListLoading(true);
     setListErrors([]);
-    void Promise.allSettled([
-      api("logistics/pickups/", { signal: pending.signal }),
-      api("logistics/outbound/", { signal: pending.signal }),
-    ]).then((results) => {
+    const tasks = [
+      {
+        key: "outbound",
+        read: () => api("logistics/outbound/", { signal: pending.signal }),
+      },
+      ...(canPickups
+        ? [
+            {
+              key: "pickups",
+              read: () => api("logistics/pickups/", { signal: pending.signal }),
+            },
+          ]
+        : []),
+    ];
+    if (!canPickups) setPickups([]);
+    void Promise.allSettled(
+      tasks.map(async (task) => [task.key, await task.read()] as const),
+    ).then((results) => {
       if (pending.signal.aborted) return;
       const failures: string[] = [];
       results.forEach((result, index) => {
         if (result.status === "fulfilled") {
-          if (index === 0) setPickups(listResult(result.value) as Pickup[]);
-          else setJobs(listResult(result.value) as OutboundJob[]);
+          if (result.value[0] === "pickups")
+            setPickups(listResult(result.value[1]) as Pickup[]);
+          else setJobs(listResult(result.value[1]) as OutboundJob[]);
         } else
           failures.push(
             result.reason instanceof Error
@@ -123,7 +148,7 @@ export default function CourierWorkspace({
       setListLoading(false);
     });
     return () => pending.abort();
-  }, [revision, user.id]);
+  }, [revision, user.id, canPickups]);
   async function refreshed() {
     setRevision((value) => value + 1);
     await onReload();
@@ -181,6 +206,14 @@ export default function CourierWorkspace({
           </span>
         </div>
         <h3>{pickup.client.name}</h3>
+        {pickup.pickup_scope === "end_customer" && (
+          <div className="pickup-final-customer">
+            <MapPin size={16} />
+            <span>
+              Client final : <strong>{pickup.end_customer_name}</strong>
+            </span>
+          </div>
+        )}
         <strong className="courier-job-serial">{pickup.serial_number}</strong>
         <p>{pickup.model || "Modèle à identifier à la réception"}</p>
         <div className="courier-job-address">
@@ -218,7 +251,7 @@ export default function CourierWorkspace({
               Prendre en charge l’enlèvement
             </button>
           )}
-          {pickup.can_receive && (
+          {pickup.can_receive && canReceive && (
             <button
               type="button"
               className="button primary"
@@ -279,6 +312,7 @@ export default function CourierWorkspace({
           role={user.role}
           compact
         />
+        <CourierRouting record={job} />
         {job.status === "completed" ? (
           <HandoffReceipt job={job} />
         ) : (
@@ -306,7 +340,9 @@ export default function CourierWorkspace({
           </span>
           <div>
             <strong>PowerCare</strong>
-            <small>Espace Livreur · TVM</small>
+            <small>
+              {external ? "Livreur de société cliente" : "Espace Livreur TVM"}
+            </small>
           </div>
         </div>
         <div className="courier-header-actions">
@@ -340,6 +376,15 @@ export default function CourierWorkspace({
         </div>
       )}
       <main className="courier-main">
+        {external && (
+          <div className="courier-company-scope">
+            <UserRound size={18} />
+            <span>
+              {bootstrap?.clients[0]?.name || "Votre société"} · Uniquement vos
+              transports affectés
+            </span>
+          </div>
+        )}
         <div className="courier-page-heading">
           <div>
             <span className="eyebrow">VOTRE ESPACE LIVREUR</span>
@@ -356,7 +401,9 @@ export default function CourierWorkspace({
             </h1>
             <p>
               {view === "home"
-                ? "Votre matériel, vos transports et les réceptions du jour."
+                ? external
+                  ? "Vos livraisons et retours pour votre société."
+                  : "Votre matériel, vos transports et les réceptions du jour."
                 : view === "receive"
                   ? "Le scan identifie le matériel ; seule votre confirmation enregistre son arrivée."
                   : "Vos missions affectées, avec confirmation de chaque étape."}
@@ -389,19 +436,23 @@ export default function CourierWorkspace({
         )}
         {view === "home" ? (
           <>
-            <div className="courier-metrics">
-              <button
-                type="button"
-                onClick={() => onNavigate("courier/routes")}
-              >
-                <span>
-                  <MapPin size={21} />
-                </span>
-                <strong className="metric-value">
-                  {bootstrap?.metrics.pickups ?? "—"}
-                </strong>
-                <small>Enlèvements affectés</small>
-              </button>
+            <div
+              className={`courier-metrics ${!canPickups ? "courier-metrics-two" : ""}`}
+            >
+              {canPickups && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate("courier/routes")}
+                >
+                  <span>
+                    <MapPin size={21} />
+                  </span>
+                  <strong className="metric-value">
+                    {bootstrap?.metrics.pickups ?? "—"}
+                  </strong>
+                  <small>Enlèvements affectés</small>
+                </button>
+              )}
               <button type="button" onClick={() => onNavigate("courier/ready")}>
                 <span>
                   <Truck size={21} />
@@ -424,23 +475,29 @@ export default function CourierWorkspace({
                 <small>Retours affectés</small>
               </button>
             </div>
-            <button
-              type="button"
-              className="courier-reception-shortcut"
-              onClick={() => {
-                setSelectedPickup(null);
-                onNavigate("courier/receive");
-              }}
-            >
-              <ScanLine size={29} />
-              <div>
-                <strong>Réceptionner un onduleur</strong>
-                <span>Douchette USB, caméra, photo ou saisie manuelle</span>
-              </div>
-              <ArrowRight size={21} />
-            </button>
+            {canReceive && (
+              <button
+                type="button"
+                className="courier-reception-shortcut"
+                onClick={() => {
+                  setSelectedPickup(null);
+                  onNavigate("courier/receive");
+                }}
+              >
+                <ScanLine size={29} />
+                <div>
+                  <strong>Réceptionner un onduleur</strong>
+                  <span>Douchette USB, caméra, photo ou saisie manuelle</span>
+                </div>
+                <ArrowRight size={21} />
+              </button>
+            )}
             <div className="courier-section-heading">
-              <h2>Prochains enlèvements</h2>
+              <h2>
+                {canPickups
+                  ? "Prochains enlèvements"
+                  : "Mes prochaines remises"}
+              </h2>
               <button
                 type="button"
                 className="text-button"
@@ -455,6 +512,24 @@ export default function CourierWorkspace({
                 <LoaderCircle size={18} className="spin" />
                 Chargement des missions…
               </div>
+            ) : !canPickups ? (
+              jobs.filter((job) => job.status === "assigned").length ? (
+                <div className="courier-job-list">
+                  {jobs
+                    .filter((job) => job.status === "assigned")
+                    .slice(0, 3)
+                    .map(jobCard)}
+                </div>
+              ) : (
+                <div className="courier-empty-state">
+                  <Truck size={29} />
+                  <h3>Aucun transport affecté</h3>
+                  <p>
+                    Votre société et l’équipe TVM peuvent préparer les
+                    prochaines affectations.
+                  </p>
+                </div>
+              )
             ) : activePickups.length ? (
               <div className="courier-job-list">
                 {activePickups.slice(0, 3).map(pickupCard)}
@@ -485,7 +560,9 @@ export default function CourierWorkspace({
             <div className="courier-section-heading">
               <h2>
                 {view === "routes"
-                  ? "Enlèvements et remises"
+                  ? canPickups
+                    ? "Enlèvements et remises"
+                    : "Mes livraisons et retours"
                   : view === "ready"
                     ? "Livraisons affectées"
                     : "Retours affectés"}
@@ -516,8 +593,14 @@ export default function CourierWorkspace({
           </>
         )}
       </main>
-      <nav className="courier-bottom-nav" aria-label="Navigation livreur">
-        {courierNavigation.map((item) => (
+      <nav
+        className="courier-bottom-nav"
+        aria-label="Navigation livreur"
+        style={{
+          gridTemplateColumns: `repeat(${navigation.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {navigation.map((item) => (
           <button
             type="button"
             key={item.key}

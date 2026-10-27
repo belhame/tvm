@@ -551,6 +551,16 @@ function EditForm({
       ["client", "courier"].includes(String(entry))
         ? { can_validate_billing: "false" }
         : {}),
+      ...(modal.resource === "users" && name === "role" && entry !== "courier"
+        ? { courier_kind: "internal" }
+        : {}),
+      ...(modal.resource === "users" &&
+      ((name === "courier_kind" && entry === "internal") ||
+        (name === "role" &&
+          entry !== "client" &&
+          !(entry === "courier" && previous.courier_kind === "client")))
+        ? { client: "" }
+        : {}),
       ...(modal.resource === "interventions" && name === "service_request"
         ? { replacement_equipment: "", contract: "", extension_warranty: "" }
         : {}),
@@ -563,6 +573,13 @@ function EditForm({
   }
   function allowedOptions(name: string, resource: string) {
     return (data[resource] || []).filter((row) => {
+      if (resource === "couriers") {
+        const company =
+          typeof row.client === "object" ? row.client?.id : row.client;
+        return name === "default_courier"
+          ? row.courier_kind === "client" && company === modal.record?.id
+          : row.courier_kind === "internal";
+      }
       if (
         resource === "users" &&
         !["technician", "manager", "admin"].includes(row.role)
@@ -652,9 +669,13 @@ function EditForm({
                 : null;
         else if (field.type === "date") value = value || null;
         else if (
-          ["is_active", "return_flag", "can_validate_billing"].includes(
-            field.name,
-          )
+          [
+            "is_active",
+            "return_flag",
+            "can_validate_billing",
+            "notify_email",
+            "notify_whatsapp",
+          ].includes(field.name)
         )
           value = value === true || value === "true";
         payload[field.name] = value;
@@ -669,8 +690,16 @@ function EditForm({
         else if (payload.kind === "in")
           payload.quantity = Math.abs(payload.quantity);
       }
-      if (modal.resource === "users" && payload.role !== "client")
+      if (
+        modal.resource === "users" &&
+        !(
+          payload.role === "client" ||
+          (payload.role === "courier" && payload.courier_kind === "client")
+        )
+      )
         payload.client = null;
+      if (modal.resource === "users" && payload.role !== "courier")
+        payload.courier_kind = "internal";
       if (
         modal.resource === "users" &&
         ["client", "courier"].includes(payload.role)
@@ -784,6 +813,10 @@ function EditForm({
                 .filter(
                   (field) =>
                     field.section !== "reception" &&
+                    (!(modal.resource === "users" && field.name === "client") ||
+                      values.role === "client" ||
+                      (values.role === "courier" &&
+                        values.courier_kind === "client")) &&
                     (!readonly || field.name !== "password") &&
                     (!field.managerOnly ||
                       user.role === "admin" ||
@@ -806,7 +839,11 @@ function EditForm({
                       )}
                     <div className={`form-field ${field.wide ? "span-2" : ""}`}>
                       <label htmlFor={`${formId}-${field.name}`}>
-                        {field.label}
+                        {modal.resource === "users" &&
+                        field.name === "client" &&
+                        values.role === "courier"
+                          ? "Société du livreur externe"
+                          : field.label}
                         {field.required && (
                           <span className="required" aria-hidden="true">
                             {" "}
@@ -831,7 +868,11 @@ function EditForm({
                             (field.name === "technician" &&
                               user.role === "technician")
                           }
-                          required={field.required}
+                          required={
+                            field.required ||
+                            (modal.resource === "users" &&
+                              field.name === "client")
+                          }
                           value={values[field.name]}
                           onChange={(e) =>
                             updateField(field.name, e.target.value)
@@ -2889,10 +2930,18 @@ export default function App() {
           "delivery-notes",
           "users",
         ];
+    const tasks = names.map((name) => ({
+      key: name,
+      read: async () => listResult(await api(`${name}/`)),
+    }));
+    if (user.role === "admin" || user.role === "manager")
+      tasks.push({
+        key: "couriers",
+        read: async () =>
+          (await api<LogisticsBootstrap>("logistics/bootstrap/")).couriers,
+      });
     const results = await Promise.allSettled(
-      names.map(
-        async (name) => [name, listResult(await api(`${name}/`))] as const,
-      ),
+      tasks.map(async (task) => [task.key, await task.read()] as const),
     );
     const failures: string[] = [];
     const fresh: DataMap = {};
@@ -2901,7 +2950,7 @@ export default function App() {
         fresh[result.value[0]] = result.value[1];
       else
         failures.push(
-          `${resources[names[index]]?.title || names[index]} : ${result.reason.message}`,
+          `${resources[tasks[index].key]?.title || (tasks[index].key === "couriers" ? "Livreurs" : tasks[index].key)} : ${result.reason.message}`,
         );
     });
     if (!current()) return;
@@ -3313,6 +3362,7 @@ export default function App() {
               key={user.id}
               user={user}
               clients={data.clients || []}
+              equipment={data.equipment || []}
               Dialog={Modal}
             />
           ) : allowedPage === "clients" ? (
@@ -3512,7 +3562,7 @@ export default function App() {
           ) : allowedPage === "catalogue" ? (
             <EatonCatalogue user={user} />
           ) : allowedPage === "integrations" ? (
-            <Integrations user={user} />
+            <Integrations user={user} clients={data.clients || []} />
           ) : resources[allowedPage] ? (
             <ResourcePage
               key={allowedPage}

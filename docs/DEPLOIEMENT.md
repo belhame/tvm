@@ -77,7 +77,7 @@ Les fichiers du dépôt et la configuration conservée ne garantissent pas que d
 
 ## Rappels internes de 08:00
 
-Le profil Compose `container` démarre également le service **`reminders`**, avec la même image que `web`, après disponibilité de la base et du serveur migré. Il vérifie les rappels toutes les 60 secondes, réglables par `TVM_REMINDER_POLL_SECONDS` entre 10 et 3 600. Les comptes doivent activer leur préférence ; le démarrage du worker n'active personne automatiquement. Le worker crée seulement des notifications dans PostgreSQL et n'envoie aucun message WhatsApp.
+Le profil Compose `container` démarre également le service **`reminders`**, avec la même image que `web`, après disponibilité de la base et du serveur migré. Il vérifie les rappels toutes les 60 secondes, réglables par `TVM_REMINDER_POLL_SECONDS` entre 10 et 3 600. Les comptes doivent activer leur préférence ; le démarrage du worker n'active personne automatiquement. Il traite aussi la file des notifications externes décrite ci-dessous, uniquement si le serveur et la société ont explicitement activé le canal.
 
 En mode Python local, après chargement du `.env`, lancer un second processus supervisé :
 
@@ -86,6 +86,38 @@ En mode Python local, après chargement du `.env`, lancer un second processus su
 ```
 
 Pour un contrôle ponctuel, ajouter `--once`. Ne pas utiliser la simple ouverture d'une page pour déclencher le traitement : les GET ne créent aucun rappel. Plusieurs workers gardent un seul rappel par destinataire et jour local ; un seul processus supervisé suffit à cette équipe. Le fuseau personnel du compte détermine 08:00, avec repli sur `TVM_TIMEZONE`. Aucun rappel ancien n'est conservé dans une file WhatsApp future.
+
+## Connecter les notifications externes du responsable client
+
+Les adaptateurs SMTP et WhatsApp Cloud API sont fournis, **désactivés par défaut**. Aucun accès SMTP ou WhatsApp réel n'a été fourni ou validé dans la version de travail. Les essais automatisés utilisent une boîte e-mail en mémoire et des transports simulés ; ils ne prouvent pas l'acceptation par votre fournisseur.
+
+Le destinataire est toujours le responsable du centre propriétaire : `Client.contact_name`, `Client.email` et `Client.phone`. Les coordonnées du client final d'une collecte servent au transport, sans remplacer ce destinataire. Dans la fiche société, les options `notify_email` et `notify_whatsapp` sont désactivées par défaut ; leur modification relève d'un administrateur ou responsable.
+
+Renseigner les accès **sur le serveur**, dans `.env` protégé ou le gestionnaire de secrets de l'hébergement. Ne pas les copier dans le navigateur, Git, une archive publique ou un message de support. Conserver les valeurs des indicateurs d'envoi à `0` pendant cette préparation.
+
+| Canal | Variables de configuration |
+|---|---|
+| SMTP | `TVM_SMTP_HOST`, `TVM_SMTP_PORT` (587 par défaut), `TVM_SMTP_USER`, `TVM_SMTP_PASSWORD`, `TVM_SMTP_FROM_EMAIL` (adresse seule, par exemple `sav@example.invalid`) |
+| Chiffrement SMTP | `TVM_SMTP_USE_TLS=1` et `TVM_SMTP_USE_SSL=0` pour STARTTLS ; ou l'inverse pour SSL, généralement sur le port 465. Une connexion sans chiffrement ou les deux modes simultanés reste bloquée. |
+| WhatsApp | `TVM_WHATSAPP_TOKEN`, `TVM_WHATSAPP_PHONE_ID` numérique, `TVM_WHATSAPP_API_VERSION` (version Meta active choisie), `TVM_WHATSAPP_TEMPLATE`, `TVM_WHATSAPP_LANGUAGE` (`fr` par défaut) |
+| Activation explicite | `TVM_EMAIL_ENABLED=1` et/ou `TVM_WHATSAPP_ENABLED=1`, puis option correspondante activée sur chaque société destinataire |
+| Délai réseau | `TVM_NOTIFICATION_TIMEOUT`, 10 secondes par défaut, borné de 1 à 30 |
+
+Le numéro WhatsApp de la société doit être en format international avec `+` et indicatif ; aucun pays n'est deviné depuis un numéro local. Le seul hôte appelé est `graph.facebook.com`, en HTTPS avec vérification TLS et sans suivre les redirections. Aucun autre fournisseur ou URL arbitraire n'est configurable.
+
+Le modèle WhatsApp doit être approuvé chez Meta et contenir **cinq paramètres de corps**, dans cet ordre : événement/heure réelle d'affectation/livreur, numéro TVM, référence du centre, numéro de série, adresse du transport. Le nom et le type du livreur proviennent de l'affectation réelle. L'heure d'affectation ne constitue pas un rendez-vous : le message indique que le créneau est à convenir. Ni diagnostic interne, ni notes, ni prix ou facture ne sont transmis.
+
+Après configuration, redémarrer les services pour relire l'environnement. Vérifier le résumé des canaux et un événement de recette avec des destinataires autorisés avant l'ouverture aux centres. Le champ API `configured` contrôle la présence et le format des paramètres, pas la validité du mot de passe ou du jeton chez le fournisseur. `operational`/`ready` signifie que le serveur peut tenter l'envoi ; seul le résultat d'une tentative indique une acceptation.
+
+Les nouveaux événements éligibles alimentent la file. **Activer un canal ne relance jamais les anciennes entrées bloquées.** Un responsable doit ouvrir l'aperçu courant puis relancer explicitement une entrée encore valable. Le destinataire et la mission sont revérifiés avant envoi ; un événement remplacé ou une société incohérente ne part pas. Une autorisation d'envoi de plus de 24 heures doit être revue. Les GET ne déclenchent aucun envoi.
+
+Le worker `reminders` existant traite aussi cette file ; la sauvegarde l'arrête avec `web`. Pour un passage contrôlé, après chargement de `.env` :
+
+```bash
+.venv/bin/python backend/manage.py notification_outbox --once
+```
+
+Un succès signifie **accepté par le fournisseur**, sans preuve de réception ou de lecture. Un refus temporaire explicite est réessayé avec attente croissante, au plus cinq tentatives. Un timeout, une interruption ou une acceptation incertaine ne sont jamais relancés automatiquement : vérifier chez le fournisseur avant une relance manuelle susceptible de créer un doublon. Les webhooks de réception/lecture ne sont pas implémentés dans cette étape. Les secrets et réponses brutes des fournisseurs ne figurent pas dans les journaux applicatifs.
 
 ## Sauvegarder
 
@@ -142,4 +174,4 @@ Vérifier les relations, le nombre de dossiers et les téléchargements d'un éc
 
 Exécuter les tests fournis et contrôler un dossier représentatif depuis deux sessions indépendantes. Vérifier les rôles, l'association de chaque compte client à sa société, les refus d'accès à un dossier tiers, le rapport PDF, la caméra d'un téléphone compatible et une restauration de sauvegarde.
 
-Les comptes, données fictives, clés de démonstration et chemins locaux ne doivent pas être présentés comme une installation de production validée. WhatsApp et l'IA restent indisponibles jusqu'à une intégration et des essais réels avec les accès retenus.
+Les comptes, données fictives, clés de démonstration et chemins locaux ne doivent pas être présentés comme une installation de production validée. SMTP et WhatsApp restent à connecter et à essayer avec les accès retenus ; leurs adaptateurs et leur journal ne prouvent pas un envoi réel. L'assistant IA reste non connecté.

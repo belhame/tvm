@@ -17,11 +17,14 @@ import {
   Search,
   Truck,
   Users,
+  Plus,
+  Route,
 } from "lucide-react";
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import CallReference from "./CallReference";
 import CourierReception from "./CourierReception";
-import { HandoffReceipt } from "./ClientPickups";
+import { HandoffReceipt, PickupForm } from "./ClientPickups";
+import CourierRouting from "./CourierRouting";
 import {
   logisticsReference,
   pickupLabels,
@@ -45,10 +48,12 @@ type Destination = {
 export default function LogisticsWorkspace({
   user,
   clients,
+  equipment,
   Dialog,
 }: {
   user: User;
   clients: RecordData[];
+  equipment: RecordData[];
   Dialog: ComponentType<DialogProps>;
 }) {
   const id = useId();
@@ -64,6 +69,7 @@ export default function LogisticsWorkspace({
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
+  const [createPickupOpen, setCreatePickupOpen] = useState(false);
   const [destinations, setDestinations] = useState<Record<string, Destination>>(
     {},
   );
@@ -113,6 +119,46 @@ export default function LogisticsWorkspace({
     });
     return () => pending.abort();
   }, [revision, user.id]);
+  async function reconcile() {
+    if (busy) return;
+    const pending = new AbortController();
+    controller.current = pending;
+    setBusy("reconcile");
+    setErrors([]);
+    setNotice("");
+    try {
+      const result = await api<{
+        created: number[];
+        reassigned: number[];
+        skipped: number[];
+        errors: { service_request: number; detail: string }[];
+      }>("logistics/reconcile/", {
+        method: "POST",
+        signal: pending.signal,
+        body: JSON.stringify({ reassign_automatic: false }),
+      });
+      if (mounted.current && !pending.signal.aborted) {
+        setNotice(
+          `${result.created.length} mission(s) créée(s), ${result.reassigned.length} réaffectation(s), ${result.skipped.length} dossier(s) conservé(s). Les missions existantes ne sont pas écrasées.`,
+        );
+        setErrors(
+          result.errors.map(
+            (error) => `Dossier ${error.service_request} : ${error.detail}`,
+          ),
+        );
+        setRevision((value) => value + 1);
+      }
+    } catch (failure) {
+      if (mounted.current && !pending.signal.aborted)
+        setErrors([
+          failure instanceof Error
+            ? failure.message
+            : "Le routage n’a pas pu être confirmé.",
+        ]);
+    } finally {
+      if (mounted.current && !pending.signal.aborted) setBusy("");
+    }
+  }
   function destination(record: RecordData): Destination {
     const key = String(record.id);
     if (destinations[key]) return destinations[key];
@@ -215,6 +261,13 @@ export default function LogisticsWorkspace({
     const key = `${kind}:${record.id}`;
     const value = assignments[key] ?? String(record.assigned_courier || "");
     const target = destination(record);
+    const companyId =
+      typeof record.client === "object" ? record.client?.id : record.client;
+    const allowedCouriers = (bootstrap?.couriers || []).filter((courier) =>
+      kind === "pickup"
+        ? (courier.courier_kind || "internal") === "internal"
+        : courier.courier_kind !== "client" || courier.client === companyId,
+    );
     return (
       <div className="logistics-assignment">
         <label className="sr-only" htmlFor={`${id}-${key}`}>
@@ -236,9 +289,10 @@ export default function LogisticsWorkspace({
           }
         >
           <option value="">Choisir le livreur…</option>
-          {bootstrap?.couriers.map((courier) => (
+          {allowedCouriers.map((courier) => (
             <option value={courier.id} key={courier.id}>
-              {courier.name}
+              {courier.name} ·{" "}
+              {courier.courier_kind === "client" ? "Livreur client" : "TVM"}
             </option>
           ))}
         </select>
@@ -298,6 +352,9 @@ export default function LogisticsWorkspace({
             </small>
           </div>
         )}
+        {kind === "candidate" && (
+          <CourierRouting record={record} recommendation />
+        )}
         <button
           type="button"
           className="button primary small"
@@ -354,16 +411,49 @@ export default function LogisticsWorkspace({
             livreurs.
           </p>
         </div>
+        <div className="client-heading-actions">
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setCreatePickupOpen(true)}
+          >
+            <Plus size={17} />
+            Créer une collecte
+          </button>
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => {
+              setReceivePickup(null);
+              setReceptionOpen(true);
+            }}
+          >
+            <PackageCheck size={18} />
+            Réception atelier
+          </button>
+        </div>
+      </div>
+      <div className="logistics-auto-routing">
+        <div>
+          <strong>Routage des dossiers prêts à livrer</strong>
+          <p>
+            Priorité au livreur client actif, puis au référent TVM de la
+            société. Les retours et les missions déjà affectées restent à gérer
+            explicitement.
+          </p>
+        </div>
         <button
           type="button"
-          className="button primary"
-          onClick={() => {
-            setReceivePickup(null);
-            setReceptionOpen(true);
-          }}
+          className="button secondary small"
+          disabled={!!busy || loading}
+          onClick={() => void reconcile()}
         >
-          <PackageCheck size={18} />
-          Réception atelier
+          {busy === "reconcile" ? (
+            <LoaderCircle size={16} className="spin" />
+          ) : (
+            <Route size={16} />
+          )}
+          Compléter les affectations automatiques
         </button>
       </div>
       {notice && (
@@ -500,6 +590,12 @@ export default function LogisticsWorkspace({
                           {pickup.serial_number} · {pickup.model}
                         </small>
                       </div>
+                      {pickup.pickup_scope === "end_customer" && (
+                        <div className="pickup-final-customer">
+                          <MapPin size={14} />
+                          <span>Client final : {pickup.end_customer_name}</span>
+                        </div>
+                      )}
                       {pickup.client_reference && (
                         <small>
                           N° d’appel client : {pickup.client_reference}
@@ -654,6 +750,7 @@ export default function LogisticsWorkspace({
                     compact
                   />
                 </div>
+                <CourierRouting record={job} />
                 {job.status === "completed" ? (
                   <HandoffReceipt job={job} />
                 ) : job.can_assign ? (
@@ -710,6 +807,33 @@ export default function LogisticsWorkspace({
               }}
             />
           </div>
+        </Dialog>
+      )}
+      {createPickupOpen && (
+        <Dialog
+          title="Créer une collecte pour un centre"
+          subtitle="Le centre choisi reste propriétaire du dossier et du matériel."
+          onClose={() => setCreatePickupOpen(false)}
+          wide
+        >
+          <PickupForm
+            equipment={equipment}
+            managerClients={clients}
+            onClose={() => setCreatePickupOpen(false)}
+            onSaved={(pickup) => {
+              setPickups((rows) => [
+                pickup,
+                ...rows.filter((row) => row.id !== pickup.id),
+              ]);
+              setCreatePickupOpen(false);
+              setTab("pickups");
+              setQuery("");
+              setNotice(
+                "Collecte enregistrée pour le centre client. La réception physique au SAV reste à confirmer.",
+              );
+              setRevision((value) => value + 1);
+            }}
+          />
         </Dialog>
       )}
       {cancellation && (

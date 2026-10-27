@@ -261,6 +261,46 @@ export const resources: Record<string, Resource> = {
         maxLength: 4000,
         help: "Réservées à votre équipe ; absentes du portail client.",
       },
+      {
+        name: "default_courier",
+        label: "Livreur client par défaut",
+        type: "select",
+        resource: "couriers",
+        managerOnly: true,
+        help: "Livreur externe actif lié à cette société. Prioritaire lors de la mise prêt à livrer ; les missions existantes sont conservées.",
+      },
+      {
+        name: "internal_courier",
+        label: "Référent livreur TVM",
+        type: "select",
+        resource: "couriers",
+        managerOnly: true,
+        help: "Livreur TVM utilisé quand aucun livreur client n’est configuré. Une nouvelle société doit d’abord être enregistrée pour associer son livreur externe.",
+      },
+      {
+        name: "notify_email",
+        label: "Notifications client par e-mail",
+        type: "select",
+        options: [
+          ["false", "Désactivées"],
+          ["true", "Autorisées"],
+        ],
+        default: false,
+        managerOnly: true,
+        help: "Autorise la préparation des notifications de cette société. Un fournisseur configuré reste nécessaire pour les envoyer.",
+      },
+      {
+        name: "notify_whatsapp",
+        label: "Notifications client WhatsApp",
+        type: "select",
+        options: [
+          ["false", "Désactivées"],
+          ["true", "Autorisées"],
+        ],
+        default: false,
+        managerOnly: true,
+        help: "Autorisation propre à cette société ; aucun envoi n’est annoncé sans acceptation réelle du fournisseur.",
+      },
     ],
   },
   equipment: {
@@ -782,11 +822,24 @@ export const resources: Record<string, Resource> = {
         default: "technician",
       },
       {
+        name: "courier_kind",
+        label: "Type de livreur",
+        type: "select",
+        options: [
+          ["internal", "TVM — livreur interne"],
+          ["client", "Client — livreur externe d’une société"],
+        ],
+        default: "internal",
+        when: { field: "role", value: "courier" },
+        required: true,
+        help: "L’identité et la société d’un livreur sont conservées dès une mission, une réception ou une référence client. Le serveur précise les liens à retirer si une modification est refusée.",
+      },
+      {
         name: "client",
         label: "Client du portail",
         type: "select",
         resource: "clients",
-        help: "Obligatoire pour le rôle Client, vide pour un compte interne.",
+        help: "Société obligatoire pour un compte client ou un livreur externe. Un livreur TVM reste sans société liée.",
       },
       {
         name: "password",
@@ -820,6 +873,8 @@ export const resources: Record<string, Resource> = {
 };
 
 export function optionLabel(resource: string, item: RecordData) {
+  if (resource === "couriers")
+    return `${item.name} · ${item.courier_kind === "client" ? "Livreur client" : "TVM"}`;
   if (resource === "clients") return item.name;
   if (resource === "equipment")
     return `${item.serial_number} · ${item.model} · ${item.client_name || ""}`;

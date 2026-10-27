@@ -7,6 +7,7 @@ export type User = {
   email: string;
   role: "admin" | "manager" | "technician" | "client" | "courier";
   client: number | null;
+  courier_kind?: "internal" | "client";
   can_validate_billing?: boolean;
 };
 let csrfToken = "";

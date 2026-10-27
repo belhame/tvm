@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/logistics/recognize-serial/', recognize_serial),
     path('api/logistics/', include('core.logistics_urls')),
     path('api/logistics/', include('core.notification_urls')),
+    path('api/logistics/', include('core.outbox_urls')),
     path('api/requests/intake/', intake_views.request_intake),
     path('api/exchanges/', exchange_views.exchange_list),
     path('api/dispatch/ready/', disposition_views.dispatch_list, {'queue': 'ready'}),

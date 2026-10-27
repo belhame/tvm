@@ -34,6 +34,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Tableau de bord | Compteurs, interventions récentes, activité et répartition des états issus de la base | Pas de statistiques historiques importées avant reprise des données |
 | Recherche | Recherche de clients, dossiers, interventions et séries selon les droits du compte | Aucun accès implicite à une autre société via une recherche |
 | Notifications internes | Boîte de réception propre au compte, événements de réception/remise pour le portail et rappel logistique opt-in de 08:00 | Rappel dans l'application, fuseau IANA explicite et missions affectées seulement ; aucun envoi WhatsApp |
+| Notifications du centre | Journal des affectations et collectes, destinataire responsable de la société, canaux e-mail/WhatsApp opt-in, aperçu et relance contrôlée | Canaux désactivés et accès absents dans l'instance de travail ; aucune reprise automatique des anciennes entrées bloquées ; accepté ne signifie pas reçu/lu |
 | Logistique | Demandes d'enlèvement client, affectation par responsable, espace livreur, réception atelier et preuve de remise | Lecture de série consultative avant confirmation ; preuve saisie par le livreur, sans signature ni acquittement automatique du client ; finance distincte |
 | Traçabilité | Journal des opérations accessible aux administrateurs / responsables via `/api/audit/` | Consultation via l'API ; pas de vue dédiée dans cette étape |
 
@@ -46,7 +47,8 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 | Administrateur | Création et modification des données métier ; gestion des comptes, rôles et délégations de validation financière ; autorisation financière implicite |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
 | Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
-| Livreur | Espace logistique restreint : missions affectées, réception contrôlée et remise enregistrée ; ses propres rappels et notifications ; aucun accès aux diagnostics techniques internes, factures ou comptes |
+| Livreur TVM | Espace restreint : collectes affectées, réception atelier et remise enregistrée ; ses rappels/notifications, sans diagnostics internes, factures ou comptes |
+| Livreur client | Compte lié à sa société : uniquement ses livraisons/retours affectés et leur remise ; aucune collecte, réception, recherche de séries ou photo OCR |
 | Client | Consultation de sa société et demande d'enlèvement, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
@@ -54,6 +56,8 @@ Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, �
 La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif éligible. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ou un livreur ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
+
+Une société peut définir son livreur client et son référent TVM. Les nouvelles mises à disposition prêtes utilisent ces référents dans cet ordre ; sans référent valide, le dossier reste à affecter. Les choix manuels et les preuves de remise restent conservés. Une collecte chez le client final reste la propriété du centre et relève toujours des livreurs TVM.
 
 L'import d'annuaire est réservé aux administrateurs et responsables. Il accepte une fiche avec son nom seul, garde les informations absentes vides et ne reprend aucune ancienne colonne de connexion. Les notes `Client.notes` et le nombre de comptes portail restent internes ; créer les accès utilisateurs est une opération distincte.
 
@@ -101,10 +105,11 @@ La règle confirmée est **début de garantie = fabrication + six mois calendair
 
 | Intégration | État livré | Éléments requis avant activation |
 |---|---|---|
-| WhatsApp | Préparation et aperçu du rappel, état `requires_credentials` ; aucun message envoyé, connexion reportée à la demande de l'utilisateur | Compte WhatsApp Business / Meta, numéro validé, accès serveur, modèles approuvés, webhooks et consentement des destinataires |
+| E-mail | Adaptateur SMTP et file persistante, désactivés ; essais en mémoire seulement | Serveur SMTP, compte, expéditeur et TLS/SSL, activation serveur et option par société, essai réel à effectuer |
+| WhatsApp | Adaptateur Cloud API avec modèle à cinq paramètres, aperçu et journal ; désactivé, accès à connecter plus tard | Compte WhatsApp Business / Meta, numéro validé, jeton et modèle approuvé, activation serveur et option par société ; réception/lecture par webhook non fournie |
 | Assistant IA | Écran d'état ; aucun diagnostic ni réponse simulés | Fournisseur et modèle retenus, accès API côté serveur, règles de confidentialité, filtrage des dossiers avant chaque requête et validation des réponses |
 
-Fournir une clé ne suffit pas à déclarer une intégration opérationnelle : les adaptateurs, les contrôles d'accès, les erreurs, la réception des événements et les essais réels doivent être réalisés. Aucun secret fournisseur n'est demandé dans un formulaire navigateur ou enregistré dans les sources.
+Fournir une clé ne prouve pas une intégration validée : les accès et les essais réels restent à effectuer. Les adaptateurs SMTP/WhatsApp contrôlent les erreurs et l'acceptation ; ils ne simulent pas une réception ou une lecture. Aucun secret fournisseur n'est demandé dans un formulaire navigateur ou enregistré dans les sources.
 
 ## Ce qui est récupéré du projet WINDEV
 

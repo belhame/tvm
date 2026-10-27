@@ -14,6 +14,9 @@ class PickupRequest(models.Model):
     serial_number = models.CharField(max_length=120)
     brand = models.CharField(max_length=100, blank=True)
     model = models.CharField(max_length=120, blank=True)
+    pickup_scope = models.CharField(max_length=16, choices=[('direct', 'Chez le client'), ('end_customer', 'Chez son client final')], default='direct')
+    end_customer_name = models.CharField(max_length=200, blank=True)
+    assignment_revision = models.PositiveIntegerField(default=1)
     client_reference = models.CharField(max_length=120, blank=True)
     fault_description = models.TextField()
     pickup_address = models.TextField()
@@ -38,6 +41,7 @@ class PickupRequest(models.Model):
         ordering = ['-requested_at', '-id']
         constraints = [
             models.UniqueConstraint(fields=['requested_by', 'request_key'], name='pickup_actor_request_key_unique'),
+            models.CheckConstraint(condition=models.Q(pickup_scope='direct') | (models.Q(pickup_scope='end_customer') & ~models.Q(end_customer_name='')), name='pickup_scope_consistent'),
             models.CheckConstraint(condition=~models.Q(status='received') | models.Q(received_at__isnull=False, received_by__isnull=False, service_request__isnull=False), name='pickup_received_consistent'),
             models.CheckConstraint(condition=~models.Q(status='collected') | models.Q(collected_at__isnull=False, collected_by__isnull=False, assigned_courier__isnull=False), name='pickup_collected_consistent'),
         ]
@@ -68,7 +72,10 @@ class OutboundJob(models.Model):
     kind = models.CharField(max_length=12, choices=Kind.choices)
     assigned_courier = models.ForeignKey('core.User', on_delete=models.PROTECT, related_name='outbound_jobs')
     assigned_at = models.DateTimeField()
-    assigned_by = models.ForeignKey('core.User', on_delete=models.PROTECT, related_name='outbound_assignments')
+    assigned_by = models.ForeignKey('core.User', null=True, blank=True, on_delete=models.PROTECT, related_name='outbound_assignments')
+    assignment_mode = models.CharField(max_length=12, choices=[('manual', 'Manuelle'), ('automatic', 'Automatique')], default='manual')
+    routing_source = models.CharField(max_length=24, choices=[('manual', 'Manuelle'), ('default_courier', 'Livreur client par défaut'), ('internal_courier', 'Référent TVM')], default='manual')
+    assignment_revision = models.PositiveIntegerField(default=1)
     delivery_address = models.TextField(blank=True)
     contact_name = models.CharField(max_length=150, blank=True)
     contact_phone = models.CharField(max_length=40, blank=True)

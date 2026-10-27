@@ -1,4 +1,4 @@
-"""A polling in-app reminder worker, with no external notification transport."""
+"""Polling in-app reminders and an independently gated external delivery queue."""
 import os
 import signal
 from threading import Event
@@ -7,10 +7,11 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import OperationalError, close_old_connections
 
 from core.notification_service import run_daily_reminders
+from core.outbox_service import process_outbox
 
 
 class Command(BaseCommand):
-    help = 'Crée les rappels internes opt-in de 08:00 ; ne contacte aucun service WhatsApp.'
+    help = 'Crée les rappels internes de 08:00 et traite les notifications externes explicitement autorisées.'
 
     def add_arguments(self, parser):
         parser.add_argument('--once', action='store_true', help='Vérifie une seule fois les rappels dus et quitte.')
@@ -25,7 +26,8 @@ class Command(BaseCommand):
             raise CommandError('L’intervalle doit être compris entre 10 et 3 600 secondes.')
         if options['once']:
             count = run_daily_reminders()
-            self.stdout.write(f'Rappels internes créés : {count}. WhatsApp non connecté ; aucun envoi externe.')
+            handled = process_outbox()
+            self.stdout.write(f'Rappels internes créés : {count}. Notifications externes examinées : {handled}.')
             return
         stopped = Event()
         previous = {}
@@ -33,14 +35,17 @@ class Command(BaseCommand):
             stopped.set()
         for signum in (signal.SIGINT, signal.SIGTERM):
             previous[signum] = signal.signal(signum, stop)
-        self.stdout.write('Rappels internes actifs : contrôle de 08:00 ; WhatsApp non connecté.')
+        self.stdout.write('Worker actif : rappels internes de 08:00 et file externe opt-in selon configuration.')
         try:
             while not stopped.is_set():
                 close_old_connections()
                 try:
                     count = run_daily_reminders()
+                    handled = process_outbox()
                     if count:
                         self.stdout.write(f'Rappels internes créés : {count}.')
+                    if handled:
+                        self.stdout.write(f'Notifications externes examinées : {handled}.')
                 except OperationalError:
                     self.stderr.write('Base temporairement indisponible ; les rappels internes seront revérifiés au prochain passage.')
                 stopped.wait(interval)

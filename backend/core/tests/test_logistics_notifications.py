@@ -174,11 +174,11 @@ class LogisticsNotificationWorkloadTests(TestCase):
 class ReminderWorkerCommandTests(SimpleTestCase):
     def test_once_reports_only_internal_delivery_and_does_not_loop(self):
         output = StringIO()
-        with patch('core.management.commands.logistics_reminders.run_daily_reminders', return_value=2) as run:
+        with patch('core.management.commands.logistics_reminders.run_daily_reminders', return_value=2) as run, patch('core.management.commands.logistics_reminders.process_outbox', return_value=0):
             call_command('logistics_reminders', once=True, stdout=output)
         run.assert_called_once_with()
         self.assertIn('Rappels internes créés : 2', output.getvalue())
-        self.assertIn('aucun envoi externe', output.getvalue())
+        self.assertIn('Notifications externes examinées : 0', output.getvalue())
 
     def test_invalid_poll_interval_is_rejected_before_accessing_database(self):
         for interval in (0, 9, 3601):

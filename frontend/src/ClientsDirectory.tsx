@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Upload,
   Users,
+  Truck,
   X,
 } from "lucide-react";
 import {
@@ -548,6 +549,52 @@ function ClientDetails({
             </dl>
           </section>
         </div>
+        {user.role !== "client" && (
+          <section className="request-dossier-card client-courier-settings">
+            <h3>
+              <Truck size={18} />
+              Livreurs et notifications de la société
+            </h3>
+            <dl className="request-dossier-facts">
+              <div>
+                <dt>Livreur client par défaut</dt>
+                <dd>
+                  {client.default_courier_name ||
+                    "Aucun livreur client configuré"}
+                </dd>
+              </div>
+              <div>
+                <dt>Référent livreur TVM</dt>
+                <dd>
+                  {client.internal_courier_name ||
+                    "Aucun référent TVM configuré"}
+                </dd>
+              </div>
+              <div>
+                <dt>Notifications client par e-mail</dt>
+                <dd>
+                  {client.notify_email
+                    ? "Autorisées pour cette société"
+                    : "Désactivées"}
+                </dd>
+              </div>
+              <div>
+                <dt>Notifications client WhatsApp</dt>
+                <dd>
+                  {client.notify_whatsapp
+                    ? "Autorisées pour cette société"
+                    : "Désactivées"}
+                </dd>
+              </div>
+            </dl>
+            <p>
+              À la mise prêt à livrer, le livreur client actif est prioritaire,
+              puis le référent TVM. Les missions déjà affectées sont conservées.
+              Une notification autorisée reste soumise à la disponibilité réelle
+              du fournisseur.
+            </p>
+          </section>
+        )}
         {user.role !== "client" && (
           <section className="request-dossier-card client-private-notes">
             <h3>Notes internes</h3>

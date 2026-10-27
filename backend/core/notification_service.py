@@ -1,4 +1,4 @@
-"""Only in-app delivery is implemented; WhatsApp has no transport or outbox."""
+"""Own-account in-app reminders; external logistics delivery is opt-in and separate."""
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -73,7 +73,10 @@ def notification_payload(item, user):
     base = {'id': item.pk, 'kind': item.kind, 'created_at': item.created_at, 'read_at': item.read_at,
             'local_date': item.local_date, 'channel': 'in_app', 'channel_status': 'available',
             'service_request': None, 'call_number': '', 'client_reference': '', 'details': {}}
-    if item.kind == InAppNotification.Kind.DAILY:
+    if item.kind == InAppNotification.Kind.LOGISTICS:
+        from .outbox_service import logistics_in_app_payload
+        base.update(logistics_in_app_payload(item, user))
+    elif item.kind == InAppNotification.Kind.DAILY:
         workload = logistics_workload(user) if user.effective_role in ('courier', 'admin') else {'pickups': [], 'deliveries': []}
         pickup_ids = set(item.payload.get('pickup_ids', []))
         delivery_ids = set(item.payload.get('delivery_ids', []))

@@ -9,10 +9,10 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
 from .exchange_views import StrictInput
-from .logistics_permissions import LogisticsOperatorPermission, logistics_manager
+from .logistics_permissions import LogisticsOperatorPermission, logistics_manager, logistics_receiver
 from .models import Client
 from .request_numbering import reference_query_value
-from .workflow_api import StrictText
+from .workflow_api import StrictBoolean, StrictText
 
 
 class ParticipantPermission(BasePermission):
@@ -26,6 +26,13 @@ class ParticipantPermission(BasePermission):
 class LogisticsManagerPermission(BasePermission):
     def has_permission(self, request, view):
         return logistics_manager(request.user)
+
+
+class InternalLogisticsPermission(BasePermission):
+    message = 'La réception atelier et les collectes sont réservées à l’équipe TVM.'
+
+    def has_permission(self, request, view):
+        return logistics_receiver(request.user)
 
 
 class StrictId(serializers.IntegerField):
@@ -73,6 +80,9 @@ class ReceiveInput(LookupInput):
 
 class PickupInput(StrictInput):
     request_key = StrictUuid()
+    client = StrictId(required=False)
+    pickup_scope = serializers.ChoiceField(choices=['direct', 'end_customer'], required=False, default='direct')
+    end_customer_name = StrictText(max_length=200, required=False, allow_blank=True, default='')
     equipment = StrictId(required=False)
     serial_number = StrictText(max_length=120, required=False)
     brand = StrictText(max_length=100, required=False, allow_blank=True, default='')
@@ -86,6 +96,8 @@ class PickupInput(StrictInput):
     def validate(self, attrs):
         if not attrs.get('equipment') and not attrs.get('serial_number'):
             raise serializers.ValidationError({'serial_number': 'Sélectionnez votre équipement ou renseignez son numéro de série.'})
+        if attrs.get('pickup_scope') == 'end_customer' and not attrs.get('end_customer_name'):
+            raise serializers.ValidationError({'end_customer_name': 'Renseignez le nom du client final chez qui collecter l’onduleur.'})
         return attrs
 
 
@@ -108,6 +120,11 @@ class HandoffInput(StrictInput):
     recipient_name = StrictText(max_length=150)
 
 
+class ReconcileInput(StrictInput):
+    client = StrictId(required=False)
+    reassign_automatic = StrictBoolean(required=False, default=False)
+
+
 def _input(serializer_class, request):
     serializer = serializer_class(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -128,7 +145,7 @@ def bootstrap(request):
 
 
 @api_view(['GET'])
-@permission_classes([LogisticsOperatorPermission])
+@permission_classes([InternalLogisticsPermission])
 def clients(request):
     queryset = Client.objects.order_by('name', 'id')
     query = reference_query_value(request.query_params, 'q')
@@ -138,7 +155,7 @@ def clients(request):
 
 
 @api_view(['POST'])
-@permission_classes([LogisticsOperatorPermission])
+@permission_classes([InternalLogisticsPermission])
 @parser_classes([JSONParser])
 def lookup(request):
     from .logistics_service import lookup as lookup_serial
@@ -148,7 +165,7 @@ def lookup(request):
 
 
 @api_view(['POST'])
-@permission_classes([LogisticsOperatorPermission])
+@permission_classes([InternalLogisticsPermission])
 @parser_classes([JSONParser])
 def receive(request):
     from .logistics_service import receive as receive_equipment
@@ -164,8 +181,8 @@ def pickups(request):
     from .logistics_service import create_pickup, pickups_for
     from .logistics_payloads import pickup_payload
     if request.method == 'POST':
-        if request.user.effective_role != 'client':
-            raise PermissionDenied('La demande d’enlèvement est créée depuis le portail de la société cliente.')
+        if request.user.effective_role != 'client' and not logistics_manager(request.user):
+            raise PermissionDenied('Le client ou le responsable TVM enregistre la demande d’enlèvement.')
         record = create_pickup(request.user, _input(PickupInput, request))
         return _private(pickup_payload(record, request.user))
     queryset = pickups_for(request.user)
@@ -194,7 +211,7 @@ def pickup_assign(request, pickup_id):
 
 
 @api_view(['POST'])
-@permission_classes([LogisticsOperatorPermission])
+@permission_classes([InternalLogisticsPermission])
 @parser_classes([JSONParser])
 def pickup_collect(request, pickup_id):
     from .logistics_service import collect_pickup
@@ -274,3 +291,13 @@ def outbound_cancel(request, job_id):
 def dispatch_candidates(request):
     from .logistics_payloads import dispatch_candidates as candidates
     return _private(candidates(request.user, q=reference_query_value(request.query_params, 'q')))
+
+
+@api_view(['POST'])
+@permission_classes([LogisticsManagerPermission])
+@parser_classes([JSONParser])
+def reconcile(request):
+    from .logistics_service import reconcile_dispatch
+    data = _input(ReconcileInput, request)
+    return _private(reconcile_dispatch(request.user, client_id=data.get('client'),
+                                       reassign_automatic=data['reassign_automatic']))

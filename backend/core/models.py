@@ -25,11 +25,20 @@ class Client(LegacyModel):
     postal_code = models.CharField(max_length=20, blank=True)
     country = models.CharField(max_length=80, default='France', blank=True)
     notes = models.TextField(blank=True)
+    default_courier = models.ForeignKey('core.User', null=True, blank=True, on_delete=models.PROTECT, related_name='default_delivery_clients')
+    internal_courier = models.ForeignKey('core.User', null=True, blank=True, on_delete=models.PROTECT, related_name='internal_delivery_clients')
+    notify_email = models.BooleanField(default=False)
+    notify_whatsapp = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering = ['name', 'id']
     def __str__(self):
         return self.name
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        from .logistics_service import validate_client_routing
+        validate_client_routing(self, kwargs.get('update_fields'))
+        return super().save(*args, **kwargs)
 
 
 class PowerCareUserManager(UserManager):
@@ -45,6 +54,10 @@ class User(AbstractUser):
         TECHNICIAN = 'technician', 'Technicien'
         COURIER = 'courier', 'Livreur'
         CLIENT = 'client', 'Client'
+    class CourierKind(models.TextChoices):
+        INTERNAL = 'internal', 'Livreur TVM'
+        CLIENT = 'client', 'Livreur client'
+    courier_kind = models.CharField(max_length=12, choices=CourierKind.choices, default=CourierKind.INTERNAL)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.TECHNICIAN)
     can_validate_billing = models.BooleanField(default=False)
     client = models.ForeignKey(Client, on_delete=models.PROTECT, null=True, blank=True, related_name='portal_users')
@@ -52,7 +65,7 @@ class User(AbstractUser):
     objects = PowerCareUserManager()
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=(models.Q(role='client', client__isnull=False) | (~models.Q(role='client') & models.Q(client__isnull=True))), name='user_client_role_consistent'),
+            models.CheckConstraint(condition=(models.Q(role='client', courier_kind='internal', client__isnull=False) | models.Q(role='courier', courier_kind='client', client__isnull=False) | (models.Q(courier_kind='internal', client__isnull=True) & ~models.Q(role='client'))), name='user_client_role_consistent'),
             models.CheckConstraint(condition=~models.Q(role='client') | models.Q(can_validate_billing=False), name='user_client_cannot_validate_billing'),
             models.CheckConstraint(condition=~models.Q(role='courier') | models.Q(can_validate_billing=False, is_staff=False, is_superuser=False), name='user_courier_restricted'),
         ]
@@ -62,6 +75,11 @@ class User(AbstractUser):
             raise ValidationError({'can_validate_billing': 'Un compte client ou livreur ne peut pas valider la facturation.'})
         if self.role == self.Role.COURIER and (self.is_staff or self.is_superuser):
             raise ValidationError({'role': 'Un compte livreur ne dispose pas de droits d’administration Django.'})
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        from .logistics_service import guard_courier_identity_update
+        guard_courier_identity_update(self, kwargs.get('update_fields'))
+        return super().save(*args, **kwargs)
     @property
     def effective_role(self):
         return 'admin' if self.is_superuser else self.role
@@ -212,6 +230,10 @@ class ServiceRequest(ReferencedModel):
             result = super().save(*args, **kwargs)
             register_exchange_request(self, old_status)
             register_disposition_request(self, old_status)
+            if self.status == 'ready_for_delivery' and old_status != self.status:
+                from .logistics_service import auto_assign_ready
+                from .workflow_events import current_actor
+                auto_assign_ready(self.pk, actor=current_actor())
             return result
         except Exception:
             if allocated:
@@ -423,3 +445,4 @@ from .exchange_models import ExchangeProcess  # noqa: E402,F401
 from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, DispositionProcess  # noqa: E402,F401
 from .notification_models import DailyReminderPreferences, InAppNotification  # noqa: E402,F401
 from .logistics_models import CourierReceipt, OutboundJob, PickupRequest  # noqa: E402,F401
+from .outbox_models import ExternalNotification  # noqa: E402,F401

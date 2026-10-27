@@ -16,8 +16,10 @@ class InAppNotification(models.Model):
         DAILY = 'daily_logistics', 'Rappel logistique quotidien'
         RECEIVED = 'equipment_received', 'Matériel reçu'
         DELIVERED = 'equipment_delivered', 'Remise enregistrée'
+        LOGISTICS = 'logistics_update', 'Information logistique du centre'
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='in_app_notifications')
+    client = models.ForeignKey('core.Client', on_delete=models.PROTECT, null=True, blank=True, related_name='in_app_notifications')
     kind = models.CharField(max_length=32, choices=Kind.choices)
     dedup_key = models.CharField(max_length=160)
     local_date = models.DateField()

@@ -33,7 +33,7 @@ User = get_user_model()
 
 
 def user_payload(user):
-    return {'id': user.pk, 'username': user.username, 'first_name': user.first_name, 'last_name': user.last_name, 'email': user.email, 'role': user.effective_role, 'client': user.client_id, 'can_validate_billing': user.can_validate_billing}
+    return {'id': user.pk, 'username': user.username, 'first_name': user.first_name, 'last_name': user.last_name, 'email': user.email, 'role': user.effective_role, 'courier_kind': user.courier_kind, 'client': user.client_id, 'can_validate_billing': user.can_validate_billing}
 
 
 @ensure_csrf_cookie
@@ -137,10 +137,10 @@ class ClientViewSet(BusinessViewSet):
     serializer_class = ClientSerializer
     owner_path = 'id'
     def get_queryset(self):
-        qs = super().get_queryset().annotate(
+        qs = super().get_queryset().select_related('default_courier', 'internal_courier').annotate(
             equipment_count=Count('equipment', distinct=True),
             open_requests_count=Count('equipment__service_requests', filter=~Q(equipment__service_requests__status='closed'), distinct=True),
-            portal_users_count=Count('portal_users', filter=Q(portal_users__is_active=True), distinct=True),
+            portal_users_count=Count('portal_users', filter=Q(portal_users__is_active=True, portal_users__role='client'), distinct=True),
         )
         query = reference_query_value(self.request.query_params, 'q')
         if query:
@@ -400,8 +400,12 @@ def search_view(request):
 @api_view(['GET'])
 @permission_classes([InternalPermission])
 def integrations_view(request):
+    from .outbox_service import channel_status
+    whatsapp = channel_status('whatsapp')
+    email = channel_status('email')
     return Response({
-        'whatsapp': {'configured': False, 'operational': False, 'status': 'requires_credentials', 'message': 'Aucun message n’est envoyé. Connectez un compte WhatsApp Business, validez vos modèles et le consentement de chaque destinataire avant activation.', 'requirements': ['Compte Meta WhatsApp Business et numéro validé', 'Jeton API et identifiant du numéro fournis via un gestionnaire de secrets', 'Modèles approuvés, opt-in des clients et webhook signé', 'Règles de confidentialité et traçabilité des envois à valider']},
+        'whatsapp': {**whatsapp, 'message': 'Les messages de collecte et de livraison visent le responsable du centre client, selon sa préférence. Configurez et activez WhatsApp Business pour permettre les envois ; leur acceptation réelle se consulte dans le journal. Le rappel personnel de 08:00 reste dans TVM.', 'requirements': ['Compte Meta WhatsApp Business et numéro validé', 'Jeton API et identifiant du numéro dans la configuration privée', 'Modèle approuvé et notifications activées pour le client']},
+        'email': {**email, 'message': 'Notifications au responsable du centre via le serveur SMTP configuré et la préférence du client. Le journal distingue les messages en attente, bloqués ou acceptés par le serveur.'},
         'ai': {'configured': False, 'operational': False, 'status': 'requires_credentials', 'message': 'Assistant non connecté. Aucune réponse de diagnostic n’est simulée et aucun dossier n’est transmis à un fournisseur.', 'requirements': ['Fournisseur et modèle IA approuvés', 'Clé API fournie par canal sécurisé', 'Politique de conservation, localisation et traitement des données', 'Recherche filtrée selon les droits de l’utilisateur et audit des accès']},
         'scanner': {'operational': True, 'requires_https': True, 'message': 'Recherche par numéro de série opérationnelle. Le scan caméra nécessite HTTPS et une caméra autorisée ; prise en charge selon navigateur, saisie manuelle disponible.'},
     })
