@@ -150,12 +150,24 @@ class DispositionWorkflowTests(TestCase):
         from core.exchange_workflow import exchange_related, workflow_permission_hints
         from core.preventive_visits import with_preventive_counts
         from core.serializers import ServiceRequestSerializer
+        def queryset():
+            return workflow_permission_hints(disposition_related(exchange_related(with_preventive_counts(
+                ServiceRequest.objects.select_related('equipment__client', 'assigned_technician', 'assignment_accepted_by')))), self.tech)
+
+        # A list now includes the battery reference and observed quantities.
+        # It uses three bounded batch reads beside the main annotated query:
+        # equipment/catalogue, active catalogue version, intervention counts.
+        # The same budget must hold as accepted requests and units are added.
+        with self.assertNumQueries(4):
+            single = ServiceRequestSerializer(queryset(), many=True, context={'request': SimpleNamespace(user=self.tech)}).data
+        self.assertEqual(len(single), 1)
+        self.assertTrue(single[0]['disposition']['can_mark_repaired'])
         for index in range(4):
-            ServiceRequest.objects.create(equipment=self.unit, subject=f'Autre diagnostic fictif {index}', status='testing')
-        queryset = workflow_permission_hints(disposition_related(exchange_related(with_preventive_counts(
-            ServiceRequest.objects.select_related('equipment__client', 'assigned_technician', 'assignment_accepted_by')))), self.tech)
-        with self.assertNumQueries(1):
-            records = ServiceRequestSerializer(queryset, many=True, context={'request': SimpleNamespace(user=self.tech)}).data
+            unit = Equipment.objects.create(client=self.company, serial_number=f'DIAG-LIST-LAB-{index}', model='Modèle fictif')
+            record = ServiceRequest.objects.create(equipment=unit, subject=f'Autre diagnostic fictif {index}', status='testing', assigned_technician=self.manager)
+            confirm_assignment(record.pk, actor=self.manager, expected_revision=record.assignment_revision, accept=True)
+        with self.assertNumQueries(4):
+            records = ServiceRequestSerializer(queryset(), many=True, context={'request': SimpleNamespace(user=self.tech)}).data
         self.assertEqual(len(records), 5)
         allowed = [row['id'] for row in records if row['disposition']['can_mark_repaired']]
         self.assertEqual(allowed, [self.request.pk])

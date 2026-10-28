@@ -38,3 +38,4 @@ clients_tvm*.[cC][sS][vV]
 *.[xX][lL][sS][bB]
 !backend/core/tests/fixtures/catalogue_synthetic.xls
 !backend/core/tests/fixtures/request_intake_synthetic.xls
+!tests/browser/fixtures/warranty_synthetic.xls

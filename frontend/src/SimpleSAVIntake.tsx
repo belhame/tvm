@@ -309,6 +309,7 @@ export default function SimpleSAVIntake({
       },
       equipment: receipt.equipment,
       coverage: receipt.coverage,
+      warranty_check: receipt.warranty_check,
       return_history: receipt.return_history,
       open_request: null,
       warnings: receipt.warnings,

@@ -82,6 +82,7 @@ class EquipmentSerializer(LegacySerializer):
 
 
 class ServiceRequestSerializer(LegacySerializer):
+    battery_configuration = serializers.SerializerMethodField()
     assignment = serializers.SerializerMethodField()
     disposition = serializers.SerializerMethodField()
     dispatch_kind = serializers.SerializerMethodField()
@@ -102,11 +103,14 @@ class ServiceRequestSerializer(LegacySerializer):
     preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
-        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier']
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', 'battery_count', 'battery_count_source', 'battery_configuration', *FOLLOWUP_FIELD_NAMES]
+        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier', 'battery_count', 'battery_count_source']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
+        if user and user.is_authenticated and user.effective_role in ('client', 'courier'):
+            for key in ('battery_count', 'battery_count_source', 'battery_configuration'):
+                fields.pop(key, None)
         if user and user.is_authenticated and user.effective_role == 'client':
             fields.pop('intake_key', None)
             fields.pop('intake_data', None)
@@ -117,6 +121,9 @@ class ServiceRequestSerializer(LegacySerializer):
     def get_assignment(self, obj):
         from .request_assignment import assignment_payload
         return assignment_payload(obj, getattr(self.context.get('request'), 'user', None))
+    def get_battery_configuration(self, obj):
+        from .request_batteries import serializer_battery_payload
+        return serializer_battery_payload(self, obj)
     def validate(self, attrs):
         if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and (self.instance.interventions.exists() or self.instance.operation_events.exists()):
             raise serializers.ValidationError({'equipment': 'Un dossier ayant des interventions ne peut pas changer d’équipement.'})
@@ -283,6 +290,8 @@ class InterventionSerializer(LegacySerializer):
             require_accepted_assignment(user, service_request)
             if getattr(validated_data.get('technician'), 'pk', user.pk) != user.pk:
                 raise serializers.ValidationError({'technician': 'Vous pouvez créer uniquement vos propres fiches sur un dossier pris en charge.'})
+        if 'battery_count' not in validated_data and service_request.battery_count_source == 'manual' and service_request.battery_count is not None:
+            validated_data['battery_count'] = service_request.battery_count
         return self._save_state(super().create(validated_data), service_request)
     @transaction.atomic
     def update(self, instance, validated_data):

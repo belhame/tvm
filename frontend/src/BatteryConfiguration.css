@@ -1,0 +1,173 @@
+.battery-configuration {
+  border: 1px solid #cedcf0;
+  border-radius: 12px;
+  background: #fff;
+  color: #293f5e;
+  min-width: 0;
+  overflow: hidden;
+}
+.battery-configuration > header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: #f0f6ff;
+  padding: 16px 17px;
+  border-bottom: 1px solid #dce6f4;
+}
+.battery-configuration-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: #fff;
+  color: #245cb9;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.battery-configuration > header h3 {
+  font-size: 15px;
+  margin: 0;
+  color: #253f65;
+}
+.battery-configuration > header p {
+  font-size: 12px;
+  margin: 5px 0 0;
+  color: #4c6487;
+  line-height: 1.7;
+}
+.battery-configuration-body {
+  padding: 17px;
+  display: grid;
+  gap: 15px;
+}
+.battery-configuration-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin: 0;
+}
+.battery-configuration-facts dt {
+  color: #526783;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.battery-configuration-facts dd {
+  margin: 5px 0 0;
+  color: #283e5e;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.battery-configuration-actual {
+  display: grid;
+  gap: 7px;
+  background: #f5f8fd;
+  border: 1px solid #dfe7f4;
+  border-radius: 9px;
+  padding: 13px;
+  font-size: 12px;
+  color: #4b6384;
+  line-height: 1.6;
+}
+.battery-configuration-actual strong {
+  font-size: 19px;
+  color: #253f65;
+}
+.battery-configuration-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #79510c;
+  background: #fff7e4;
+  border: 1px solid #e8d3a5;
+  border-radius: 8px;
+  padding: 11px;
+  font-size: 12px;
+  line-height: 1.75;
+  margin: 0;
+}
+.battery-configuration-warning svg,
+.battery-configuration-source svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.battery-configuration-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12px;
+  color: #526783;
+  line-height: 1.7;
+  margin: 0;
+}
+.battery-configuration-warnings {
+  margin: 0;
+  padding: 11px 11px 11px 28px;
+  border-radius: 8px;
+  background: #fff7e4;
+  color: #79510c;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.battery-configuration-history {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #486181;
+}
+.battery-configuration-history summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: #2f4b73;
+}
+.battery-configuration-history p {
+  margin: 8px 0 0;
+}
+.battery-count-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #344e70;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.battery-count-confirm input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: #1b61f8;
+  flex-shrink: 0;
+}
+.battery-count-edit {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #dfe7f4;
+  padding-top: 15px;
+}
+.request-dossier-panel > .battery-configuration,
+.request-dossier-panel > .warranty-check-panel {
+  margin-top: 18px;
+}
+.sav-followup-sidebar > .warranty-check-panel {
+  background: #fff;
+  border: 1px solid #dce5f2;
+  padding: 16px;
+  border-radius: 12px;
+}
+.sav-followup-editor .battery-configuration-body {
+  padding: 13px;
+}
+.sav-followup-editor .battery-configuration > header {
+  padding: 13px;
+}
+@media (max-width: 540px) {
+  .battery-configuration-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .battery-configuration-body {
+    padding: 15px;
+  }
+  .battery-configuration > header {
+    padding: 15px;
+  }
+}

@@ -53,7 +53,8 @@ def record_change(sender, instance, created, raw=False, update_fields=None, **kw
         return
     related = getattr(instance, 'replacement_equipment', None) if sender is Intervention else None
     common = dict(equipment=equipment, service_request=service_request, intervention=intervention, related_equipment=related)
-    public_changes = changed - PRIVATE
+    private_fields = PRIVATE | ({'battery_count', 'battery_count_source', 'battery_reference'} if sender is ServiceRequest else set())
+    public_changes = changed - private_fields
     if public_changes:
         label = {'Equipment': 'Onduleur', 'ServiceRequest': 'Demande SAV', 'Intervention': 'Intervention',
                  'Contract': 'Contrat', 'Warranty': 'Garantie', 'DeliveryNote': 'Bon de livraison'}[sender.__name__]

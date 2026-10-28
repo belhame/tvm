@@ -26,10 +26,18 @@ class StrictRevision(serializers.IntegerField):
         return super().to_internal_value(value)
 
 
+class StrictBatteryCount(serializers.IntegerField):
+    def to_internal_value(self, value):
+        if type(value) is not int:
+            self.fail('invalid')
+        return super().to_internal_value(value)
+
+
 class FollowupInput(serializers.Serializer):
     status = serializers.ChoiceField(choices=ServiceRequest.Status.choices)
     expected_status = serializers.ChoiceField(choices=ServiceRequest.Status.choices, required=False)
     assignment_revision = StrictRevision(min_value=0, max_value=MAX_REVISION, required=False)
+    battery_count = StrictBatteryCount(min_value=0, max_value=100000, allow_null=True, required=False)
 
     def get_fields(self):
         # Local import keeps the legacy timeline's strict scalar validators in
@@ -93,10 +101,17 @@ def write_followup(identifier, payload, *, actor, require_preconditions=True, re
         raise ValidationError({'status': 'Un dossier affecté ne peut pas revenir à Non affecté. Le responsable doit d’abord retirer l’affectation.'})
     events = []
     with actor_context(actor):
+        battery_event = None
+        if 'battery_count' in data:
+            from .request_batteries import apply_request_battery_count
+            battery_event = apply_request_battery_count(record, data['battery_count'], actor=actor)
         record._operation_manual_event = True
         record.status = after
         try:
-            record.save(update_fields=['status', 'updated_at'] if changing else ['updated_at'])
+            fields = ['status', 'updated_at'] if changing else ['updated_at']
+            if 'battery_count' in data:
+                fields += ['battery_count', 'battery_count_source', 'battery_reference']
+            record.save(update_fields=fields)
         finally:
             record._operation_manual_event = False
         if changing:
@@ -112,6 +127,8 @@ def write_followup(identifier, payload, *, actor, require_preconditions=True, re
                 kind=note_kind or ('summary' if data['summary'].strip() else 'observation'),
                 observation=data['observation'], summary=data['summary'], is_internal=data['is_internal'], source='followup',
             ))
+        if battery_event:
+            events.append(battery_event)
         AuditLog.objects.create(actor=actor, action='followup', resource='servicerequest', resource_id=str(record.pk))
     return FollowupResult(record, events)
 

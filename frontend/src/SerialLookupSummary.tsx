@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { dateFR, type User } from "./api";
 import CallReference from "./CallReference";
+import WarrantyCheckCard from "./WarrantyCheckCard";
+import { warrantyScopeLabel, type WarrantyCheck } from "./warranty";
 
 export type SerialLookupProduct = {
   id: number;
@@ -147,6 +149,8 @@ export type SerialLookupContract = {
 };
 
 export type SerialLookupResult = {
+  warranty_check?: WarrantyCheck;
+  catalogue_computed_warranty?: SerialLookupComputedWarranty;
   serial_number: string;
   normalized_serial_number: string;
   catalogue_import_id: number | null;
@@ -463,95 +467,128 @@ export default function SerialLookupSummary({
         </section>
       </div>
 
-      <section
-        className="serial-lookup-card serial-lookup-warranty"
-        aria-label="Couverture de garantie"
-      >
-        <div className="serial-lookup-card-heading">
-          <ShieldCheck size={17} />
-          <h4>Garantie</h4>
-          <span className={`badge ${coverageClass}`}>
-            {coverageLabels[computed.coverage_status]}
-          </span>
-        </div>
-        <p
-          className={`serial-lookup-warranty-basis ${computed.status === "recorded_priority" ? "recorded" : ""}`}
+      {result.warranty_check && (
+        <WarrantyCheckCard check={result.warranty_check} />
+      )}
+      {result.warranty_check && hasRecordedWarranty && (
+        <section
+          className="serial-lookup-card serial-lookup-recorded-warranties"
+          aria-label="Garanties déjà enregistrées"
         >
-          <ShieldCheck size={15} />
-          {computedLabels[computed.status]}
-        </p>
-        <dl className="serial-lookup-facts serial-lookup-warranty-dates">
-          <Fact label="Début de garantie" value={date(computed.starts_on)} />
-          <Fact label="Fin de garantie" value={date(computed.ends_on)} />
-          <Fact
-            label="Durée retenue"
-            value={duration(computed.duration_months)}
-          />
-        </dl>
-        {selectedWarranty && (
-          <div className="serial-lookup-warranty-option">
-            <strong>
-              {selectedWarranty.category ||
-                selectedWarranty.product_name ||
-                "Garantie catalogue sélectionnée"}
-            </strong>
-            <p>
-              {selectedWarranty.scope === "electronics"
-                ? "Électronique"
-                : selectedWarranty.scope === "battery"
-                  ? "Batteries"
-                  : selectedWarranty.scope}
-              {selectedWarranty.duration_text
-                ? ` · Durée source : ${selectedWarranty.duration_text}`
-                : ""}
+          <h4>Garanties enregistrées prioritaires</h4>
+          {result.recorded_warranties.length > 0 ? (
+            <ul>
+              {result.recorded_warranties.map((warranty) => (
+                <li key={warranty.id}>
+                  <div>
+                    <strong>
+                      {warranty.provider || "Garantie enregistrée"}
+                    </strong>
+                    <span>
+                      {date(warranty.starts_on)} → {date(warranty.ends_on)}
+                    </span>
+                  </div>
+                  {warranty.terms && <p>{warranty.terms}</p>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="serial-lookup-note">
+              Fin de garantie enregistrée dans la fiche équipement :{" "}
+              <strong>{date(equipment?.warranty_until)}</strong>. Le début et la
+              durée ne sont pas déduits de cette seule date.
             </p>
-            {selectedWarranty.conditions && (
-              <p>{selectedWarranty.conditions}</p>
-            )}
+          )}
+        </section>
+      )}
+
+      {!result.warranty_check && (
+        <section
+          className="serial-lookup-card serial-lookup-warranty"
+          aria-label="Couverture de garantie"
+        >
+          <div className="serial-lookup-card-heading">
+            <ShieldCheck size={17} />
+            <h4>Garantie</h4>
+            <span className={`badge ${coverageClass}`}>
+              {coverageLabels[computed.coverage_status]}
+            </span>
           </div>
-        )}
-        <p className="serial-lookup-rule">
-          <Info size={15} />
-          <span>
-            <strong>Règle TVM :</strong> début estimé = date de fabrication + 6
-            mois calendaires. La fin dépend de la durée de garantie retenue. Une
-            date de fabrication limitée au mois ou non justifiée ne permet pas
-            ce calcul.
-          </span>
-        </p>
-        {hasRecordedWarranty && (
-          <div className="serial-lookup-recorded-warranties">
-            <p className="serial-lookup-recorded-priority">
-              <ShieldCheck size={15} />
-              Les garanties enregistrées sont prioritaires sur le calcul
-              indicatif.
-            </p>
-            {result.recorded_warranties.length > 0 ? (
-              <ul>
-                {result.recorded_warranties.map((warranty) => (
-                  <li key={warranty.id}>
-                    <div>
-                      <strong>
-                        {warranty.provider || "Garantie enregistrée"}
-                      </strong>
-                      <span>
-                        {date(warranty.starts_on)} → {date(warranty.ends_on)}
-                      </span>
-                    </div>
-                    {warranty.terms && <p>{warranty.terms}</p>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="serial-lookup-note">
-                Fin de garantie enregistrée dans la fiche équipement :{" "}
-                <strong>{date(equipment?.warranty_until)}</strong>. Le début et
-                la durée ne sont pas déduits de cette seule date.
+          <p
+            className={`serial-lookup-warranty-basis ${computed.status === "recorded_priority" ? "recorded" : ""}`}
+          >
+            <ShieldCheck size={15} />
+            {computedLabels[computed.status]}
+          </p>
+          <dl className="serial-lookup-facts serial-lookup-warranty-dates">
+            <Fact label="Début de garantie" value={date(computed.starts_on)} />
+            <Fact label="Fin de garantie" value={date(computed.ends_on)} />
+            <Fact
+              label="Durée retenue"
+              value={duration(computed.duration_months)}
+            />
+          </dl>
+          {selectedWarranty && (
+            <div className="serial-lookup-warranty-option">
+              <strong>
+                {selectedWarranty.category ||
+                  selectedWarranty.product_name ||
+                  "Garantie catalogue sélectionnée"}
+              </strong>
+              <p>
+                {warrantyScopeLabel(selectedWarranty.scope)}
+                {selectedWarranty.duration_text
+                  ? ` · Durée source : ${selectedWarranty.duration_text}`
+                  : ""}
               </p>
-            )}
-          </div>
-        )}
-      </section>
+              {selectedWarranty.conditions && (
+                <p>{selectedWarranty.conditions}</p>
+              )}
+            </div>
+          )}
+          <p className="serial-lookup-rule">
+            <Info size={15} />
+            <span>
+              <strong>Règle TVM :</strong> début estimé = date de fabrication +
+              6 mois calendaires. La fin dépend de la durée de garantie retenue.
+              Une date de fabrication limitée au mois ou non justifiée ne permet
+              pas ce calcul.
+            </span>
+          </p>
+          {hasRecordedWarranty && (
+            <div className="serial-lookup-recorded-warranties">
+              <p className="serial-lookup-recorded-priority">
+                <ShieldCheck size={15} />
+                Les garanties enregistrées sont prioritaires sur le calcul
+                indicatif.
+              </p>
+              {result.recorded_warranties.length > 0 ? (
+                <ul>
+                  {result.recorded_warranties.map((warranty) => (
+                    <li key={warranty.id}>
+                      <div>
+                        <strong>
+                          {warranty.provider || "Garantie enregistrée"}
+                        </strong>
+                        <span>
+                          {date(warranty.starts_on)} → {date(warranty.ends_on)}
+                        </span>
+                      </div>
+                      {warranty.terms && <p>{warranty.terms}</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="serial-lookup-note">
+                  Fin de garantie enregistrée dans la fiche équipement :{" "}
+                  <strong>{date(equipment?.warranty_until)}</strong>. Le début
+                  et la durée ne sont pas déduits de cette seule date.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section
         className="serial-lookup-card serial-lookup-contracts"

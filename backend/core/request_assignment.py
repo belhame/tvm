@@ -261,6 +261,8 @@ def confirm_assignment(request_id, *, actor, expected_revision, accept, on_behal
     append_event(equipment=record.equipment, service_request=record, actor=actor, kind='assignment_accepted',
                  status_before=record.status, status_after=record.status,
                  summary=f'Prise en charge confirmée pour l’affectation révision {record.assignment_revision} de {_display(record.assigned_technician)}.', is_internal=True)
+    from .request_batteries import initialize_request_batteries
+    initialize_request_batteries(record, actor=actor)
     if on_behalf:
         append_event(equipment=record.equipment, service_request=record, actor=actor, kind='assignment_override',
                      summary='Confirmation enregistrée par un administrateur au nom du technicien affecté.', observation=reason, is_internal=True)

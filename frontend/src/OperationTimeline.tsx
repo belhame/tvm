@@ -90,6 +90,8 @@ const kindLabels: Record<string, string> = {
   assignment_changed: "Affectation modifiée",
   assignment_accepted: "Prise en charge confirmée",
   assignment_override: "Prise en charge confirmée par l’administrateur",
+  battery_reference: "Configuration nominale des batteries proposée",
+  battery_count: "Nombre de batteries confirmé",
   observation: "Observation",
   summary: "Synthèse",
 };

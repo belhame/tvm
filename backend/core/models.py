@@ -207,6 +207,9 @@ class ServiceRequest(ReferencedModel):
     contact_email = models.EmailField(blank=True)
     intake_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     intake_data = models.JSONField(default=dict, blank=True)
+    battery_count = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    battery_count_source = models.CharField(max_length=12, default='', blank=True, editable=False)
+    battery_reference = models.JSONField(default=dict, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
@@ -223,6 +226,8 @@ class ServiceRequest(ReferencedModel):
             ), name='request_assignment_acceptance_consistent'),
             models.CheckConstraint(condition=models.Q(assigned_technician__isnull=False) | models.Q(assigned_at__isnull=True), name='request_assignment_date_consistent'),
             models.CheckConstraint(condition=models.Q(assignment_accepted_at__isnull=True) | models.Q(assigned_at__isnull=True) | models.Q(assignment_accepted_at__gte=models.F('assigned_at')), name='request_acceptance_after_assignment'),
+            models.CheckConstraint(condition=models.Q(battery_count__isnull=True) | models.Q(battery_count__gte=0, battery_count__lte=100000), name='request_battery_count_range'),
+            models.CheckConstraint(condition=models.Q(battery_count_source__in=['', 'reference', 'manual']), name='request_battery_count_source'),
         ]
     def __str__(self):
         return self.reference

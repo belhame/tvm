@@ -14,6 +14,9 @@ import RequestAssignment from "./RequestAssignment";
 import RequestFollowup from "./RequestFollowup";
 import RequestIntakeIndicators from "./RequestIntakeIndicators";
 import { canWriteRequest } from "./requestAccess";
+import RequestWarrantyCheck from "./RequestWarrantyCheck";
+import BatteryConfigurationCard from "./BatteryConfigurationCard";
+import { canViewBattery } from "./battery";
 import "./SAVFollowup.css";
 
 const tabs = [
@@ -374,6 +377,15 @@ export default function RequestDossier({
                 {renderTimeline(false)}
               </div>
               <aside className="sav-followup-sidebar">
+                {["admin", "manager", "technician"].includes(user.role) && (
+                  <RequestWarrantyCheck
+                    key={`warranty-${record.id}`}
+                    serialNumber={
+                      record.equipment_serial || equipment?.serial_number || ""
+                    }
+                    equipmentId={record.equipment}
+                  />
+                )}
                 <RequestFollowup
                   record={record}
                   user={user}
@@ -578,6 +590,18 @@ export default function RequestDossier({
                   />
                 </dl>
               </section>
+              {["admin", "manager", "technician"].includes(user.role) && (
+                <RequestWarrantyCheck
+                  key={`warranty-material-${record.id}`}
+                  serialNumber={
+                    record.equipment_serial || equipment?.serial_number || ""
+                  }
+                  equipmentId={record.equipment}
+                />
+              )}
+              {canViewBattery(record, user) && (
+                <BatteryConfigurationCard record={record} />
+              )}
               <section className="request-dossier-card">
                 <h3>Signalement</h3>
                 <p>

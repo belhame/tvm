@@ -1,3 +1,5 @@
+import type { WarrantyCheck } from "./warranty";
+
 export type SimpleSAVPerson = { id: number; name: string };
 export type SimpleSAVOptions = {
   clients: SimpleSAVPerson[];
@@ -18,6 +20,7 @@ export type SimpleSAVRequest = {
   arrival_courier: SimpleSAVPerson;
 };
 export type SimpleSAVLookupResult = {
+  warranty_check?: WarrantyCheck;
   serial_number: string;
   client: SimpleSAVPerson;
   equipment: {

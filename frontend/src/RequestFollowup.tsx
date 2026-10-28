@@ -11,6 +11,8 @@ import {
 import { api, type RecordData, type User } from "./api";
 import { requestStatusLabels } from "./resources";
 import { canWriteRequest } from "./requestAccess";
+import BatteryConfigurationCard from "./BatteryConfigurationCard";
+import { batteryCountText, canViewBattery } from "./battery";
 import "./SAVFollowup.css";
 
 type FollowupResponse = { request: RecordData; events: RecordData[] };
@@ -32,6 +34,13 @@ export default function RequestFollowup({
   const [observation, setObservation] = useState("");
   const [summary, setSummary] = useState("");
   const [isInternal, setIsInternal] = useState(true);
+  const [batteryCount, setBatteryCount] = useState(
+    batteryCountText(record.battery_count),
+  );
+  const [baseBatteryCount, setBaseBatteryCount] = useState(
+    batteryCountText(record.battery_count),
+  );
+  const [batteryConfirmed, setBatteryConfirmed] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +48,13 @@ export default function RequestFollowup({
   const submitting = useRef(false);
   const revision = record.assignment?.revision ?? 0;
   const canWrite = canWriteRequest(record, user);
-  const stale = baseStatus !== record.status || baseRevision !== revision;
+  const showBattery = canViewBattery(record, user);
+  const batteryDirty = batteryCount !== baseBatteryCount;
+  const stale =
+    baseStatus !== record.status ||
+    baseRevision !== revision ||
+    ((batteryDirty || batteryConfirmed) &&
+      baseBatteryCount !== batteryCountText(record.battery_count));
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     controller.current?.abort();
@@ -47,12 +62,25 @@ export default function RequestFollowup({
     setBusy(false);
   }, [record.id, revision]);
   useEffect(() => {
-    if (!observation.trim() && !summary.trim() && status === baseStatus) {
+    if (
+      !observation.trim() &&
+      !summary.trim() &&
+      status === baseStatus &&
+      !batteryDirty &&
+      !batteryConfirmed
+    ) {
       setBaseStatus(record.status);
       setStatus(record.status);
       setBaseRevision(revision);
     }
   }, [record.status, revision]);
+  useEffect(() => {
+    if (!batteryDirty && !batteryConfirmed) {
+      const freshCount = batteryCountText(record.battery_count);
+      setBatteryCount(freshCount);
+      setBaseBatteryCount(freshCount);
+    }
+  }, [record.battery_count]);
   async function refresh() {
     if (submitting.current) return;
     const request = new AbortController();
@@ -68,6 +96,9 @@ export default function RequestFollowup({
         setBaseStatus(fresh.status);
         setStatus(fresh.status);
         setBaseRevision(fresh.assignment?.revision ?? 0);
+        setBaseBatteryCount(batteryCountText(fresh.battery_count));
+        if (!batteryDirty && !batteryConfirmed)
+          setBatteryCount(batteryCountText(fresh.battery_count));
         await onChanged(fresh);
         if (!request.signal.aborted)
           setNotice(
@@ -97,6 +128,23 @@ export default function RequestFollowup({
       );
       return;
     }
+    if (showBattery && batteryDirty && !batteryConfirmed) {
+      setError(
+        "Confirmez le comptage réel des batteries avant d’enregistrer cette modification.",
+      );
+      return;
+    }
+    if (
+      showBattery &&
+      batteryConfirmed &&
+      batteryCount !== "" &&
+      (!/^\d+$/.test(batteryCount) || Number(batteryCount) > 100000)
+    ) {
+      setError(
+        "Le nombre réel de batteries doit être un entier entre 0 et 100 000, ou rester vide.",
+      );
+      return;
+    }
     if (!note && !final) {
       setError(
         "Saisissez une observation ou une synthèse avant d’enregistrer.",
@@ -123,6 +171,12 @@ export default function RequestFollowup({
             observation: note,
             ...(final ? { summary: final } : {}),
             is_internal: isInternal,
+            ...(showBattery && batteryConfirmed
+              ? {
+                  battery_count:
+                    batteryCount === "" ? null : Number(batteryCount),
+                }
+              : {}),
           }),
         },
       );
@@ -133,6 +187,9 @@ export default function RequestFollowup({
       setObservation("");
       setSummary("");
       setIsInternal(true);
+      setBatteryCount(batteryCountText(response.request.battery_count));
+      setBaseBatteryCount(batteryCountText(response.request.battery_count));
+      setBatteryConfirmed(false);
       try {
         await onChanged(response.request);
       } catch {
@@ -161,6 +218,7 @@ export default function RequestFollowup({
           {requestStatusLabels[record.status] || record.status}
         </span>
       </div>
+      {showBattery && !canWrite && <BatteryConfigurationCard record={record} />}
       {!canWrite ? (
         <div className="sav-followup-readonly">
           <LockKeyhole size={19} />
@@ -178,6 +236,58 @@ export default function RequestFollowup({
         </div>
       ) : (
         <form onSubmit={(event) => void submit(event)}>
+          {showBattery && (
+            <BatteryConfigurationCard record={record}>
+              <div className="battery-count-edit">
+                <div className="field">
+                  <label htmlFor={`${id}-battery-count`}>
+                    Nombre réel de batteries
+                  </label>
+                  <input
+                    className="input"
+                    id={`${id}-battery-count`}
+                    type="number"
+                    min={0}
+                    max={100000}
+                    step={1}
+                    value={batteryCount}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setBatteryCount(event.target.value);
+                      setBatteryConfirmed(false);
+                      setError("");
+                    }}
+                    aria-describedby={`${id}-battery-help`}
+                  />
+                  <small id={`${id}-battery-help`}>
+                    Renseignez le nombre constaté, y compris les batteries
+                    externes. Une valeur vide signifie « non renseigné » ; 0
+                    n’est jamais déduit d’une absence de batteries internes.
+                  </small>
+                </div>
+                <label className="battery-count-confirm">
+                  <input
+                    type="checkbox"
+                    checked={batteryConfirmed}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setBatteryConfirmed(event.target.checked);
+                      setError("");
+                    }}
+                  />
+                  <span>
+                    J’ai vérifié le nombre de batteries sur ce matériel
+                  </span>
+                </label>
+                <p className="battery-configuration-source">
+                  La quantité est enregistrée uniquement après cette
+                  confirmation et « Enregistrer le suivi », avec votre
+                  observation ou synthèse. Une simple observation ne confirme
+                  pas le nombre prérempli.
+                </p>
+              </div>
+            </BatteryConfigurationCard>
+          )}
           <div className="field">
             <label htmlFor={`${id}-status`}>État du dossier</label>
             <select

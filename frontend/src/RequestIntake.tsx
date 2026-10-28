@@ -572,6 +572,9 @@ export default function RequestIntake({
                                 {
                                   electronics: "Électronique",
                                   battery: "Batteries",
+                                  batteries: "Batteries",
+                                  electronics_and_batteries:
+                                    "Électronique et batteries",
                                   unspecified: "Portée à préciser",
                                 } as Record<string, string>
                               )[option.scope] ||

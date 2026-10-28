@@ -13,6 +13,7 @@ import {
 import { dateFR } from "./api";
 import { requestStatusLabels } from "./resources";
 import type { SimpleSAVLookupResult } from "./simpleSAV";
+import WarrantyCheckCard from "./WarrantyCheckCard";
 import "./SimpleSAVLookup.css";
 
 type Props = {
@@ -103,6 +104,10 @@ export default function SimpleSAVLookup({ result, onOpenRequest }: Props) {
           </p>
         </div>
       </section>
+
+      {result.warranty_check && (
+        <WarrantyCheckCard check={result.warranty_check} />
+      )}
 
       {history.is_return && (
         <section

@@ -6,6 +6,8 @@ Le **Tableau de bord** s'ouvre par défaut pour les administrateurs, responsable
 
 Le dossier suit ensuite le parcours affectation → confirmation du technicien → suivi, puis fiches d'intervention et rapports PDF selon l'opération. Un changement de statut dans le suivi exige une observation ; une réaffectation managériale remet la prise en charge à confirmer. L'administrateur et le responsable continuent à assurer le suivi, avec les validations techniques et financières habituelles. Voir [la prise en charge et le suivi](docs/GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
 
+La vérification de garantie présente le modèle, la génération, les références et les dates, avec la règle **fabrication + six mois calendaires** et priorité aux garanties enregistrées. Après confirmation de prise en charge, le dossier propose la configuration de batteries du modèle exact ; le technicien confirme ou corrige le nombre constaté, sans réécrire les anciens rapports. Voir [la garantie et les batteries](docs/GUIDE_SUIVI_SAV.md#vérifier-la-garantie-et-les-batteries).
+
 Le technicien peut aussi **Prendre en charge** un dossier non affecté ou **Prendre le relais** avec un motif, après confirmation explicite, sans accord préalable d'un responsable. Ces actions conservent l'historique et les anciennes fiches au nom de leur auteur ; elles ne passent pas automatiquement le dossier en maintenance.
 
 L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.

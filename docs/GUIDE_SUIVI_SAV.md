@@ -378,6 +378,16 @@ Les événements ne se modifient ni ne se suppriment. En PostgreSQL, cette conse
 
 Pour arrêter l'utilisation sans perdre le suivi, l'administrateur peut **désactiver le compte**, et un rôle de gestion peut passer un équipement **Hors service** ou une demande **Clôturé**. Ces états conservent les relations et la chronologie. Corriger une observation ou une synthèse d'historique consiste à ajouter un événement explicite ; cela ne réécrit pas l'ancien.
 
+## Vérifier la garantie et les batteries
+
+La consultation de garantie présente le modèle, la génération, les références industrielle et commerciale, la date de référence de fabrication, la durée et les dates de couverture. Le calcul catalogue conserve la règle **fabrication + six mois calendaires**. Les dates enregistrées restent prioritaires ; une consultation n'écrase aucune garantie. Une référence introuvable ou ambiguë reste **à vérifier**, distincte d'une garantie expirée. Voir [les règles par numéro de série](PARCOURS_DEMANDE_SERIE.md).
+
+Après confirmation de la prise en charge, le suivi propose la configuration nominale de batteries issue du tableau TVM : nombre, tension unitaire, capacité et fournisseurs indiqués. La correspondance conserve la génération, la version tour/rack et la référence exacte. Une puissance seule ne suffit pas à identifier la configuration.
+
+Le **nombre proposé** reste distinct du **nombre confirmé par le technicien**. Une observation seule ne confirme pas la quantité proposée : le technicien doit la vérifier ou la corriger, puis enregistrer son suivi. Les corrections sont datées et attribuées dans la chronologie interne. Une ancienne fiche d'intervention conserve son propre nombre de batteries ; modifier le dossier courant ne réécrit pas les rapports historiques.
+
+Les armoires EBM sont des équipements séparés : leur quantité ne s'ajoute pas automatiquement aux batteries internes de l'onduleur. Un module sans batterie interne exigeant une EBM ne signifie pas que l'installation complète contient zéro batterie. Les variantes inconnues et les lignes sans famille identifiée restent à renseigner après contrôle. Cette aide ne crée aucun mouvement de stock et ne détermine pas la garantie des batteries.
+
 ## Mettre à jour une installation Windows
 
 Arrêter l'application avec `ARRETER_TVM.cmd`. Remplacer les sources dans le dossier TVM déjà utilisé, en conservant **`.env`, `.local` et les données Docker**, puis relancer `INSTALLER_TVM.cmd` pour reconstruire l'application et appliquer les migrations.

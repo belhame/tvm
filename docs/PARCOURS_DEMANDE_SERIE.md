@@ -26,6 +26,14 @@ L'enregistrement recalcule la recherche et les règles côté serveur. Les valeu
 
 ## Priorité aux données existantes
 
+### Relire la garantie depuis le fichier de structure
+
+La vérification rassemble la structure détectée, le modèle et sa génération, les références industrielle et commerciale, la date de référence de fabrication, la durée, le début et la fin de garantie. Les états **en cours**, **expirée**, **pas encore commencée** et **à vérifier** restent distincts. Un résultat inconnu ne prouve pas une expiration. Le calcul est consultatif ; il n'émet ni devis ni facture.
+
+Si une gamme comporte une génération explicite, mais que la feuille de garantie ne propose que sa famille de base, une référence de famille compatible peut être proposée avec sa provenance. Une référence propre à la génération reste prioritaire. Plusieurs durées ou portées possibles exigent un choix ; la durée la plus longue n'est jamais choisie par défaut. Ce rapprochement de garantie ne sert pas à déduire la configuration des batteries d'une autre génération.
+
+Le fichier XLS est lu comme un référentiel, sans exécuter ses macros, liens ou objets intégrés. L'import du catalogue sur le PC reste nécessaire s'il n'y est pas déjà présent. Relancer une vérification ne modifie pas la fiche équipement ni les garanties enregistrées.
+
 Un numéro de série déjà présent sert à rattacher la demande à l'équipement existant. Ses données, ses garanties et ses contrats restent prioritaires : ils ne sont pas remplacés par une suggestion du catalogue ou par une nouvelle saisie dans ce formulaire.
 
 Les garanties sont comparées à portée identique : une garantie batterie ne devient pas une garantie électronique. Les anciennes dates globales restent utilisables pour une recherche globale, sans être attribuées à un composant précis. Si une seule période enregistrée compatible est active, une extension active peut être affichée à la place d'une période de base expirée ; les autres périodes restent visibles.

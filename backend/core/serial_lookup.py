@@ -21,6 +21,79 @@ PROFILES = ('Eaton', 'Pulsar', 'Powerware', 'NV DX')
 WARRANTY_RULE = {'code': 'manufacture_monday_plus_6_calendar_months', 'start_offset_months': 6}
 
 
+def generation_family(value):
+    """Recognize only an explicit terminal generation, never strip a variant.
+
+    The workbook can list a G2 product under a generic family warranty. A
+    rack/power/battery qualifier must not be discarded to obtain that match.
+    """
+    value = re.sub(r'\(\s*launched\s*\d{4}\s*\)', '', str(value or ''), flags=re.I).strip()
+    match = re.fullmatch(r'(.+?)\s+(?:G|Gen(?:eration)?\s*)([1-9][0-9]?)', value, flags=re.I)
+    return (match[1].strip(), f'Gen {match[2]}') if match else (value, '')
+
+
+def warranty_matches(product, references):
+    """Return family warranty alternatives with exact generations preferred."""
+    family = canonical_range(product.range_name) if usable_code(product.range_name) else ''
+    base, generation = generation_family(product.range_name)
+    base_key = canonical_range(base) if generation else ''
+    exact, generic, manual = [], [], []
+    for reference in references:
+        key = canonical_range(reference.product_name)
+        if family and key == family:
+            exact.append((reference, 'exact_range'))
+        elif base_key and key == base_key:
+            generic.append((reference, 'generation_family'))
+        elif family and _manual_family_match(reference.product_name, product.range_name):
+            manual.append((reference, 'related_manual'))
+    # A qualified warranty for this generation prevents a generic family
+    # shortcut even when the qualification needs a human choice.
+    return exact or manual or generic
+
+
+def build_warranty_check(*, product, snapshot, computed, manufactured_on,
+                         reference=None, recorded=False, recorded_model='', recorded_brand='',
+                         identity_consistent=True, manufacture_date_basis=None, warnings=()):
+    """Minimal read-only tracker projection, safe for the simple intake."""
+    product = product or {}
+    if not identity_consistent:
+        product = {}
+    reference = reference or {}
+    family = product.get('range_name') or ''
+    _, generation = generation_family(family)
+    if not generation:
+        for value in (product.get('version'), product.get('product_name')):
+            _, generation = generation_family(value)
+            if generation:
+                break
+    status = computed.get('coverage_status', 'unknown')
+    status = 'no_coverage' if status == 'not_covered' else status
+    scope = computed.get('scope') or reference.get('scope') or 'unspecified'
+    evidence = 'recorded' if recorded else 'catalogue' if product else 'unknown'
+    return {
+        'status': status, 'checked_on': timezone.localdate().isoformat(), 'basis': evidence,
+        'provisional': not recorded or status == 'unknown' or scope == 'unspecified',
+        'manufacturer': recorded_brand or (product.get('structure') if product.get('structure') in ('Eaton', 'Pulsar', 'Powerware') else ''),
+        'profile': product.get('structure') or '', 'family': family, 'generation': generation,
+        'catalogue_identity_consistent': identity_consistent,
+        'model_name': recorded_model or product.get('product_name') or '',
+        'industrial_part_number': product.get('manufacturing_part_number') or '',
+        'commercial_part_number': product.get('catalogue_number') or '',
+        'manufactured_on': manufactured_on, 'starts_on': computed.get('starts_on'),
+        'manufacture_date_basis': deepcopy(manufacture_date_basis or {}),
+        'ends_on': computed.get('ends_on'), 'duration_months': computed.get('duration_months'),
+        'scope': scope, 'rule': deepcopy(WARRANTY_RULE),
+        'source': {
+            'catalogue_import_id': snapshot.pk if snapshot else None,
+            'revision': snapshot.metadata.get('revision', '') if snapshot else '',
+            'product_sheet': product.get('source_sheet') or '', 'product_row': product.get('source_row'),
+            'warranty_sheet': reference.get('source_sheet') or '', 'warranty_row': reference.get('source_row'),
+            'warranty_match_type': reference.get('match_type') or '',
+        },
+        'warnings': list(dict.fromkeys(warnings)),
+    }
+
+
 def add_calendar_months(value, months):
     """Add calendar months, clamping the day at the destination month end."""
     total = value.year * 12 + value.month - 1 + months
@@ -122,6 +195,58 @@ def _products(snapshot, profile, code):
     if not snapshot or not profile or not code or not usable_code(code):
         return CatalogueProduct.objects.none()
     return CatalogueProduct.objects.filter(snapshot=snapshot, structure=profile).annotate(code_key=Lower(Trim('product_code'))).filter(code_key=code.strip().lower())
+
+
+def find_serial_product(serial_number, *, snapshot=None):
+    """Bounded identification suggestion without SAV/history or any writes.
+
+    Callers must still compare the recorded model to this catalogue reference;
+    a code on its own must never qualify an unrelated model or battery variant.
+    """
+    if not isinstance(serial_number, str) or not serial_number.strip() or len(serial_number) > 120:
+        return None
+    return find_serial_products([serial_number], snapshot=snapshot)[serial_number]
+
+
+def find_serial_products(serial_numbers, *, snapshot=None):
+    """Batch version: one snapshot query and one product query, no history."""
+    results = {value: None for value in serial_numbers if isinstance(value, str)}
+    if snapshot is None:
+        snapshot = CatalogueImport.objects.filter(is_active=True).first()
+    if snapshot is None:
+        return results
+    from .serial_geometry import decode_profiles
+    pairs, by_profile = {}, {}
+    for serial in results:
+        if not serial.strip() or len(serial) > 120:
+            continue
+        geometries = decode_profiles(serial, snapshot.metadata.get('year_tables', []))
+        if len(geometries) != 1:
+            continue
+        geometry = geometries[0]
+        code = geometry['segments'].get('product_code')
+        if not code or not usable_code(code):
+            continue
+        code = code.strip().lower()
+        profile = geometry['profile']
+        pairs[serial] = (profile, code)
+        by_profile.setdefault(profile, set()).add(code)
+    if not pairs:
+        return results
+    conditions = Q()
+    for profile, codes in by_profile.items():
+        conditions |= Q(structure=profile, code_key__in=codes)
+    query = CatalogueProduct.objects.filter(snapshot=snapshot).annotate(code_key=Lower(Trim('product_code'))).filter(conditions)
+    products = {}
+    for product in query:
+        # Cache the already-loaded version so callers can inspect provenance.
+        product.snapshot = snapshot
+        products.setdefault((product.structure, product.product_code.strip().lower()), []).append(product)
+    for serial, pair in pairs.items():
+        candidates = products.get(pair, [])
+        if len(candidates) == 1:
+            results[serial] = candidates[0]
+    return results
 
 
 def _product_data(product, collisions):
@@ -236,6 +361,7 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
     selected_product = _product_data(chosen, collisions) if chosen else None
     candidate_data = [_product_data(item, collisions) for item in candidates]
     manufactured_on = geometry['manufactured_on'] if geometry else None
+    catalogue_manufactured_on = manufactured_on
     basis = deepcopy(geometry['manufacture_date_basis']) if geometry else {'type': None, 'reconstructed': False, 'source': '', 'precision': 'unknown', 'blocked_reason': 'Profil ou date non déterminé.'}
     existing, history, recorded, contracts = _recorded(equipment)
     if equipment:
@@ -248,21 +374,15 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
 
     options = []
     if chosen:
-        family = canonical_range(chosen.range_name) if usable_code(chosen.range_name) else ''
-        exact_options, manual_options = [], []
-        for reference in CatalogueWarranty.objects.filter(snapshot=snapshot):
-            exact = bool(family) and canonical_range(reference.product_name) == family
-            related = bool(family) and _manual_family_match(reference.product_name, chosen.range_name)
-            if not exact and not related:
-                continue
+        for reference, match_type in warranty_matches(chosen, CatalogueWarranty.objects.filter(snapshot=snapshot)):
             item = dict(CatalogueWarrantySerializer(reference).data)
-            item['match_type'] = 'exact_range' if exact else 'related_manual'
+            item['match_type'] = match_type
             item['computed_warranty'] = _computed(manufactured_on, item)
-            (exact_options if exact else manual_options).append(item)
-        # Exact family references take precedence. Qualified labels are offered
-        # for an explicit choice only when no exact family reference exists.
-        options = exact_options if exact_options else manual_options
-    default_id = options[0]['id'] if len(options) == 1 and options[0]['match_type'] == 'exact_range' else None
+            options.append(item)
+    default_id = options[0]['id'] if len(options) == 1 and (
+        options[0]['match_type'] == 'exact_range'
+        or options[0]['match_type'] == 'generation_family' and options[0]['scope'] in ('unspecified', 'electronics_and_batteries')
+    ) else None
     selected_warranty = None
     if warranty_reference_id:
         selected_warranty = next((item for item in options if item['id'] == warranty_reference_id), None)
@@ -272,11 +392,19 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
         selected_warranty = options[0]
     if len(options) > 1 and selected_warranty is None:
         warnings.append('Plusieurs garanties ou composants sont possibles ; choisissez la portée exacte, sans retenir automatiquement la durée la plus longue.')
-    if selected_warranty and selected_warranty['match_type'] != 'exact_range':
+    if selected_warranty and selected_warranty['match_type'] == 'related_manual':
         warnings.append('Cette garantie qualifiée exige une validation explicite de sa portée ; le rapprochement n’est pas automatique.')
+    if selected_warranty and selected_warranty['match_type'] == 'generation_family':
+        warnings.append('Le catalogue ne donne pas de garantie distincte pour cette génération : la durée de la gamme générale est proposée à titre indicatif, avec une couverture à confirmer.')
     if selected_warranty and selected_warranty['duration_months'] == 0:
         warnings.append('La référence indique zéro mois : aucune couverture calculée ni garantie active n’est créée.')
     computed = deepcopy(selected_warranty['computed_warranty']) if selected_warranty else _computed(manufactured_on, needs_choice=bool(options))
+    catalogue_computed = _computed(catalogue_manufactured_on, selected_warranty, needs_choice=bool(options) and selected_warranty is None)
+    identity_consistent = product_matches_equipment(chosen, equipment)
+    if equipment and chosen and not identity_consistent:
+        warnings.append('La référence décodée dans le catalogue diffère du modèle enregistré. Vérifiez l’étiquette ; les références et la garantie du catalogue ne sont pas attribuées automatiquement au matériel réel.')
+        if not recorded and not equipment.warranty_until:
+            computed = _computed(None)
     if recorded or (equipment and equipment.warranty_until):
         computed = _computed(None)
         computed['status'] = 'recorded_priority'
@@ -287,7 +415,7 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
         matching_recorded = [
             item for item in recorded
             if wanted_scope in ('unspecified', 'electronics', 'batteries', 'electronics_and_batteries')
-            and (item['scope'] == wanted_scope or item['scope'] == 'electronics_and_batteries' and wanted_scope in ('electronics', 'batteries'))
+            and (item['scope'] == wanted_scope or item['scope'] == 'electronics_and_batteries' and wanted_scope in ('unspecified', 'electronics', 'batteries'))
         ]
         active_periods = [item for item in matching_recorded if item['coverage_status'] == 'active']
         actual = active_periods[0] if len(active_periods) == 1 else matching_recorded[0] if len(matching_recorded) == 1 else None
@@ -305,6 +433,14 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
         status = 'ambiguous'
     if not snapshot:
         status = 'catalogue_unavailable'
+    warranty_check = build_warranty_check(
+        product=selected_product, snapshot=snapshot, computed=computed,
+        manufactured_on=manufactured_on if identity_consistent or equipment and equipment.manufactured_on else None,
+        reference=selected_warranty if identity_consistent else None, recorded=computed['status'] == 'recorded_priority',
+        recorded_model=equipment.model if equipment else '', recorded_brand=equipment.brand if equipment else '',
+        identity_consistent=identity_consistent,
+        manufacture_date_basis=basis if identity_consistent or equipment and equipment.manufactured_on else {}, warnings=warnings,
+    )
     return {
         'serial_number': serial, 'normalized_serial_number': normalized,
         'catalogue_import_id': snapshot.pk if snapshot else None,
@@ -323,6 +459,21 @@ def lookup_serial(serial_number, *, profile=None, product_id=None, catalogue_imp
         'manufactured_on': manufactured_on, 'manufacture_date_basis': basis,
         'warranty_options': options, 'selected_warranty': selected_warranty,
         'default_warranty_id': default_id, 'computed_warranty': computed,
+        'catalogue_manufactured_on': catalogue_manufactured_on,
+        'catalogue_computed_warranty': catalogue_computed, 'warranty_check': warranty_check,
         'recorded_warranties': recorded, 'active_contracts': list(contracts),
         'warnings': list(dict.fromkeys(warnings)),
     }
+
+
+def product_matches_equipment(product, equipment, suggestion=None):
+    if equipment is None:
+        return True
+    if product is None:
+        return False
+    if equipment.catalogue_product_id == product.pk:
+        return True
+    names = {product.product_name.strip().casefold(), product.catalogue_number.strip().casefold()}
+    if suggestion:
+        names.add(suggestion.strip().casefold())
+    return equipment.model.strip().casefold() in names

@@ -14,7 +14,7 @@ from .catalogue_models import CatalogueImport, CatalogueProduct, CatalogueWarran
 from .catalogue_service import usable_code
 from .models import AuditLog, Client, Equipment, Intervention, ServiceRequest, User, Warranty
 from .serial_geometry import decode_profiles
-from .serial_lookup import _computed, _coverage, _products, canonical_range
+from .serial_lookup import _computed, _coverage, _products, build_warranty_check, product_matches_equipment, warranty_matches
 from .workflow_events import actor_context, append_event
 
 
@@ -73,12 +73,12 @@ def intake_options(actor):
             'actor_courier': {'id': actor.pk, 'name': _name(actor)} if actor.role == 'courier' else None}
 
 
-def _coverage_result(status='unknown', *, provisional=True, source='unknown', start=None, end=None, warnings=None):
+def _coverage_result(status='unknown', *, provisional=True, source='unknown', start=None, end=None, warnings=None, scope='unspecified'):
     active = status == 'active'
     quotation = status in ('expired', 'no_coverage')
     return {'status': status, 'warranty_status': 'warranty' if active else 'quotation',
             'label': 'Garantie en cours' if active else 'Devis / facturable' if quotation else 'Garantie à vérifier',
-            'provisional': provisional, 'source': source,
+            'provisional': provisional, 'source': source, 'scope': scope,
             'starts_on': start.isoformat() if isinstance(start, date) else start,
             'ends_on': end.isoformat() if isinstance(end, date) else end,
             'warnings': list(warnings or [])}
@@ -87,8 +87,11 @@ def _coverage_result(status='unknown', *, provisional=True, source='unknown', st
 def _catalogue(serial):
     """Reuse documented decoding/calendar rules without loading SAV serializers."""
     result = {'product': None, 'model': 'À identifier', 'brand': '', 'manufactured_on': None,
-              'coverage': _coverage_result(), 'warnings': [], 'identification': 'unknown'}
+              'coverage': _coverage_result(), 'warnings': [], 'identification': 'unknown',
+              'snapshot': None, 'warranty_reference': None, 'computed_warranty': _computed(None),
+              'manufacture_date_basis': {}}
     snapshot = CatalogueImport.objects.filter(is_active=True).first()
+    result['snapshot'] = snapshot
     if snapshot is None:
         result['warnings'].append('Aucun catalogue actif ne permet une identification automatique ; le matériel sera enregistré À identifier.')
         return result
@@ -97,6 +100,7 @@ def _catalogue(serial):
         result['warnings'].append('La série ne détermine pas un profil unique ; aucune référence de modèle ou garantie n’est choisie automatiquement.')
         return result
     geometry = geometries[0]
+    result['manufacture_date_basis'] = geometry['manufacture_date_basis']
     result['warnings'].extend(geometry['warnings'])
     products = list(_products(snapshot, geometry['profile'], geometry['segments'].get('product_code'))[:2])
     if len(products) != 1:
@@ -105,7 +109,8 @@ def _catalogue(serial):
     product = products[0]
     short = product.catalogue_number.strip()
     model = short if usable_code(short) and len(short) <= 120 else product.product_name if len(product.product_name) <= 120 else 'À identifier'
-    result.update(product=product, model=model, brand='Eaton', identification='catalogue')
+    result.update(product=product, model=model,
+        brand=geometry['profile'] if geometry['profile'] in ('Eaton', 'Pulsar', 'Powerware') else '', identification='catalogue')
     if model == 'À identifier':
         result['warnings'].append('La désignation du catalogue dépasse le champ du modèle ; le personnel complétera son identification.')
     manufactured = geometry.get('manufactured_on')
@@ -114,23 +119,26 @@ def _catalogue(serial):
     elif manufactured:
         result['warnings'].append('La fabrication calculée est future ; aucune date de fabrication ou garantie active n’est retenue.')
         manufactured = None
-    family = canonical_range(product.range_name) if usable_code(product.range_name) else ''
-    references = [reference for reference in CatalogueWarranty.objects.filter(snapshot=snapshot)
-                  if family and canonical_range(reference.product_name) == family]
-    if len(references) != 1 or references[0].scope not in ('unspecified', 'electronics_and_batteries'):
+    references = warranty_matches(product, CatalogueWarranty.objects.filter(snapshot=snapshot))
+    if len(references) != 1 or references[0][1] == 'related_manual' or references[0][0].scope not in ('unspecified', 'electronics_and_batteries'):
         result['coverage']['warnings'].append('La portée globale ou la durée de garantie ne sont pas uniques ; une garantie de composant n’est pas étendue à tout l’onduleur.')
         return result
-    reference = references[0]
+    reference, match_type = references[0]
+    result['warranty_reference'] = {'scope': reference.scope, 'source_sheet': reference.source_sheet,
+        'source_row': reference.source_row, 'match_type': match_type}
     computed = _computed(manufactured, {'id': reference.pk, 'duration_months': reference.duration_months})
+    result['computed_warranty'] = computed
     status = computed['coverage_status']
     status = 'no_coverage' if status == 'not_covered' else status
     warnings = ['Orientation fondée sur le catalogue et la règle TVM ; la prise en charge commerciale reste à confirmer.']
+    if match_type == 'generation_family':
+        warnings.append('La génération ne possède pas de garantie distincte dans le fichier ; la durée de la gamme générale est une estimation à confirmer.')
     if geometry['manufacture_date_basis'].get('reconstructed'):
         warnings.append('La date de fabrication est reconstituée selon la règle documentée, sans certifier un jour réel de fabrication.')
     if reference.scope == 'unspecified' and status == 'active':
         warnings.append('Garantie en cours selon les dates enregistrées ; étendue de couverture à confirmer.')
     result['coverage'] = _coverage_result(status, provisional=status not in ('expired', 'no_coverage'), source='catalogue_estimate',
-                                         start=computed['starts_on'], end=computed['ends_on'], warnings=warnings)
+                                         start=computed['starts_on'], end=computed['ends_on'], warnings=warnings, scope=reference.scope)
     return result
 
 
@@ -147,7 +155,8 @@ def _recorded_coverage(equipment, suggestion):
             warnings.append('Plusieurs périodes globales sont actives ; aucune durée maximale n’est choisie automatiquement.')
         return _coverage_result('active', provisional=not bool(explicit), source='recorded_global_warranty',
             start=candidates[0].starts_on if len(candidates) == 1 else None,
-            end=candidates[0].ends_on if len(candidates) == 1 else None, warnings=warnings)
+            end=candidates[0].ends_on if len(candidates) == 1 else None, warnings=warnings,
+            scope='electronics_and_batteries' if explicit else 'unspecified')
     if global_rows:
         future = [row for row in global_rows if row.starts_on > today]
         if future:
@@ -164,7 +173,7 @@ def _recorded_coverage(equipment, suggestion):
         return _coverage_result(status, provisional=status == 'active', source='equipment_global_end', end=equipment.warranty_until,
             warnings=['Garantie en cours selon les dates enregistrées ; étendue de couverture à confirmer.'] if status == 'active' else [])
     product = suggestion['product']
-    if product and equipment.model.casefold().strip() in {suggestion['model'].casefold().strip(), product.product_name.casefold().strip()}:
+    if product_matches_equipment(product, equipment, suggestion['model']):
         return suggestion['coverage']
     return _coverage_result(warnings=['Aucune date globale exploitable n’est enregistrée ; la garantie doit être vérifiée.'])
 
@@ -202,12 +211,31 @@ def _inspect(company, serial, equipment=None):
     warnings.extend(coverage['warnings'])
     if coverage['status'] == 'unknown':
         warnings.append('Garantie à vérifier : orientation Devis / facturable provisoire, sans émission de devis ni facture.')
+    product = suggestion['product']
+    identity_consistent = product_matches_equipment(product, equipment, suggestion['model'])
+    if equipment and product and not identity_consistent:
+        warnings.append('Le modèle enregistré diffère de la référence décodée. Vérifiez l’étiquette ; aucune référence catalogue ni garantie calculée n’est attribuée automatiquement au matériel réel.')
+    product_data = {key: getattr(product, key) for key in ('range_name', 'product_name', 'version',
+        'manufacturing_part_number', 'catalogue_number', 'source_sheet', 'source_row', 'structure')} if product else None
+    summary_computed = {**suggestion['computed_warranty'], 'coverage_status': coverage['status'], 'scope': coverage['scope'],
+        'starts_on': coverage['starts_on'], 'ends_on': coverage['ends_on']}
+    recorded = coverage['source'] in ('recorded_global_warranty', 'equipment_global_end')
+    if recorded or not identity_consistent:
+        summary_computed['duration_months'] = None
+    manufactured = equipment.manufactured_on if equipment and equipment.manufactured_on else suggestion['manufactured_on'] if identity_consistent else None
+    manufacture_basis = {'type': 'recorded', 'precision': 'day', 'reconstructed': False,
+        'source': 'Date enregistrée sur l’équipement.'} if equipment and equipment.manufactured_on else suggestion['manufacture_date_basis'] if identity_consistent else {}
+    warranty_check = build_warranty_check(product=product_data, snapshot=suggestion['snapshot'],
+        computed=summary_computed, manufactured_on=manufactured.isoformat() if manufactured else None,
+        reference=suggestion['warranty_reference'] if identity_consistent else None, recorded=recorded,
+        recorded_model=equipment.model if equipment else '', recorded_brand=equipment.brand if equipment else '',
+        identity_consistent=identity_consistent, manufacture_date_basis=manufacture_basis, warnings=warnings)
     open_request = ServiceRequest.objects.filter(equipment=equipment).exclude(status='closed').first() if equipment else None
     return {'serial_number': serial, 'client': {'id': company.pk, 'name': company.name},
         'equipment': {'id': equipment.pk if equipment else None, 'serial_number': equipment.serial_number if equipment else serial,
             'brand': equipment.brand if equipment else suggestion['brand'], 'model': equipment.model if equipment else suggestion['model'],
             'known': equipment is not None, 'identification': 'recorded' if equipment else suggestion['identification']},
-        'coverage': coverage, 'return_history': history,
+        'coverage': coverage, 'warranty_check': warranty_check, 'return_history': history,
         'open_request': _request_mini(open_request) if open_request else None, 'warnings': list(dict.fromkeys(warnings))}, suggestion
 
 
@@ -298,7 +326,7 @@ def _create(actor, data):
             summary='Réception SAV simple enregistrée ; dossier non affecté.', is_internal=True)
         AuditLog.objects.create(actor=actor, action='simple_sav_intake', resource='servicerequest', resource_id=str(record.pk))
     result['equipment'].update(id=equipment.pk)
-    response = {'created': True, 'request': _request_mini(record), **{key: result[key] for key in ('equipment', 'coverage', 'return_history', 'warnings')}}
+    response = {'created': True, 'request': _request_mini(record), **{key: result[key] for key in ('equipment', 'coverage', 'warranty_check', 'return_history', 'warnings')}}
     record.intake_data = {'kind': 'simple_sav', 'actor_id': actor.pk, 'payload_hash': digest,
         'summary': {'coverage': deepcopy(result['coverage']), 'return_history': deepcopy(result['return_history'])},
         'response': deepcopy(response)}
