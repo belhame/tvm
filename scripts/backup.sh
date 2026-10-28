@@ -16,7 +16,9 @@ for task_service in web reminders; do
 done
 task_restore_writers() {
   if (( ${#task_writers[@]} )); then
-    docker compose --profile container start --wait --wait-timeout 90 "${task_writers[@]}" > /dev/null || printf 'Relancez DEMARRER_TVM.cmd pour redemarrer les services arretes pendant la sauvegarde.\n' >&2
+    # `start --wait` is unavailable in some Compose versions. Restart the
+    # existing containers without recreating them or changing their images.
+    docker compose --profile container start "${task_writers[@]}" > /dev/null || printf 'Relancez DEMARRER_TVM.cmd pour redemarrer les services arretes pendant la sauvegarde.\n' >&2
   fi
 }
 trap task_restore_writers EXIT

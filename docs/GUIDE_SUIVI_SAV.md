@@ -16,17 +16,30 @@ Les interventions restent les fiches détaillées des opérations réalisées : 
 
 L'indicateur passe de **À confirmer** à **Prise en charge confirmée**. La confirmation ne change pas l'état du dossier. Elle ne remplace pas la réception physique du matériel et ne redémarre pas le compteur depuis l'arrivée. Son auteur et sa date sont enregistrés. Confirmer à nouveau une affectation déjà acceptée ne crée pas une seconde prise en charge.
 
-Une **réaffectation** annule la confirmation précédente pour le travail à venir. Le nouveau technicien doit confirmer à son tour ; l'ancien ne conserve pas ses droits d'écriture du seul fait qu'il a traité une visite de ce dossier. Si l'affectation a changé pendant qu'une fenêtre était ouverte, actualiser le dossier avant de confirmer ou d'enregistrer le suivi.
+Une **réaffectation par l'administrateur ou le responsable** annule la confirmation précédente pour le travail à venir. Le nouveau technicien doit confirmer à son tour ; l'ancien ne conserve pas ses droits d'écriture du seul fait qu'il a traité une visite de ce dossier. Si l'affectation a changé pendant qu'une fenêtre était ouverte, actualiser le dossier avant de confirmer ou d'enregistrer le suivi.
 
-L'affectation d'une demande **Non affecté** la fait passer à **En attente**. Une désaffectation ne choisit pas automatiquement un autre état. L'administrateur et le responsable restent chargés de l'affectation et de l'échéance.
+L'affectation d'une demande **Non affecté** la fait passer à **En attente**. Une désaffectation ne choisit pas automatiquement un autre état. L'administrateur et le responsable continuent à gérer les affectations et l'échéance.
 
 L'administrateur et le responsable peuvent continuer à assurer le suivi sans devoir accepter personnellement l'affectation d'un autre utilisateur. **Seul l'administrateur** peut, si nécessaire, utiliser **Confirmer au nom du technicien** : il doit remplir le **Motif de confirmation au nom du technicien**, puis répondre **Oui**. Ce motif et l'auteur réel de l'action sont conservés dans l'historique interne. Le responsable ne dispose pas de cette confirmation au nom d'autrui.
 
 Ces droits ne contournent pas les validations d'échange, de facturation ou de livraison. Une confirmation de prise en charge ne vaut ni validation technique, ni accord de gratuité, ni preuve de remise.
 
+### Prendre directement un dossier ou prendre le relais
+
+Un technicien actif peut prendre un dossier non clôturé sans demander une affectation préalable au responsable :
+
+- **Sans technicien désigné**, cliquer sur **Prendre en charge**, vérifier la demande puis répondre **Oui**. Le serveur affecte le dossier au technicien connecté et enregistre sa prise en charge dans la même opération.
+- **Affecté à une autre personne**, cliquer sur **Prendre le relais**, vérifier **Technicien actuel** et **Nouveau technicien**, remplir le **Motif de la prise de relais**, puis répondre **Oui**. L'accord du responsable ou de l'ancien technicien n'est pas demandé. L'affectation et la nouvelle confirmation sont enregistrées ensemble ; l'ancienne affectation ne donne plus de droit d'écriture au technicien précédent.
+
+Le motif de reprise, l'auteur et la date sont conservés dans l'historique interne. **Annuler** avant confirmation ne modifie rien. Si le dossier est déjà affecté au technicien connecté mais reste à confirmer, utiliser **Confirmer la prise en charge**. Un dossier clôturé ne peut pas être pris par ces actions. Si l'affectation change pendant la confirmation, le dossier est actualisé : relire sa situation avant une nouvelle action, sans supposer que la prise de relais a été enregistrée.
+
+Ces actions conservent l'état courant, sauf **Non affecté**, qui devient **En attente** lors de l'affectation. Elles ne passent pas automatiquement le dossier **En entretien** : après la prise en charge, choisir cet état dans le suivi et renseigner l'observation obligatoire si le travail commence.
+
+Les anciennes fiches d'intervention restent au nom de leur technicien. Le nouveau crée sa propre fiche de visite si nécessaire ; il ne reprend pas l'identité de l'auteur des fiches précédentes. L'historique reste consultable. Les actions habituelles d'affectation de l'administrateur et du responsable restent disponibles.
+
 ### Après la mise à jour d'un ancien dossier
 
-Les affectations et les historiques déjà enregistrés sont conservés, mais **aucune ancienne prise en charge n'est supposée acceptée**. Le technicien actuellement affecté doit confirmer avant ses nouvelles écritures de suivi. Une ancienne intervention, une observation ou un état terminé ne fournit pas cette confirmation à sa place.
+Les affectations, les confirmations réelles et les historiques déjà enregistrés sont conservés. **Aucune ancienne prise en charge sans confirmation enregistrée n'est supposée acceptée** : dans ce cas, le technicien actuellement affecté doit confirmer avant ses nouvelles écritures de suivi. Une ancienne intervention, une observation ou un état terminé ne fournit pas cette confirmation à sa place.
 
 ## Identifier un dossier avec les deux numéros
 
@@ -141,7 +154,7 @@ Une observation ajoute un élément de suivi. Une **synthèse** est un texte ajo
 
 Les observations et les informations internes restent soumises aux droits du compte. La consultation d'un historique ne donne pas accès à un autre client ni aux notes qui ne sont pas destinées au portail.
 
-La case **Notes internes — masquées au client** est cochée par défaut. Dans ce cas, l'historique public montre le changement d'état sans l'observation ni la synthèse privées ; ces textes restent dans un événement interne. Décocher cette case partage explicitement les textes avec le client du dossier. Les comptes clients consultent uniquement les événements publics de leurs propres dossiers et ne peuvent pas ajouter d'événement. Un technicien ajoute des notes ou un changement d'état uniquement sur son affectation courante confirmée ; l'affectation et l'échéance restent gérées par l'administrateur ou le responsable.
+La case **Notes internes — masquées au client** est cochée par défaut. Dans ce cas, l'historique public montre le changement d'état sans l'observation ni la synthèse privées ; ces textes restent dans un événement interne. Décocher cette case partage explicitement les textes avec le client du dossier. Les comptes clients consultent uniquement les événements publics de leurs propres dossiers et ne peuvent pas ajouter d'événement. Un technicien ajoute des notes ou un changement d'état uniquement sur son affectation courante confirmée, obtenue par confirmation, prise en charge directe ou relais. L'échéance et l'affectation d'une autre personne restent gérées par l'administrateur ou le responsable.
 
 L'onglet **Suivi** utilise le formulaire ci-dessus. Pour ajouter directement une opération à l'historique du matériel, ouvrir l'onglet **Matériel**, puis **Historique de l'onduleur**. Dans **Historique des opérations**, cliquer sur **Ajouter une opération**, puis choisir **Ajouter une observation**, **Ajouter une synthèse** ou, depuis une demande, **Changer l'état du dossier**. Vérifier la case de visibilité interne avant **Enregistrer l'opération** ; le formulaire se referme après l'ajout et peut être rouvert pour une autre opération. Le filtre **Afficher** permet de retrouver les observations, synthèses, changements d'état, interventions ou états repris ; le choix **Ordre** permet une lecture chronologique ou du plus récent au plus ancien.
 
@@ -170,7 +183,7 @@ Le dossier conserve son état et son numéro TVM commun aux visites. L'affichage
 
 Renseigner le **Type de fiche** et la **Date de l'opération**, puis les champs utiles : site, client final, contact, série de l'armoire, nombre de batteries, contrat ou extension de garantie. La date planifiée sert à une visite future ; une date d'opération future n'est pas acceptée. Pour terminer une fiche d'échange, de mise en service ou préventive, la date réalisée est obligatoire.
 
-Pour qu'un technicien crée une intervention sur un dossier, l'administrateur ou le responsable doit d'abord lui affecter ce dossier et le technicien doit confirmer sa prise en charge. Il ne peut pas s'attribuer librement un dossier tiers en y créant une intervention. Une ancienne visite à son nom ne remplace pas l'affectation courante confirmée ; les limites propres aux fiches d'intervention restent applicables.
+Pour créer une intervention, le technicien doit disposer de l'affectation courante confirmée : soit après affectation par l'administrateur ou le responsable, soit par **Prendre en charge** ou **Prendre le relais**. Créer une intervention ne permet pas, à lui seul, de s'attribuer le dossier. Une ancienne visite à son nom ne remplace pas l'affectation courante confirmée ; les limites propres aux fiches d'intervention restent applicables.
 
 Pour un échange terminé, le nouvel équipement doit être différent de l'ancien et appartenir au même client. Le dossier SAV reste rattaché au matériel d'origine ; choisir un remplacement ne réécrit pas son numéro de série. Le contrat doit concerner ce client et l'équipement d'origine, ou l'ensemble du client ; une extension de garantie doit concerner le matériel d'origine.
 
@@ -320,7 +333,7 @@ Arrêter l'application avec `ARRETER_TVM.cmd`. Remplacer les sources dans le dos
 
 La nouvelle numérotation s'applique aux prochaines demandes. Les références déjà enregistrées, les numéros des centres et les visites existantes restent conservés ; la mise à jour ne doit pas les reformater pour leur donner l'apparence des nouveaux numéros.
 
-Après cette mise à jour, les techniciens déjà affectés devront confirmer réellement leur prise en charge avant les nouvelles écritures. Les anciens suivis restent consultables ; la migration n'ajoute aucune acceptation ou date de confirmation fictive.
+Les confirmations déjà enregistrées restent valables. Si une ancienne affectation ne dispose pas encore d'une confirmation, le technicien désigné doit la confirmer avant ses nouvelles écritures. Les anciens suivis restent consultables ; la mise à jour n'ajoute aucune acceptation ou date de confirmation fictive.
 
 Un nouveau dossier extrait n'est pas une nouvelle base indépendante. Si vous changez de dossier, récupérer d'abord la configuration de l'installation existante selon [le guide Windows](INSTALLATION_WINDOWS.md#mettre-à-jour-lapplication-sans-perdre-la-configuration). Ne pas supprimer les volumes Docker pour obtenir les nouvelles vues ou l'historique.
 

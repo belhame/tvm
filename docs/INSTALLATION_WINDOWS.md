@@ -58,6 +58,8 @@ Si le navigateur ne s’ouvre pas automatiquement, ouvrez **http://localhost:800
 
 Les administrateurs, responsables et techniciens ouvrent **Demandes SAV**. Pour essayer le parcours, créer un client, son équipement et une demande, puis affecter un technicien comme administrateur ou responsable. Le technicien ouvre la demande dans une autre session et confirme sa prise en charge avec **Oui** avant d'ajouter son suivi. Les fiches d'intervention et leur rapport PDF restent accessibles depuis le dossier selon l'opération. Une fenêtre privée permet aussi d'essayer le compte `client` et son accès limité. Voir [le guide de suivi SAV](GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
 
+Le technicien peut également ouvrir une demande non clôturée et utiliser **Prendre en charge** si personne n'est désigné, ou **Prendre le relais** avec un motif si une autre personne est affectée. La confirmation explicite enregistre ensemble son affectation et sa prise en charge. Il peut ensuite saisir son suivi ; les anciennes visites gardent leur auteur, sans passage automatique en maintenance.
+
 ## 4. Utiliser l’application les jours suivants
 
 Ouvrez Docker Desktop et attendez que son moteur soit prêt, puis double-cliquez sur **`DEMARRER_TVM.cmd`**. Ce script démarre l’installation existante et attend sa disponibilité ; il ne reconstruit pas l’image, ne réinstalle pas les dépendances et ne remet pas les comptes à zéro.
@@ -87,7 +89,7 @@ La version ajoute le suivi des échanges et une validation financière distincte
 
 Les anciens échanges et visites restent conservés sans approbation technique ou facture inventée. La procédure **Échange → validation technique → Prêt à être livré**, puis **Échanges à facturer → Confirmer la facturation** est décrite dans [le guide](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation). La mise à jour du code ne signifie pas que cette procédure a déjà été effectuée dans la base du PC.
 
-Les anciennes affectations restent conservées, sans confirmation de prise en charge supposée. Après mise à jour, le technicien actuellement désigné doit confirmer avant ses nouvelles écritures ; ses anciens suivis restent consultables. Une réaffectation demande une nouvelle confirmation.
+Les affectations et confirmations déjà enregistrées restent conservées. Une ancienne affectation sans confirmation reste à confirmer par son technicien avant de nouvelles écritures ; ses anciens suivis restent consultables. Une réaffectation par un responsable demande une nouvelle confirmation. Les actions **Prendre en charge** et **Prendre le relais** enregistrent directement l'acceptation du technicien connecté après son **Oui**.
 
 Le suivi commun **Prêt à être livré** et les devis de diagnostic TVM utilisent aussi cette mise à jour. Les anciens dossiers ne reçoivent pas de tests validés ou de gratuité par déduction. Après installation, saisir le résultat réel, les données du devis et les décisions financières dans votre instance, selon [le parcours prêt / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 

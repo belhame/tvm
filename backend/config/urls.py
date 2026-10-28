@@ -47,6 +47,8 @@ urlpatterns = [
     path('api/requests/intake/', intake_views.request_intake),
     path('api/requests/<int:request_id>/assignment/', request_assignment_views.assignment_view),
     path('api/requests/<int:request_id>/assignment/confirm/', request_assignment_views.confirmation_view),
+    path('api/requests/<int:request_id>/assignment/claim/', request_assignment_views.claim_view),
+    path('api/requests/<int:request_id>/assignment/takeover/', request_assignment_views.takeover_view),
     path('api/requests/<int:request_id>/followup/', followup_view),
     path('api/exchanges/', exchange_views.exchange_list),
     path('api/dispatch/ready/', disposition_views.dispatch_list, {'queue': 'ready'}),

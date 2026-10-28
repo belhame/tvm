@@ -217,10 +217,16 @@ Ces actions sont réservées aux comptes internes actifs, avec session et CSRF. 
 |---|---|
 | `POST /api/requests/{id}/assignment/` | `{technician,expected_revision,reason?}` ; administrateur/responsable uniquement. `technician` est l'identifiant d'un utilisateur interne actif (`technician`, `manager` ou `admin`), ou `null` pour désaffecter. `reason` est un texte facultatif de 2 000 caractères maximum. |
 | `POST /api/requests/{id}/assignment/confirm/` | `{expected_revision,accept,on_behalf?,reason?}` ; l'utilisateur actuellement désigné confirme avec `accept:true`. `on_behalf` vaut `false` par défaut ; `true` est réservé à l'administrateur et exige un motif non vide pour confirmer au nom de la personne désignée. |
+| `POST /api/requests/{id}/assignment/claim/` | `{expected_revision}` ; technicien actif uniquement, dossier non clôturé sans personne affectée. Affecte le technicien connecté et confirme sa prise en charge dans une seule transaction. |
+| `POST /api/requests/{id}/assignment/takeover/` | `{expected_revision,reason}` ; technicien actif uniquement, dossier non clôturé affecté à une autre personne. Motif non vide de 2 000 caractères maximum. Réaffecte au technicien connecté et confirme sa prise en charge dans une seule transaction. |
 
-Les deux actions retournent HTTP `200` avec la demande complète sérialisée. Une révision obsolète renvoie `409` sans appliquer l'opération ; données invalides `400`, rôle interdit `403`, dossier absent `404`. `expected_revision` est obligatoire et vaut la révision relue sur le dossier.
+Les actions retournent HTTP `200` avec la demande complète sérialisée. Une révision obsolète renvoie `409` sans appliquer l'opération ; données invalides `400`, rôle interdit `403`, dossier absent `404`. `expected_revision` est obligatoire et vaut la révision relue sur le dossier.
 
-Une vraie modification d'affectation incrémente `assignment_revision`, date `assigned_at` côté serveur et remet les trois champs d'acceptation à `null`. Affecter le même utilisateur est sans effet. Une affectation d'un dossier `new` le passe à `pending` ; désaffecter conserve l'état courant. La confirmation ne change pas l'état. Un rejeu de la confirmation déjà enregistrée est sans effet ; `accept:false` ne produit aucune écriture ni événement de refus. Dans l'interface, **Annuler** n'effectue aucun POST.
+Une vraie modification d'affectation incrémente `assignment_revision` et date `assigned_at` côté serveur. L'affectation managériale remet les trois champs d'acceptation à `null` ; `claim` et `takeover` enregistrent immédiatement l'acceptation de la nouvelle révision. Affecter le même utilisateur par la route managériale est sans effet. Une affectation d'un dossier `new` le passe à `pending` ; désaffecter conserve l'état courant. La confirmation ne change pas l'état. Un rejeu de la confirmation déjà enregistrée est sans effet ; `accept:false` ne produit aucune écriture ni événement de refus. Dans l'interface, **Annuler** n'effectue aucun POST.
+
+`claim` et `takeover` ne demandent ni accord du responsable ni accord de l'ancien technicien. Ils n'acceptent aucun identifiant d'utilisateur cible : l'acteur connecté devient le technicien. Un dossier `closed`, déjà affecté à soi (même à confirmer), ou une situation incompatible avec l'action retourne `409` ; utiliser la confirmation classique pour sa propre affectation. `takeover` sur un dossier sans technicien et `claim` sur un dossier déjà affecté sont également refusés. Un motif manquant/invalide ou une révision non entière renvoie `400`. Administrateurs et responsables gardent leurs actions managériales ; ils n'utilisent pas ces deux routes réservées au rôle technicien.
+
+La prise de relais ne réattribue aucune ancienne fiche d'intervention ni aucun auteur historique. Le nouveau technicien crée ses propres visites si nécessaire, et l'ancien perd l'autorisation d'écriture liée au dossier. L'état est conservé, sauf `new` qui devient `pending` : ces actions ne passent pas automatiquement en `maintenance`. Le changement technique suivant exige son observation via le suivi.
 
 Les cinq métadonnées en lecture seule sont `assignment_revision`, `assigned_at`, `assignment_accepted_at`, `assignment_accepted_by` et `assignment_accepted_revision`. L'objet interne calculé est :
 
@@ -228,11 +234,11 @@ Les cinq métadonnées en lecture seule sont `assignment_revision`, `assigned_at
 assignment: {
   revision, technician, technician_name, assigned_at,
   accepted, accepted_at, accepted_by, accepted_by_name,
-  can_confirm, can_write_followup
+  can_confirm, can_write_followup, can_claim, can_takeover
 }
 ```
 
-Les événements internes `assignment_changed` et `assignment_accepted` conservent l'auteur et la date réels ; une confirmation au nom d'autrui ajoute `assignment_override` avec son motif privé. Le portail client ne reçoit ni cet objet ni les cinq métadonnées et ne voit pas ces événements internes.
+Les événements internes `assignment_changed` et `assignment_accepted` conservent l'auteur et la date réels ; une confirmation au nom d'autrui ajoute `assignment_override` avec son motif privé. Les prises directes ou relais ajoutent respectivement `assignment_claimed` ou `assignment_taken_over`. Le motif du relais est conservé dans l'événement interne d'affectation. Le portail client ne reçoit ni cet objet ni les cinq métadonnées et ne voit pas ces événements internes.
 
 Les anciennes demandes commencent à la révision `0`, sans date d'affectation ni acceptation inventée. Une affectation ancienne peut être confirmée explicitement à cette révision : sa confirmation porte la vraie date de l'action, tandis que sa date d'affectation historique reste inconnue. Les anciens historiques sont conservés.
 

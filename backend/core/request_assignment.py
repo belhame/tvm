@@ -4,13 +4,14 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 
-from .workflow_events import append_event, current_actor
+from .workflow_events import actor_context, append_event, current_actor
 
 
 MAX_REVISION = 9_223_372_036_854_775_807
 ASSIGNMENT_FIELDS = {'assignment_revision', 'assigned_at', 'assignment_accepted_at',
                      'assignment_accepted_by_id', 'assignment_accepted_revision'}
 _CONFIRMATION_TOKEN = object()
+_SELF_ASSIGNMENT_TOKEN = object()
 
 
 class AssignmentConflict(APIException):
@@ -102,6 +103,7 @@ def assignment_payload(record, actor):
     can_confirm = bool(fresh and assigned and fresh.pk == assigned.pk and not accepted)
     can_write = bool(fresh and (fresh.effective_role in ('admin', 'manager') or
                      (fresh.pk == record.assigned_technician_id and accepted)))
+    self_service = bool(fresh and fresh.effective_role == 'technician' and record.status != 'closed')
     accepted_by = record.assignment_accepted_by if record.assignment_accepted_by_id else None
     public_actor = getattr(actor, 'role', None) in ('client', 'courier')
     return {'revision': record.assignment_revision, 'technician': record.assigned_technician_id,
@@ -109,7 +111,9 @@ def assignment_payload(record, actor):
             'accepted': accepted, 'accepted_at': record.assignment_accepted_at.isoformat() if record.assignment_accepted_at else None,
             'accepted_by': None if public_actor else record.assignment_accepted_by_id,
             'accepted_by_name': ('Équipe SAV' if public_actor else _display(accepted_by)) if accepted_by else None,
-            'can_confirm': can_confirm, 'can_write_followup': can_write}
+            'can_confirm': can_confirm, 'can_write_followup': can_write,
+            'can_claim': bool(self_service and record.assigned_technician_id is None),
+            'can_takeover': bool(self_service and record.assigned_technician_id is not None and record.assigned_technician_id != fresh.pk)}
 
 
 def prepare_assignment_save(instance, update_fields=None):
@@ -126,7 +130,18 @@ def prepare_assignment_save(instance, update_fields=None):
         users = _locked_users(getattr(actor, 'pk', None), target_id)
         if actor is not None:
             actor = _internal(users.get(actor.pk))
-            if actor.effective_role not in ('admin', 'manager'):
+            self_service = getattr(instance, '_self_assignment_token', None) is _SELF_ASSIGNMENT_TOKEN
+            if self_service:
+                if actor.effective_role != 'technician' or target_id != actor.pk or old is None:
+                    raise PermissionDenied('La prise en charge personnelle doit viser le technicien connecté.')
+                if old.status == 'closed' or old.assignment_revision != getattr(instance, '_self_assignment_revision', None):
+                    raise AssignmentConflict()
+                mode = getattr(instance, '_self_assignment_mode', None)
+                if ((mode == 'claim' and previous_id is not None)
+                    or (mode == 'takeover' and (previous_id is None or previous_id == actor.pk))
+                    or mode not in ('claim', 'takeover')):
+                    raise AssignmentConflict('Le dossier ne correspond plus à la prise en charge demandée.')
+            elif actor.effective_role not in ('admin', 'manager'):
                 raise PermissionDenied('Le responsable SAV gère les affectations.')
         target = users.get(target_id)
         if target_id and (target is None or not target.is_active or target.role in ('client', 'courier') or target.effective_role not in ('admin', 'manager', 'technician')):
@@ -170,9 +185,11 @@ def finish_assignment_save(instance, context):
     old = context['old']
     before = _display(old.assigned_technician) if old else 'Non affecté'
     after = _display(instance.assigned_technician)
+    immediate = getattr(instance, '_self_assignment_token', None) is _SELF_ASSIGNMENT_TOKEN
+    confirmation = 'Prise en charge personnelle confirmée dans la même opération.' if immediate else 'Confirmation de prise en charge requise.'
     append_event(equipment=instance.equipment, service_request=instance, actor=context['actor'],
                  kind='assignment_changed', status_before=context['before_status'], status_after=instance.status,
-                 summary=f'Affectation révision {instance.assignment_revision} : {before} → {after}. Confirmation de prise en charge requise.' if instance.assigned_technician_id else f'Affectation révision {instance.assignment_revision} : {before} → Non affecté.',
+                 summary=f'Affectation révision {instance.assignment_revision} : {before} → {after}. {confirmation}' if instance.assigned_technician_id else f'Affectation révision {instance.assignment_revision} : {before} → Non affecté.',
                  observation=getattr(instance, '_assignment_reason', ''), is_internal=True)
 
 
@@ -248,3 +265,62 @@ def confirm_assignment(request_id, *, actor, expected_revision, accept, on_behal
         append_event(equipment=record.equipment, service_request=record, actor=actor, kind='assignment_override',
                      summary='Confirmation enregistrée par un administrateur au nom du technicien affecté.', observation=reason, is_internal=True)
     return record
+
+
+@transaction.atomic
+def _self_assign_request(request_id, *, actor, expected_revision, mode, reason=''):
+    expected_revision = _expected_revision(expected_revision)
+    reason = _reason(reason)
+    record = _locked_request(request_id)
+    actor = _fresh_actor(actor, lock=True)
+    if actor.effective_role != 'technician':
+        raise PermissionDenied('Cette action personnelle est réservée aux techniciens actifs.')
+    if record.assignment_revision != expected_revision:
+        raise AssignmentConflict()
+    if record.status == 'closed':
+        raise AssignmentConflict('Un dossier clôturé ne peut pas être pris en charge. Un responsable peut gérer sa suite selon les règles SAV.')
+    previous_id = record.assigned_technician_id
+    previous_name = _display(record.assigned_technician)
+    if mode == 'claim':
+        if previous_id is not None:
+            raise AssignmentConflict('Ce dossier est déjà affecté. Rechargez sa fiche avant de reprendre le relais.')
+    elif mode == 'takeover':
+        if not reason:
+            raise ValidationError({'reason': 'Expliquez pourquoi vous reprenez le relais sur ce dossier.'})
+        if previous_id is None or previous_id == actor.pk:
+            raise AssignmentConflict('La reprise concerne uniquement un dossier affecté à une autre personne.')
+    else:
+        raise ValidationError('Action de prise en charge inconnue.')
+    record.assigned_technician = actor
+    record._assignment_actor = actor
+    record._assignment_reason = reason
+    record._self_assignment_token = _SELF_ASSIGNMENT_TOKEN
+    record._self_assignment_revision = expected_revision
+    record._self_assignment_mode = mode
+    with actor_context(actor):
+        try:
+            record.save(update_fields=['assigned_technician', 'updated_at'])
+        finally:
+            del record._self_assignment_token
+            del record._self_assignment_revision
+            del record._self_assignment_mode
+        # Reuse the established acceptance service and its private token; a
+        # failure rolls back the assignment, timestamps and all history.
+        record = confirm_assignment(record.pk, actor=actor, expected_revision=record.assignment_revision, accept=True)
+        append_event(
+            equipment=record.equipment, service_request=record, actor=actor,
+            kind='assignment_claimed' if mode == 'claim' else 'assignment_taken_over',
+            status_before=record.status, status_after=record.status,
+            summary=f'Demande prise en charge personnellement par {_display(actor)}.' if mode == 'claim'
+                    else f'Relais repris par {_display(actor)} après {previous_name}. Les fiches et auteurs antérieurs sont conservés.',
+            is_internal=True,
+        )
+    return record
+
+
+def claim_request(request_id, *, actor, expected_revision):
+    return _self_assign_request(request_id, actor=actor, expected_revision=expected_revision, mode='claim')
+
+
+def takeover_request(request_id, *, actor, expected_revision, reason):
+    return _self_assign_request(request_id, actor=actor, expected_revision=expected_revision, mode='takeover', reason=reason)

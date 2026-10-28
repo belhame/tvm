@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
-from .request_assignment import assign_request, confirm_assignment
+from .request_assignment import assign_request, claim_request, confirm_assignment, takeover_request
 from .serializers import ServiceRequestSerializer
 from .workflow_api import StrictBoolean, StrictText
 
@@ -43,6 +43,14 @@ class ConfirmInput(StrictInput):
     reason = StrictText(max_length=2000, allow_blank=True, required=False, default='')
 
 
+class ClaimInput(StrictInput):
+    expected_revision = Identifier(min_value=0, max_value=9223372036854775807)
+
+
+class TakeoverInput(ClaimInput):
+    reason = StrictText(max_length=2000)
+
+
 @api_view(['POST'])
 @permission_classes([AssignmentPermission])
 def assignment_view(request, request_id):
@@ -60,4 +68,29 @@ def confirmation_view(request, request_id):
     serializer = ConfirmInput(data=request.data)
     serializer.is_valid(raise_exception=True)
     record = confirm_assignment(request_id, actor=request.user, **serializer.validated_data)
+    return Response(ServiceRequestSerializer(record, context={'request': request}).data)
+
+
+class TechnicianSelfAssignmentPermission(BasePermission):
+    def has_permission(self, request, view):
+        actor = request.user
+        return bool(actor.is_authenticated and actor.is_active and actor.role == 'technician'
+                    and actor.effective_role == 'technician')
+
+
+@api_view(['POST'])
+@permission_classes([TechnicianSelfAssignmentPermission])
+def claim_view(request, request_id):
+    serializer = ClaimInput(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    record = claim_request(request_id, actor=request.user, **serializer.validated_data)
+    return Response(ServiceRequestSerializer(record, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([TechnicianSelfAssignmentPermission])
+def takeover_view(request, request_id):
+    serializer = TakeoverInput(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    record = takeover_request(request_id, actor=request.user, **serializer.validated_data)
     return Response(ServiceRequestSerializer(record, context={'request': request}).data)

@@ -2,7 +2,9 @@
 
 Application de gestion du SAV des onduleurs : **React / TypeScript**, API **Django**, base **PostgreSQL 16** commune à tous les utilisateurs. Les dossiers sont enregistrés sur le serveur ; chaque ordinateur se connecte à la même application. Aucun dossier métier n'est stocké dans le `localStorage` du navigateur.
 
-Le parcours de travail part de la **demande SAV**, ouverte par défaut pour les administrateurs, responsables et techniciens : client et onduleur / numéro de série → affectation → confirmation du technicien → suivi du dossier, puis fiches d'intervention et rapports PDF selon l'opération. Dans le suivi, un changement de statut exige une observation ; une réaffectation impose une nouvelle confirmation. L'administrateur et le responsable continuent à assurer le suivi, avec les validations techniques et financières habituelles. Voir [la prise en charge et le suivi](docs/GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
+Le parcours de travail part de la **demande SAV**, ouverte par défaut pour les administrateurs, responsables et techniciens : client et onduleur / numéro de série → affectation → confirmation du technicien → suivi du dossier, puis fiches d'intervention et rapports PDF selon l'opération. Dans le suivi, un changement de statut exige une observation ; une réaffectation managériale remet la prise en charge à confirmer. L'administrateur et le responsable continuent à assurer le suivi, avec les validations techniques et financières habituelles. Voir [la prise en charge et le suivi](docs/GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
+
+Le technicien peut aussi **Prendre en charge** un dossier non affecté ou **Prendre le relais** avec un motif, après confirmation explicite, sans accord préalable d'un responsable. Ces actions conservent l'historique et les anciennes fiches au nom de leur auteur ; elles ne passent pas automatiquement le dossier en maintenance.
 
 L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.
 

@@ -25,6 +25,9 @@ with open(os.environ['BACKUP_TEST_LOG'], 'a') as log:
     log.write(json.dumps(args) + '\\n')
 if 'ps' in args:
     print(os.environ['BACKUP_TEST_RUNNING'])
+elif 'start' in args and '--wait' in args:
+    sys.stderr.write('unknown flag: --wait\\n')
+    sys.exit(1)
 elif 'pg_dump' in ' '.join(args):
     if os.environ['BACKUP_TEST_FAIL'] == '1':
         sys.exit(7)
@@ -51,7 +54,8 @@ elif args[:2] == ['volume', 'inspect']:
         self.assertTrue(all(i < dump_index for i, _ in stops))
         start = next(args for args in calls if 'start' in args)
         self.assertEqual(start[-2:], ['web', 'reminders'])
-        self.assertIn('--wait', start)
+        self.assertNotIn('--wait', start)
+        self.assertNotIn('Relancez DEMARRER_TVM.cmd', result.stderr)
 
     def test_failed_snapshot_still_resumes_both_previously_running_services(self):
         result, calls = self.run_backup(['db', 'web', 'reminders'], fail_dump=True)

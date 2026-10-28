@@ -84,6 +84,8 @@ const kindLabels: Record<string, string> = {
   diagnostic_free_approved: "Gratuité du diagnostic approuvée",
   diagnostic_closed: "Retour client clôturé",
   disposition_reset: "Décision technique rouverte",
+  assignment_claimed: "Demande prise en charge",
+  assignment_taken_over: "Prise de relais",
   assignment_changed: "Affectation modifiée",
   assignment_accepted: "Prise en charge confirmée",
   assignment_override: "Prise en charge confirmée par l’administrateur",

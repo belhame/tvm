@@ -23,6 +23,8 @@ export type RequestAssignmentState = {
   accepted_by: number | null;
   accepted_by_name: string;
   can_confirm: boolean;
+  can_claim: boolean;
+  can_takeover: boolean;
   can_write_followup: boolean;
 };
 
@@ -66,6 +68,8 @@ export function assignmentOf(record: RecordData): RequestAssignmentState {
     accepted_by_name:
       typeof value.accepted_by_name === "string" ? value.accepted_by_name : "",
     can_confirm: value.can_confirm === true,
+    can_claim: value.can_claim === true,
+    can_takeover: value.can_takeover === true,
     can_write_followup: value.can_write_followup === true,
   };
 }
@@ -79,7 +83,10 @@ export function assignmentFingerprint(record: RecordData) {
     assignment.accepted,
     assignment.accepted_at,
     assignment.can_confirm,
+    assignment.can_claim,
+    assignment.can_takeover,
     assignment.can_write_followup,
+    record.status === "closed",
   ]);
 }
 
@@ -92,7 +99,13 @@ function technicianLabel(record: RecordData): string {
   );
 }
 
-type Panel = "assignment" | "confirm" | "proxy" | null;
+type AssignmentAction =
+  | "assignment"
+  | "confirm"
+  | "proxy"
+  | "claim"
+  | "takeover";
+type Panel = AssignmentAction | null;
 
 export default function RequestAssignment({
   record,
@@ -122,6 +135,7 @@ export default function RequestAssignment({
   const controller = useRef<AbortController | null>(null);
   const submitting = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const recordScope = useRef(record.id);
   const onChangedRef = useRef(onChanged);
@@ -132,6 +146,20 @@ export default function RequestAssignment({
   const isInternal = ["admin", "manager", "technician"].includes(user.role);
   const canConfirm =
     isInternal && assignment.can_confirm && !assignment.accepted;
+  const canClaim =
+    user.role === "technician" &&
+    assignment.can_claim &&
+    assignment.technician === null &&
+    current.status !== "closed" &&
+    record.status !== "closed";
+  const canTakeover =
+    user.role === "technician" &&
+    assignment.can_takeover &&
+    assignment.technician !== null &&
+    assignment.technician !== user.id &&
+    current.status !== "closed" &&
+    record.status !== "closed";
+  const actorName = technicianLabel(user);
   const canProxy =
     user.role === "admin" &&
     assignment.technician !== null &&
@@ -176,12 +204,21 @@ export default function RequestAssignment({
       ?.focus();
   }, [panel]);
 
+  useEffect(() => {
+    if (notice) summaryRef.current?.focus();
+  }, [notice]);
+
+  function restoreFocus() {
+    if (triggerRef.current?.isConnected) triggerRef.current.focus();
+    else summaryRef.current?.focus();
+  }
+
   function closePanel() {
     if (busy) return;
     setPanel(null);
     setReason("");
     setError("");
-    triggerRef.current?.focus();
+    restoreFocus();
   }
 
   function openPanel(value: Panel, trigger: HTMLButtonElement) {
@@ -204,11 +241,25 @@ export default function RequestAssignment({
     }
   }
 
-  async function mutate(mode: "assignment" | "confirm" | "proxy") {
+  async function mutate(mode: AssignmentAction) {
     if (submitting.current || !isInternal) return;
     if (mode === "assignment" && !isManager) return;
     if (mode === "confirm" && !canConfirm) return;
-    if (mode === "proxy" && (!canProxy || !reason.trim())) {
+    if (mode === "claim" && !canClaim) return;
+    if (mode === "takeover" && !canTakeover) return;
+    if (
+      mode === "takeover" &&
+      (!reason.trim() || reason.trim().length > 2000)
+    ) {
+      setError(
+        "Indiquez le motif de la prise de relais, en 2 000 caractères maximum.",
+      );
+      return;
+    }
+    if (
+      mode === "proxy" &&
+      (!canProxy || !reason.trim() || reason.trim().length > 2000)
+    ) {
       setError("Indiquez le motif de cette confirmation au nom du technicien.");
       return;
     }
@@ -224,20 +275,24 @@ export default function RequestAssignment({
     setBusy(true);
     setError("");
     setNotice("");
-    const endpoint = `requests/${current.id}/assignment/${mode === "assignment" ? "" : "confirm/"}`;
+    const endpoint = `requests/${current.id}/assignment/${mode === "assignment" ? "" : mode === "claim" ? "claim/" : mode === "takeover" ? "takeover/" : "confirm/"}`;
     const body =
       mode === "assignment"
         ? {
             technician: technician ? Number(technician) : null,
             expected_revision: assignment.revision,
           }
-        : {
-            expected_revision: assignment.revision,
-            accept: true,
-            ...(mode === "proxy"
-              ? { on_behalf: true, reason: reason.trim() }
-              : {}),
-          };
+        : mode === "claim"
+          ? { expected_revision: assignment.revision }
+          : mode === "takeover"
+            ? { expected_revision: assignment.revision, reason: reason.trim() }
+            : {
+                expected_revision: assignment.revision,
+                accept: true,
+                ...(mode === "proxy"
+                  ? { on_behalf: true, reason: reason.trim() }
+                  : {}),
+              };
     let updated: RecordData;
     try {
       updated = await api<RecordData>(endpoint, {
@@ -288,7 +343,11 @@ export default function RequestAssignment({
         ? assignmentOf(updated).technician === null
           ? "La demande est désaffectée."
           : "Affectation enregistrée. La prise en charge doit être confirmée."
-        : "La prise en charge de la demande est confirmée.",
+        : mode === "claim"
+          ? "La demande vous est affectée et votre prise en charge est confirmée."
+          : mode === "takeover"
+            ? "Vous avez pris le relais. Votre prise en charge est confirmée."
+            : "La prise en charge de la demande est confirmée.",
     );
     try {
       await onChangedRef.current(updated);
@@ -301,12 +360,12 @@ export default function RequestAssignment({
       if (live()) {
         submitting.current = false;
         setBusy(false);
-        triggerRef.current?.focus();
+        restoreFocus();
       }
     }
   }
 
-  if (user.role === "client")
+  if (user.role === "client" || user.role === "courier")
     return (
       <div className="request-assignment-public">
         <span>
@@ -321,7 +380,13 @@ export default function RequestAssignment({
       onClick={(event) => event.stopPropagation()}
       onKeyDown={handleKey}
     >
-      <div className="request-assignment-summary">
+      <div
+        ref={summaryRef}
+        tabIndex={-1}
+        className="request-assignment-summary"
+        role="group"
+        aria-label={`Affectation actuelle de la demande ${reference}`}
+      >
         <span
           className={`request-assignment-badge ${assignment.technician === null ? "assignment-unassigned" : assignment.accepted ? "assignment-accepted" : "assignment-pending"}`}
         >
@@ -371,6 +436,32 @@ export default function RequestAssignment({
               {compact ? "Affecter" : "Modifier l’affectation"}
             </button>
           )}
+          {canClaim && (
+            <button
+              type="button"
+              className="button primary small"
+              onClick={(event) => openPanel("claim", event.currentTarget)}
+              disabled={busy}
+              aria-expanded={panel === "claim"}
+              aria-controls={`${prefix}-panel`}
+            >
+              <UserCheck size={14} />
+              Prendre en charge
+            </button>
+          )}
+          {canTakeover && (
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={(event) => openPanel("takeover", event.currentTarget)}
+              disabled={busy}
+              aria-expanded={panel === "takeover"}
+              aria-controls={`${prefix}-panel`}
+            >
+              <UserRound size={14} />
+              Prendre le relais
+            </button>
+          )}
           {canConfirm && (
             <button
               type="button"
@@ -416,7 +507,11 @@ export default function RequestAssignment({
                 ? "Affecter la demande"
                 : panel === "proxy"
                   ? "Confirmation administrative"
-                  : "Confirmer la prise en charge"}
+                  : panel === "claim"
+                    ? "Prendre en charge"
+                    : panel === "takeover"
+                      ? "Prendre le relais"
+                      : "Confirmer la prise en charge"}
             </h3>
             <button
               type="button"
@@ -485,9 +580,63 @@ export default function RequestAssignment({
           ) : (
             <>
               <p id={`${prefix}-question`}>
-                Voulez-vous confirmer la prise en charge de la demande n°{" "}
+                {panel === "claim"
+                  ? "Voulez-vous prendre en charge la demande n° "
+                  : panel === "takeover"
+                    ? "Voulez-vous prendre le relais sur la demande n° "
+                    : "Voulez-vous confirmer la prise en charge de la demande n° "}
                 {reference} ?
               </p>
+              {(panel === "claim" || panel === "takeover") && (
+                <div className="request-assignment-handover">
+                  <dl>
+                    <div>
+                      <dt>Technicien actuel</dt>
+                      <dd>
+                        {panel === "claim"
+                          ? "Aucun technicien affecté"
+                          : assignment.technician_name ||
+                            "Technicien actuellement affecté"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Nouveau technicien</dt>
+                      <dd>{actorName}</dd>
+                    </div>
+                  </dl>
+                  <p>
+                    Vous devenez le technicien responsable et votre prise en
+                    charge est confirmée immédiatement.{" "}
+                    {panel === "takeover"
+                      ? "L’ancien technicien perd ses droits d’écriture sur ce dossier. "
+                      : ""}
+                    Les visites existantes et leurs auteurs sont conservés.
+                  </p>
+                </div>
+              )}
+              {panel === "takeover" && (
+                <div className="request-assignment-proxy">
+                  <label htmlFor={`${prefix}-takeover-reason`}>
+                    Motif de la prise de relais
+                  </label>
+                  <textarea
+                    id={`${prefix}-takeover-reason`}
+                    className="input"
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    maxLength={2000}
+                    required
+                    rows={3}
+                    disabled={busy}
+                    aria-describedby={`${prefix}-takeover-help`}
+                  />
+                  <p id={`${prefix}-takeover-help`}>
+                    Obligatoire. Ce motif est conservé dans l’historique interne
+                    du dossier.
+                  </p>
+                </div>
+              )}
+
               {panel === "proxy" && (
                 <div className="request-assignment-proxy">
                   <p>
@@ -526,7 +675,10 @@ export default function RequestAssignment({
                   type="button"
                   className="button primary small"
                   onClick={() => void mutate(panel)}
-                  disabled={busy || (panel === "proxy" && !reason.trim())}
+                  disabled={
+                    busy ||
+                    (["proxy", "takeover"].includes(panel) && !reason.trim())
+                  }
                 >
                   {busy ? (
                     <LoaderCircle className="spin" size={14} />
