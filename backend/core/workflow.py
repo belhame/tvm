@@ -62,4 +62,5 @@ def is_due_overdue(instance):
 
 
 def technician_can_write(user, service_request):
-    return service_request.assigned_technician_id == user.pk or service_request.interventions.filter(technician_id=user.pk).exists()
+    from .request_assignment import technician_has_accepted_assignment
+    return technician_has_accepted_assignment(user, service_request)

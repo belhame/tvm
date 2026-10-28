@@ -17,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Client, Equipment, Intervention, OperationEvent, ServiceRequest
+from core.request_assignment import confirm_assignment
 
 
 def pdf_text(data):
@@ -47,7 +48,10 @@ class IndependentDispositionReviewTests(TestCase):
     def new_request(self, **changes):
         fields = dict(equipment=self.original, subject='Dossier de sortie fictif', status='testing', assigned_technician=self.tech, client_reference='000042-CLIENT-FICTIF')
         fields.update(changes)
-        return ServiceRequest.objects.create(**fields)
+        record = ServiceRequest.objects.create(**fields)
+        if record.assigned_technician_id == self.tech.pk:
+            record = confirm_assignment(record.pk, actor=self.tech, expected_revision=record.assignment_revision, accept=True)
+        return record
 
     def url(self, action='', record=None):
         return f'/api/requests/{(record or self.request).pk}/disposition/' + (f'{action}/' if action else '')
@@ -82,7 +86,7 @@ class IndependentDispositionReviewTests(TestCase):
             'disposition': {'outcome': 'repaired', 'tests_passed': True, 'tested_on': '2025-10-15', 'classified_at': '2025-10-15T10:00:00Z'},
         }, format='json')
         self.assertEqual(response.status_code, 400, response.data)
-        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'ready_for_delivery'}, format='json')
+        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'ready_for_delivery', 'observation': 'Tentative de sortie sans qualification technique.'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         self.request.refresh_from_db()
         self.request.status = 'ready_for_delivery'
@@ -169,7 +173,7 @@ class IndependentDispositionReviewTests(TestCase):
                 self.assertIn(response.status_code, (200, 400), response.data)
             else:
                 self.assertEqual(response.status_code, 400, response.data)
-        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed'}, format='json')
+        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed', 'observation': 'Tentative de clôture avant décision financière.'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         self.request.refresh_from_db()
         self.request.status = 'closed'

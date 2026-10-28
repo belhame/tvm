@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 
@@ -12,7 +13,7 @@ async function login(page, username = 'admin', courier = false) {
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
   if (courier) await expect(page.getByRole('navigation', { name: 'Navigation livreur', exact: true })).toBeVisible();
-  else await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  else await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -91,6 +92,7 @@ test('le journal client prévisualise les vrais messages e-mail et WhatsApp, mas
   const reloaded = page.waitForResponse(result => new URL(result.url()).pathname === '/api/dashboard/' && result.ok());
   await page.reload();
   await reloaded;
+  await openLegacyDashboard(page);
   await navigate(page, 'WhatsApp & assistant IA');
   const journal = page.getByRole('region', { name: 'Journal des notifications client', exact: true });
   await expect(journal).toBeVisible();

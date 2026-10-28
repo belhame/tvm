@@ -1,5 +1,33 @@
 # Suivre les demandes et l'historique SAV
 
+## Commencer par la demande SAV
+
+Le **dossier SAV** est le point de départ du travail : retrouver ou créer la demande, l'affecter, confirmer sa prise en charge, puis enregistrer son suivi. Il porte le numéro d'appel TVM commun à toutes ses opérations. Il n'est pas nécessaire de créer d'abord une intervention pour changer son état ou ajouter une observation.
+
+Après connexion, les comptes administrateur, responsable et technicien ouvrent **Demandes SAV**, également placé en premier dans leur navigation. Dans le dossier, **Suivi** présente l'historique, du plus récent au plus ancien, à côté du formulaire de mise à jour.
+
+Les interventions restent les fiches détaillées des opérations réalisées : maintenance, mise en service, prévention ou échange. Les ouvrir depuis le dossier lorsqu'une opération doit être renseignée et donner lieu à son propre rapport. Elles ne remplacent ni l'affectation du dossier, ni la confirmation du technicien.
+
+## Affecter et confirmer la prise en charge
+
+1. L'administrateur ou le responsable ouvre la demande, clique sur **Modifier l'affectation** (ou **Affecter** dans la liste), choisit le **Technicien de la demande**, puis clique sur **Affecter**.
+2. Le technicien désigné ouvre ce dossier, clique sur **Confirmer la prise en charge**, puis répond **Oui**. **Annuler** ferme la confirmation sans enregistrer un refus et sans modifier l'affectation.
+3. Une fois la confirmation enregistrée, le technicien peut ajouter le suivi et travailler sur ce dossier dans les limites de ses droits. L'affectation seule ne suffit plus à autoriser ses nouvelles écritures.
+
+L'indicateur passe de **À confirmer** à **Prise en charge confirmée**. La confirmation ne change pas l'état du dossier. Elle ne remplace pas la réception physique du matériel et ne redémarre pas le compteur depuis l'arrivée. Son auteur et sa date sont enregistrés. Confirmer à nouveau une affectation déjà acceptée ne crée pas une seconde prise en charge.
+
+Une **réaffectation** annule la confirmation précédente pour le travail à venir. Le nouveau technicien doit confirmer à son tour ; l'ancien ne conserve pas ses droits d'écriture du seul fait qu'il a traité une visite de ce dossier. Si l'affectation a changé pendant qu'une fenêtre était ouverte, actualiser le dossier avant de confirmer ou d'enregistrer le suivi.
+
+L'affectation d'une demande **Non affecté** la fait passer à **En attente**. Une désaffectation ne choisit pas automatiquement un autre état. L'administrateur et le responsable restent chargés de l'affectation et de l'échéance.
+
+L'administrateur et le responsable peuvent continuer à assurer le suivi sans devoir accepter personnellement l'affectation d'un autre utilisateur. **Seul l'administrateur** peut, si nécessaire, utiliser **Confirmer au nom du technicien** : il doit remplir le **Motif de confirmation au nom du technicien**, puis répondre **Oui**. Ce motif et l'auteur réel de l'action sont conservés dans l'historique interne. Le responsable ne dispose pas de cette confirmation au nom d'autrui.
+
+Ces droits ne contournent pas les validations d'échange, de facturation ou de livraison. Une confirmation de prise en charge ne vaut ni validation technique, ni accord de gratuité, ni preuve de remise.
+
+### Après la mise à jour d'un ancien dossier
+
+Les affectations et les historiques déjà enregistrés sont conservés, mais **aucune ancienne prise en charge n'est supposée acceptée**. Le technicien actuellement affecté doit confirmer avant ses nouvelles écritures de suivi. Une ancienne intervention, une observation ou un état terminé ne fournit pas cette confirmation à sa place.
+
 ## Identifier un dossier avec les deux numéros
 
 Le **N° d'intervention / appel TVM** est le numéro métier du dossier SAV. Il reste commun à toutes les visites et opérations de ce dossier. Le **N° d'appel client** est la référence donnée par le centre SAV ou l'organisation qui confie la réparation à TVM.
@@ -60,7 +88,7 @@ Les catégories de demandes correspondent aux états suivants :
 
 | Catégorie | Dossiers présentés |
 |---|---|
-| Non affecté | État `new`, sans technicien affecté ; choisir un autre état lors de l'affectation |
+| Non affecté | État `new`, sans technicien affecté ; l'action d'affectation le fait passer à En attente |
 | En entretien | États `maintenance` et ancien `in_progress` |
 | En test | État `testing` |
 | Traité | État `resolved` |
@@ -99,19 +127,23 @@ La mise à jour ne remplit ni l'arrivée ni la clôture des anciennes fiches. Il
 
 ## Lire une fiche et sa chronologie
 
-Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Livraison / Retour**, **Conclusion** et **Documents**. Un administrateur ou responsable dispose de **Modifier le dossier** pour régler notamment son état, son affectation et son échéance. L'état **Non affecté** n'accepte pas de technicien affecté : sélectionner l'état approprié lors de l'affectation.
+Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Livraison / Retour**, **Conclusion** et **Documents**. Les actions d'affectation et de prise en charge concernent ce dossier. **Modifier le dossier**, réservé à l'administrateur ou au responsable, reste disponible pour ses informations de gestion ; l'état et le technicien se règlent par les actions de suivi et d'affectation.
 
 La fiche d'une demande regroupe son équipement, le client, l'état du dossier et les informations de traitement. L'historique de l'onduleur permet de retrouver les demandes et interventions rattachées au même matériel. La fiche équipement propose les onglets **Matériel** et **Historique des opérations** ; le dossier distingue **Historique du dossier** et **Historique de l'onduleur**.
 
 La chronologie distingue les changements réellement enregistrés, leurs dates et leur auteur, ainsi que les observations ajoutées au suivi. Un changement d'état indique l'état précédent et le nouvel état lorsqu'ils sont connus. Une entrée ne représente pas une étape effectuée simplement parce qu'elle figure dans un déroulé type.
 
+Dans **Mettre à jour le suivi**, choisir l'**État du dossier** voulu et décrire l'action dans **Observation**. **Une observation non vide est obligatoire si le statut change** ; le champ **Observation finale / synthèse** est facultatif. Si le statut reste identique, une observation ou une synthèse suffit, mais un suivi entièrement vide est refusé. Cliquer ensuite sur **Enregistrer le suivi**.
+
+Vérifier ces informations avant l'enregistrement : le serveur refuse une opération fondée sur un état ou une affectation qui a changé entre-temps, afin de ne pas écraser le travail d'un collègue. Dans ce cas, utiliser **Actualiser l'état**, puis relire les textes conservés avant un nouvel enregistrement. Les états **Prêt à être livré** et **À retourner au client** passent par les validations prévues dans **Échange** ou **Livraison / Retour**.
+
 Une observation ajoute un élément de suivi. Une **synthèse** est un texte ajouté à l'historique par un utilisateur ; elle ne simule pas un diagnostic ou un traitement par l'assistant IA. Chaque ajout est conservé comme un événement : ce n'est pas une zone de texte qui réécrit les anciennes synthèses. Pour apporter une correction, ajouter un nouvel élément explicite.
 
 Les observations et les informations internes restent soumises aux droits du compte. La consultation d'un historique ne donne pas accès à un autre client ni aux notes qui ne sont pas destinées au portail.
 
-Les notes sont internes par défaut. Une transition d'état destinée au suivi public ne rend pas automatiquement publiques les observations internes qui l'accompagnent. Les comptes clients consultent uniquement les événements publics de leurs propres dossiers et ne peuvent pas ajouter d'événement. Un technicien ajoute des notes ou un changement d'état uniquement dans son périmètre d'affectation ; l'affectation et l'échéance restent gérées par l'administrateur ou le responsable.
+La case **Notes internes — masquées au client** est cochée par défaut. Dans ce cas, l'historique public montre le changement d'état sans l'observation ni la synthèse privées ; ces textes restent dans un événement interne. Décocher cette case partage explicitement les textes avec le client du dossier. Les comptes clients consultent uniquement les événements publics de leurs propres dossiers et ne peuvent pas ajouter d'événement. Un technicien ajoute des notes ou un changement d'état uniquement sur son affectation courante confirmée ; l'affectation et l'échéance restent gérées par l'administrateur ou le responsable.
 
-Dans **Historique des opérations**, cliquer sur **Ajouter une opération**, puis choisir **Ajouter une observation**, **Ajouter une synthèse** ou, depuis une demande, **Changer l'état du dossier**. Vérifier la case de visibilité interne avant **Enregistrer l'opération**. Le filtre **Afficher** permet de retrouver les observations, synthèses, changements d'état, interventions ou états repris ; le choix **Ordre** permet une lecture chronologique ou du plus récent au plus ancien.
+L'onglet **Suivi** utilise le formulaire ci-dessus. Pour ajouter directement une opération à l'historique du matériel, ouvrir l'onglet **Matériel**, puis **Historique de l'onduleur**. Dans **Historique des opérations**, cliquer sur **Ajouter une opération**, puis choisir **Ajouter une observation**, **Ajouter une synthèse** ou, depuis une demande, **Changer l'état du dossier**. Vérifier la case de visibilité interne avant **Enregistrer l'opération** ; le formulaire se referme après l'ajout et peut être rouvert pour une autre opération. Le filtre **Afficher** permet de retrouver les observations, synthèses, changements d'état, interventions ou états repris ; le choix **Ordre** permet une lecture chronologique ou du plus récent au plus ancien.
 
 ## Comprendre le point de départ de l'historique
 
@@ -138,7 +170,7 @@ Le dossier conserve son état et son numéro TVM commun aux visites. L'affichage
 
 Renseigner le **Type de fiche** et la **Date de l'opération**, puis les champs utiles : site, client final, contact, série de l'armoire, nombre de batteries, contrat ou extension de garantie. La date planifiée sert à une visite future ; une date d'opération future n'est pas acceptée. Pour terminer une fiche d'échange, de mise en service ou préventive, la date réalisée est obligatoire.
 
-Pour qu'un technicien crée sa première intervention sur un dossier, le responsable doit d'abord lui affecter ce dossier. Le technicien ne peut pas s'attribuer librement un dossier tiers en y créant une intervention. Il peut ensuite travailler dans son périmètre d'affectation et reste limité à ses propres interventions.
+Pour qu'un technicien crée une intervention sur un dossier, l'administrateur ou le responsable doit d'abord lui affecter ce dossier et le technicien doit confirmer sa prise en charge. Il ne peut pas s'attribuer librement un dossier tiers en y créant une intervention. Une ancienne visite à son nom ne remplace pas l'affectation courante confirmée ; les limites propres aux fiches d'intervention restent applicables.
 
 Pour un échange terminé, le nouvel équipement doit être différent de l'ancien et appartenir au même client. Le dossier SAV reste rattaché au matériel d'origine ; choisir un remplacement ne réécrit pas son numéro de série. Le contrat doit concerner ce client et l'équipement d'origine, ou l'ensemble du client ; une extension de garantie doit concerner le matériel d'origine.
 
@@ -174,7 +206,7 @@ La colonne distincte **À retourner au client** sert aux matériels déclarés *
 
 Le champ Retour renseigné à l'accueil ne qualifie pas à lui seul cette non-réparabilité : la décision technique doit être enregistrée dans ce parcours.
 
-Dans un dossier **En test** ou **Traité**, l'onglet **Livraison / Retour** propose **Tests validés — Réparé** : saisir la synthèse technique et la date réelle des tests, confirmer qu'ils sont réussis, puis utiliser **Confirmer la réparation et mettre prêt à livrer**. Pour un matériel non réparable, choisir **Non réparable — Retour client**, renseigner le diagnostic et le mode de frais, puis **Enregistrer le retour client**. Ces opérations sont accessibles à l'administrateur, au responsable ou au technicien affecté. Les contrôles sont des déclarations enregistrées par l'équipe ; aucune lecture automatique des mesures de l'onduleur n'est effectuée.
+Dans un dossier **En test** ou **Traité**, l'onglet **Livraison / Retour** propose **Tests validés — Réparé** : saisir la synthèse technique et la date réelle des tests, confirmer qu'ils sont réussis, puis utiliser **Confirmer la réparation et mettre prêt à livrer**. Pour un matériel non réparable, choisir **Non réparable — Retour client**, renseigner le diagnostic et le mode de frais, puis **Enregistrer le retour client**. Ces opérations sont accessibles à l'administrateur, au responsable ou au technicien ayant confirmé sa prise en charge courante. Les contrôles sont des déclarations enregistrées par l'équipe ; aucune lecture automatique des mesures de l'onduleur n'est effectuée.
 
 ### Devis de diagnostic créé dans TVM
 
@@ -251,7 +283,7 @@ Passer une demande à **Échange** l'affiche dans la file correspondante, sans d
 
 La file **Échanges à facturer** est proposée à l'administrateur et aux comptes internes autorisés. Dans **Comptes**, l'administrateur règle **Peut valider la facturation** pour les personnes choisies. Un responsable ou technicien n'en dispose pas automatiquement ; les clients n'y ont jamais accès. Le numéro d'appel TVM reste celui du dossier pendant ces étapes, et les visites gardent leurs références secondaires.
 
-Un technicien affecté peut préparer le remplacement ; les validations technique et de disponibilité restent au responsable ou à l'administrateur. Le matériel doit être distinct de l'ancien et appartenir au même client ; il ne peut pas être réservé pour deux échanges ouverts à la fois. Avant facturation, une reprise de préparation avec motif permet de retirer une validation et d'effectuer une nouvelle vérification, en conservant l'historique.
+Un technicien ayant confirmé sa prise en charge courante peut préparer le remplacement ; les validations technique et de disponibilité restent au responsable ou à l'administrateur. Le matériel doit être distinct de l'ancien et appartenir au même client ; il ne peut pas être réservé pour deux échanges ouverts à la fois. Avant facturation, une reprise de préparation avec motif permet de retirer une validation et d'effectuer une nouvelle vérification, en conservant l'historique.
 
 Cette confirmation enregistre **une facture externe**. TVM ne crée ni n'envoie la facture dans un ERP et ne déclare pas son paiement. Les commentaires internes de facturation ne sont pas imprimés. Les références et dates de facture sont réservées au PDF interne ; le portail reçoit une confirmation générique.
 
@@ -259,7 +291,7 @@ Un ancien dossier ou une ancienne visite terminée conserve ses données, avec *
 
 ## Fiche de suivi et documents du dossier
 
-L'onglet **Suivi** rassemble aussi les informations d'accueil du dossier : **N° d'appel client**, client final, arrivée et clôture, retour, emballage, lieu Atelier / Dépôt / Sur site, livraison par Livreur / Client, nom du livreur, accessoires et contact. La référence client est le numéro du centre qui confie la réparation ; elle ne déclenche pas un appel téléphonique ou une notification.
+Dans l'onglet **Suivi**, le volet **Informations de réception et du dossier** rassemble aussi les informations d'accueil : **N° d'appel client**, client final, arrivée et clôture, retour, emballage, lieu Atelier / Dépôt / Sur site, livraison par Livreur / Client, nom du livreur, accessoires et contact. La référence client est le numéro du centre qui confie la réparation ; elle ne déclenche pas un appel téléphonique ou une notification.
 
 L'appréciation Garantie / Devis / Contrat / Hors garantie est une information de suivi renseignée par l'équipe. Elle ne déclenche pas une décision automatique de prise en charge ou de facturation. Les données manquantes restent à compléter ; les informations d'un dossier ou d'un modèle privé ne sont pas recopiées comme valeurs par défaut.
 
@@ -287,6 +319,8 @@ Pour arrêter l'utilisation sans perdre le suivi, l'administrateur peut **désac
 Arrêter l'application avec `ARRETER_TVM.cmd`. Remplacer les sources dans le dossier TVM déjà utilisé, en conservant **`.env`, `.local` et les données Docker**, puis relancer `INSTALLER_TVM.cmd` pour reconstruire l'application et appliquer les migrations.
 
 La nouvelle numérotation s'applique aux prochaines demandes. Les références déjà enregistrées, les numéros des centres et les visites existantes restent conservés ; la mise à jour ne doit pas les reformater pour leur donner l'apparence des nouveaux numéros.
+
+Après cette mise à jour, les techniciens déjà affectés devront confirmer réellement leur prise en charge avant les nouvelles écritures. Les anciens suivis restent consultables ; la migration n'ajoute aucune acceptation ou date de confirmation fictive.
 
 Un nouveau dossier extrait n'est pas une nouvelle base indépendante. Si vous changez de dossier, récupérer d'abord la configuration de l'installation existante selon [le guide Windows](INSTALLATION_WINDOWS.md#mettre-à-jour-lapplication-sans-perdre-la-configuration). Ne pas supprimer les volumes Docker pour obtenir les nouvelles vues ou l'historique.
 

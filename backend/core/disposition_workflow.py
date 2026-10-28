@@ -11,6 +11,7 @@ from .disposition_models import DiagnosticQuote, DiagnosticQuoteSequence, Dispos
 from .exchange_workflow import _editable, _manager, get_process as get_exchange, is_exchange_case, recorded_handoff
 from .models import AuditLog, Equipment, ServiceRequest
 from .permissions import can_validate_billing
+from .request_assignment import require_accepted_assignment
 from .workflow_events import append_event, current_actor
 
 
@@ -197,8 +198,7 @@ def _mutable(service_request, process):
 
 
 def _edit_allowed(actor, service_request):
-    if not _editable(actor, service_request):
-        raise PermissionDenied('Cette opération est réservée au responsable ou au technicien affecté au dossier.')
+    return require_accepted_assignment(actor, service_request)
 
 
 def _technical_change_allowed(service_request):
@@ -219,7 +219,7 @@ def _audit(process, actor, action):
 @transaction.atomic
 def mark_repaired(identifier, data, *, actor):
     service_request = _locked(identifier)
-    _edit_allowed(actor, service_request)
+    actor = _edit_allowed(actor, service_request)
     process = _process(service_request)
     _mutable(service_request, process)
     if service_request.status not in ('testing', 'resolved'):
@@ -248,7 +248,7 @@ def mark_repaired(identifier, data, *, actor):
 @transaction.atomic
 def mark_nonrepairable(identifier, data, *, actor):
     service_request = _locked(identifier)
-    _edit_allowed(actor, service_request)
+    actor = _edit_allowed(actor, service_request)
     process = _process(service_request)
     _mutable(service_request, process)
     if process.outcome == 'nonrepairable' and process.diagnosis == data['diagnosis'] and process.fee_mode == data.get('fee_mode', process.fee_mode) and process.free_reason == data.get('free_reason', process.free_reason) and service_request.status == 'return_to_client':
@@ -278,7 +278,7 @@ def mark_nonrepairable(identifier, data, *, actor):
 @transaction.atomic
 def edit_quote_draft(identifier, data, *, actor):
     service_request = _locked(identifier)
-    _edit_allowed(actor, service_request)
+    actor = _edit_allowed(actor, service_request)
     process = _process(service_request)
     _mutable(service_request, process)
     if not process.requires_diagnostic_billing:
@@ -308,7 +308,7 @@ def _quote_number():
 def issue_quote(identifier, *, actor):
     from .diagnostic_quote import quote_amounts, validate_quote_snapshot
     service_request = _locked(identifier)
-    _edit_allowed(actor, service_request)
+    actor = _edit_allowed(actor, service_request)
     process = _process(service_request)
     if process.current_quote_id:
         return service_request

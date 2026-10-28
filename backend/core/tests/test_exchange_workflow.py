@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 
 from core.exchange_workflow import prepare_exchange, ready_exchange, validate_exchange
 from core.models import AuditLog, Client, Equipment, ExchangeProcess, Intervention, OperationEvent, ServiceRequest
+from core.request_assignment import confirm_assignment
 
 
 User = get_user_model()
@@ -36,6 +37,7 @@ class ExchangeWorkflowTests(TestCase):
         cls.customer = User.objects.create_user('exchange-customer', role='client', client=cls.company)
         cls.request = ServiceRequest.objects.create(equipment=cls.original, subject='Remplacement fictif', status='exchange',
                                                    assigned_technician=cls.tech, client_reference='000-CLIENT-EXCHANGE')
+        cls.request = confirm_assignment(cls.request.pk, actor=cls.tech, expected_revision=cls.request.assignment_revision, accept=True)
 
     def setUp(self):
         self.api = APIClient()
@@ -167,7 +169,7 @@ class ExchangeWorkflowTests(TestCase):
         for state in ('ready_for_delivery', 'closed'):
             self.assertEqual(self.api.patch(f'/api/requests/{self.request.pk}/', {'status': state}, format='json').status_code, 400)
         self.assertEqual(self.api.patch(f'/api/requests/{self.request.pk}/', {'status': 'pending'}, format='json').status_code, 200)
-        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed'}, format='json')
+        response = self.api.post(f'/api/requests/{self.request.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed', 'observation': 'Tentative de clôture sans facturation.'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         self.assertIn(self.request.pk, [row['id'] for row in self.api.get('/api/exchanges/').data])
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { confirmCurrentAssignment, openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 
@@ -10,7 +11,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(response => response.url().endsWith('/api/dashboard/') && response.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -29,7 +30,7 @@ async function refresh(page) {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.reload();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function navigate(page, label) {
@@ -127,7 +128,7 @@ test('les événements datés persistent et le portail exclut les observations i
     expect(transition).toMatchObject({ status_before: 'pending', status_after: 'testing' });
     expect((await api(page, `requests/${request.id}/`)).status).toBe('testing');
     expect((await response(page, `requests/${request.id}/timeline/`, 'POST', {
-      kind: 'status_changed', status_after: 'new', is_internal: false,
+      kind: 'status_changed', status_after: 'new', is_internal: false, observation: 'Retour Non affecté interdit tant que le technicien reste désigné.',
     })).status()).toBe(400);
     expect((await api(page, `requests/${request.id}/`)).status).toBe('testing');
     const internalHistory = await api(page, `equipment/${equipment.id}/timeline/`);
@@ -159,6 +160,7 @@ test('les événements datés persistent et le portail exclut les observations i
     expect((await customer.request.get(`/api/requests/${foreignRequest.id}/timeline/`)).status()).toBe(404);
 
     await login(technician, 'technicien');
+    await confirmCurrentAssignment(technician, request.id);
     const note = await api(technician, `requests/${request.id}/timeline/`, 'POST', {
       kind: 'observation', observation: `${marker} note du technicien affecté`,
     });
@@ -209,6 +211,7 @@ test('la fiche onduleur ajoute des observations et synthèses puis filtre les v�
   await page.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
   await page.getByRole('button', { name: `Ouvrir ${request.reference}`, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Dossier SAV', exact: true });
+  await dialog.getByRole('tab', { name: 'Matériel', exact: true }).click();
   await dialog.getByRole('button', { name: 'Historique de l’onduleur', exact: true }).click();
   const timeline = dialog.getByRole('region', { name: 'Historique des opérations', exact: true });
   await expect(timeline.locator('ol')).toHaveAttribute('aria-busy', 'false');
@@ -221,6 +224,11 @@ test('la fiche onduleur ajoute des observations et synthèses puis filtre les v�
   await timeline.getByRole('combobox', { name: 'Afficher', exact: true }).selectOption('observation');
   await expect(timeline.locator('.operation-timeline-list')).toContainText(observation);
   await expect(timeline.locator('.operation-timeline-transition')).toHaveCount(0);
+  // Saving intentionally closes the composer. A new entry requires reopening
+  // it; the observation and the following summary remain separate operations.
+  await expect(timeline.getByRole('combobox', { name: 'Type d’opération', exact: true })).toHaveCount(0);
+  await timeline.getByRole('button', { name: 'Ajouter une opération', exact: true }).click();
+  await expect(timeline.getByRole('checkbox', { name: /Note interne/ })).toBeChecked();
   await timeline.getByRole('combobox', { name: 'Type d’opération', exact: true }).selectOption('summary');
   const summary = `${marker} synthèse de contrôle publiée`;
   await timeline.getByLabel('Synthèse', { exact: true }).fill(summary);

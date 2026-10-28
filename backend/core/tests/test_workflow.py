@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import AuditLog, Client, Contract, DeliveryLine, DeliveryNote, Equipment, Intervention, Part, ServiceRequest, StockMovement, Warranty
+from core.request_assignment import assign_request, confirm_assignment
 
 User = get_user_model()
 
@@ -29,6 +30,14 @@ class WorkflowTests(TestCase):
         cls.other_request = ServiceRequest.objects.create(equipment=cls.other_equipment, subject='Autre dossier')
         cls.intervention = Intervention.objects.create(service_request=cls.request, technician=cls.tech, internal_notes='CONFIDENTIEL_INTERNE', diagnosis='Diagnostic public')
         cls.other_intervention = Intervention.objects.create(service_request=cls.other_request, technician=cls.other_tech, internal_notes='SECRET_BETA')
+        # A historical visit alone no longer grants write access. This fixture
+        # represents the current technician after an explicit assignment/acceptance.
+        cls.request = assign_request(cls.request.pk, actor=cls.manager, technician_id=cls.tech.pk, expected_revision=cls.request.assignment_revision)
+        cls.request = confirm_assignment(cls.request.pk, actor=cls.tech, expected_revision=cls.request.assignment_revision, accept=True)
+        # The existing visit is planned; keep this aggregation fixture outside
+        # the commercial Pending state introduced by the assignment action.
+        cls.request.status = 'scheduled'
+        cls.request.save(update_fields=['status'])
         cls.part = Part.objects.create(sku='BAT-9', name='Batterie test', stock_quantity=5, min_stock=2, unit_price=Decimal('12.50'))
         for company, equipment, intervention in [(cls.company, cls.equipment, cls.intervention), (cls.other_company, cls.other_equipment, cls.other_intervention)]:
             Contract.objects.create(number=f'CTR-{company.pk}', client=company, equipment=equipment, starts_on=date(2026, 1, 1), ends_on=date(2027, 1, 1))

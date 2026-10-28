@@ -2,7 +2,9 @@
 
 Application de gestion du SAV des onduleurs : **React / TypeScript**, API **Django**, base **PostgreSQL 16** commune à tous les utilisateurs. Les dossiers sont enregistrés sur le serveur ; chaque ordinateur se connecte à la même application. Aucun dossier métier n'est stocké dans le `localStorage` du navigateur.
 
-Le premier parcours fonctionnel est **client → onduleur / numéro de série → demande SAV → intervention → rapport PDF**. L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.
+Le parcours de travail part de la **demande SAV**, ouverte par défaut pour les administrateurs, responsables et techniciens : client et onduleur / numéro de série → affectation → confirmation du technicien → suivi du dossier, puis fiches d'intervention et rapports PDF selon l'opération. Dans le suivi, un changement de statut exige une observation ; une réaffectation impose une nouvelle confirmation. L'administrateur et le responsable continuent à assurer le suivi, avec les validations techniques et financières habituelles. Voir [la prise en charge et le suivi](docs/GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
+
+L'interface reprend la direction visuelle PowerCare : fond clair, navigation blanche, bleu électrique, cartes, tableaux et graphiques alimentés par la base.
 
 Le compteur de prise en charge utilise la date d’arrivée réelle et passe en retard après deux jours ouvrés, samedi et dimanche exclus. Il se fige à la clôture. Les fiches de réception, les pièces jointes privées ou explicitement partagées et les PDF reprennent les dossiers enregistrés.
 

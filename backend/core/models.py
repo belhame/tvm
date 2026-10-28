@@ -181,6 +181,11 @@ class ServiceRequest(ReferencedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
     requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     assigned_technician = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='assigned_requests')
+    assignment_revision = models.PositiveBigIntegerField(default=0, editable=False)
+    assigned_at = models.DateTimeField(null=True, blank=True, editable=False)
+    assignment_accepted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    assignment_accepted_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='accepted_request_assignments', editable=False)
+    assignment_accepted_revision = models.PositiveBigIntegerField(null=True, blank=True, editable=False)
     due_on = models.DateField(null=True, blank=True)
     planned_visit_count = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(1000)])
     arrived_at = models.DateTimeField(null=True, blank=True)
@@ -207,11 +212,23 @@ class ServiceRequest(ReferencedModel):
             models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(status='closed'), name='request_closure_status_consistent'),
             models.CheckConstraint(condition=models.Q(closed_at__isnull=True) | models.Q(arrived_at__isnull=True) | models.Q(closed_at__gte=models.F('arrived_at')), name='request_arrival_before_closure'),
             models.CheckConstraint(condition=models.Q(planned_visit_count__isnull=True) | models.Q(planned_visit_count__gte=1, planned_visit_count__lte=1000), name='request_planned_visits_range'),
+            models.CheckConstraint(condition=(
+                models.Q(assignment_accepted_at__isnull=True, assignment_accepted_by__isnull=True, assignment_accepted_revision__isnull=True)
+                | models.Q(assigned_technician__isnull=False, assignment_accepted_at__isnull=False,
+                           assignment_accepted_by__isnull=False, assignment_accepted_revision__isnull=False,
+                           assignment_accepted_revision=models.F('assignment_revision'))
+            ), name='request_assignment_acceptance_consistent'),
+            models.CheckConstraint(condition=models.Q(assigned_technician__isnull=False) | models.Q(assigned_at__isnull=True), name='request_assignment_date_consistent'),
+            models.CheckConstraint(condition=models.Q(assignment_accepted_at__isnull=True) | models.Q(assigned_at__isnull=True) | models.Q(assignment_accepted_at__gte=models.F('assigned_at')), name='request_acceptance_after_assignment'),
         ]
     def __str__(self):
         return self.reference
     @transaction.atomic
     def save(self, *args, **kwargs):
+        from .request_assignment import prepare_assignment_save, finish_assignment_save
+        assignment_change = prepare_assignment_save(self, kwargs.get('update_fields'))
+        if kwargs.get('update_fields'):
+            kwargs['update_fields'] = set(kwargs['update_fields']) | {field.removesuffix('_id') for field in assignment_change['fields']}
         # The pre-save lifecycle handler must persist its closure timestamp even
         # when a status-only workflow update supplies update_fields.
         if kwargs.get('update_fields'):
@@ -228,6 +245,7 @@ class ServiceRequest(ReferencedModel):
             self.reference = next_request_number()
         try:
             result = super().save(*args, **kwargs)
+            finish_assignment_save(self, assignment_change)
             register_exchange_request(self, old_status)
             register_disposition_request(self, old_status)
             if self.status == 'ready_for_delivery' and old_status != self.status:

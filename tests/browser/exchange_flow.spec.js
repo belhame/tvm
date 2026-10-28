@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { confirmCurrentAssignment, openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 
@@ -10,7 +11,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -34,6 +35,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.reload();
   await loaded;
+  await openLegacyDashboard(page);
 }
 
 function marker(prefix) {
@@ -147,7 +149,7 @@ test('un dossier Échange sans visite combine validation et prêt à livrer puis
   expect(ready).toMatchObject({ status: 'ready_for_delivery', closed_at: null, exchange: { state: 'ready_for_delivery', is_validated: true, is_ready: true, is_invoiced: false } });
   expect(ready.exchange.ready_at).toBe(validated.exchange.ready_at);
   expect(ready.exchange.validated_at).toBe(validated.exchange.validated_at);
-  const earlyTimelineClose = await response(page, `requests/${record.id}/timeline/`, 'POST', { kind: 'status_changed', status_after: 'closed' });
+  const earlyTimelineClose = await response(page, `requests/${record.id}/timeline/`, 'POST', { kind: 'status_changed', status_after: 'closed', observation: 'Tentative de clôture sans facturation confirmée.' });
   expect([400, 403]).toContain(earlyTimelineClose.status());
   const { as_of: today } = await api(page, 'requests/categories/');
   expect((await response(page, exchangePath(record, 'billing'), 'POST', { invoice_reference: '', invoiced_on: today })).status()).toBe(400);
@@ -195,6 +197,7 @@ test('le technicien prépare sans valider, la finance est habilitée séparémen
     const finance = await financeContext.newPage();
     const customer = await clientContext.newPage();
     await login(worker, 'technicien');
+    await confirmCurrentAssignment(worker, record.id);
     await login(manager, managerUsername);
     await login(finance, financeUsername);
     await login(customer, clientUsername);

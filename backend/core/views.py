@@ -170,7 +170,7 @@ class EquipmentViewSet(BusinessViewSet):
 
 
 class ServiceRequestViewSet(BusinessViewSet):
-    queryset = disposition_related(exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician').all())))
+    queryset = disposition_related(exchange_related(with_preventive_counts(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician', 'assignment_accepted_by').all())))
     serializer_class = ServiceRequestSerializer
     owner_path = 'equipment__client_id'
     def get_queryset(self):
@@ -352,13 +352,17 @@ class AuditViewSet(viewsets.ReadOnlyModelViewSet):
 def dashboard_view(request):
     user = request.user
     interventions = scope_queryset(Intervention.objects.select_related('service_request__equipment__client', 'technician'), user, 'service_request__equipment__client_id')
-    requests = scope_queryset(ServiceRequest.objects.all(), user, 'equipment__client_id')
+    requests = scope_queryset(ServiceRequest.objects.select_related('equipment__client', 'assigned_technician', 'assignment_accepted_by'), user, 'equipment__client_id')
     equipment = scope_queryset(Equipment.objects.all(), user, 'client_id')
     clients = scope_queryset(Client.objects.all(), user, 'id')
     critical = Part.objects.filter(stock_quantity__lte=F('min_stock')).count() if user.effective_role != 'client' else None
     metrics = {
         'active_interventions': interventions.exclude(status__in=['completed', 'cancelled']).count(),
-        'open_requests': requests.exclude(status__in=['resolved', 'rejected', 'closed']).count(),
+        'request_count': requests.count(),
+        'open_requests': requests.exclude(status='closed').count(),
+        'unassigned_requests': requests.filter(assigned_technician__isnull=True).count(),
+        'accepted_requests': requests.filter(assigned_technician__isnull=False, assignment_accepted_at__isnull=False, assignment_accepted_revision=F('assignment_revision')).count(),
+        'awaiting_acceptance_requests': requests.filter(assigned_technician__isnull=False, assignment_accepted_at__isnull=True).count(),
         'critical_stock': critical,
         'equipment_count': equipment.count(), 'client_count': clients.count(),
         'completed_interventions': interventions.filter(status='completed').count(),
@@ -374,7 +378,8 @@ def dashboard_view(request):
     distribution = [{'name': row['status'], 'value': row['count']} for row in interventions.values('status').annotate(count=Count('id')).order_by('status')]
     serializer_context = {'request': request}
     upcoming = interventions.filter(status__in=['scheduled', 'in_progress', 'testing'], scheduled_at__isnull=False).order_by('scheduled_at')[:8]
-    return Response({'metrics': metrics, 'recent_interventions': InterventionSerializer(interventions.order_by('-created_at')[:8], many=True, context=serializer_context).data, 'activity': activity, 'status_distribution': distribution, 'upcoming': InterventionSerializer(upcoming, many=True, context=serializer_context).data})
+    request_distribution = [{'name': row['status'], 'status': row['status'], 'count': row['count'], 'value': row['count']} for row in requests.values('status').annotate(count=Count('id')).order_by('status')]
+    return Response({'metrics': metrics, 'recent_requests': ServiceRequestSerializer(requests.order_by('-created_at', '-id')[:10], many=True, context=serializer_context).data, 'request_status_distribution': request_distribution, 'recent_interventions': InterventionSerializer(interventions.order_by('-created_at')[:8], many=True, context=serializer_context).data, 'activity': activity, 'status_distribution': distribution, 'upcoming': InterventionSerializer(upcoming, many=True, context=serializer_context).data})
 
 
 @api_view(['GET'])

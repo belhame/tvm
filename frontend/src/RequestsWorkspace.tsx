@@ -11,6 +11,7 @@ import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import { requestCategories, requestStatusLabels, statuses } from "./resources";
 import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import { callIdentity, callPrimary } from "./CallReference";
+import RequestAssignment from "./RequestAssignment";
 
 export type RequestCategoryCount = {
   key: string;
@@ -38,6 +39,8 @@ export default function RequestsWorkspace({
   onCountsChange,
   refreshKey,
   initialSearch = "",
+  technicians = [],
+  onChanged,
 }: {
   category: string;
   user: User;
@@ -47,6 +50,8 @@ export default function RequestsWorkspace({
   onCountsChange: (value: RequestCategoryCount[]) => void;
   refreshKey: unknown;
   initialSearch?: string;
+  technicians?: RecordData[];
+  onChanged: () => Promise<void>;
 }) {
   const [search, setSearch] = useState(initialSearch);
   const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
@@ -60,6 +65,7 @@ export default function RequestsWorkspace({
   const [retry, setRetry] = useState(0);
   const [timingRefresh, setTimingRefresh] = useState(0);
   const currentScope = useRef(JSON.stringify([category, submittedSearch]));
+  const listController = useRef<AbortController | null>(null);
   useServerTimingRefresh(() => setTimingRefresh((value) => value + 1));
 
   useEffect(() => {
@@ -87,6 +93,7 @@ export default function RequestsWorkspace({
 
   useEffect(() => {
     const controller = new AbortController();
+    listController.current = controller;
     const parameters = new URLSearchParams({ category });
     if (submittedSearch.trim()) parameters.set("q", submittedSearch.trim());
     setLoading(true);
@@ -282,7 +289,24 @@ export default function RequestsWorkspace({
                         {requestStatusLabels[row.status] || row.status}
                       </span>
                     </td>
-                    <td>{row.assigned_technician_name || "Non affecté"}</td>
+                    <td>
+                      <RequestAssignment
+                        compact
+                        record={row}
+                        user={user}
+                        technicians={technicians}
+                        onChanged={async (updated) => {
+                          listController.current?.abort();
+                          setLoading(false);
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.id === updated.id ? updated : item,
+                            ),
+                          );
+                          await onChanged();
+                        }}
+                      />
+                    </td>
                     <td>
                       <span
                         className={`request-deadline ${row.is_due_overdue ? "request-overdue" : ""}`}

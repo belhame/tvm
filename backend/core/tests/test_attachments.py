@@ -22,6 +22,7 @@ from core.attachment_service import create_document
 from core.attachment_storage import private_path
 from core.attachment_validation import MAX_FILE_SIZE, check_attachment, safe_original_name
 from core.models import Client, Equipment, OperationEvent, ServiceRequest
+from core.request_assignment import confirm_assignment
 
 
 def image_bytes():
@@ -76,6 +77,8 @@ class AttachmentTests(TestCase):
         cls.equipment = Equipment.objects.create(client=cls.company, serial_number='DOCS-FICTIONAL-001', model='Laboratoire')
         cls.other_equipment = Equipment.objects.create(client=cls.other_company, serial_number='DOCS-FICTIONAL-002', model='Autre laboratoire')
         cls.request = ServiceRequest.objects.create(equipment=cls.equipment, subject='Dossier documents', assigned_technician=cls.tech)
+        # These existing document scenarios start after real technician acceptance.
+        cls.request = confirm_assignment(cls.request.pk, actor=cls.tech, expected_revision=cls.request.assignment_revision, accept=True)
         cls.other_request = ServiceRequest.objects.create(equipment=cls.other_equipment, subject='Autre dossier')
         cls.unassigned = ServiceRequest.objects.create(equipment=cls.equipment, subject='Dossier non affecté')
 

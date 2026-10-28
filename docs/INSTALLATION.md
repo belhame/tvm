@@ -69,7 +69,9 @@ Une sauvegarde exploitable doit réunir **la base PostgreSQL et les fichiers mé
 
 ## Tester le parcours métier
 
-Avec le compte administrateur ou responsable, créer un client puis un équipement rattaché, avec un numéro de série unique. Créer une demande SAV pour cet équipement, puis une intervention rattachée à la demande. Affecter un technicien, fixer une date, renseigner le diagnostic et les travaux, et télécharger le rapport PDF.
+Avec le compte administrateur ou responsable, créer un client puis un équipement rattaché, avec un numéro de série unique. Créer une demande SAV pour cet équipement, puis lui affecter un technicien. Dans une autre session, le technicien ouvre cette demande et confirme sa prise en charge avec **Oui**. Il peut alors renseigner le suivi : changer l'état avec une observation, ou ajouter une observation/synthèse sans changer l'état. Créer ensuite une fiche d'intervention si l'opération le nécessite, renseigner ses dates réelles, son diagnostic et ses travaux, puis télécharger le rapport PDF.
+
+Les administrateurs, responsables et techniciens ouvrent **Demandes SAV** après connexion. Pour tester une réaffectation, désigner un autre technicien : sa confirmation doit être demandée, et l'ancien intervenant conserve la lecture sans pouvoir modifier ce suivi. Une mise à jour ne préremplit pas les acceptations des anciens dossiers. Voir [le guide de prise en charge](GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
 
 Ouvrir un deuxième navigateur ou une fenêtre privée et se connecter au portail client. Le dossier du client doit être visible, les dossiers des autres sociétés et les notes internes doivent rester inaccessibles. Les modifications sont lues depuis la même base serveur ; changer d'ordinateur ne crée pas une base locale distincte.
 

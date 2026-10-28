@@ -16,7 +16,7 @@ import {
   Send,
   Wrench,
 } from "lucide-react";
-import { api, dateFR, type User } from "./api";
+import { api, dateFR, type User, type RecordData } from "./api";
 import { requestStatusLabels, statuses } from "./resources";
 
 export type OperationEvent = {
@@ -84,6 +84,9 @@ const kindLabels: Record<string, string> = {
   diagnostic_free_approved: "Gratuité du diagnostic approuvée",
   diagnostic_closed: "Retour client clôturé",
   disposition_reset: "Décision technique rouverte",
+  assignment_changed: "Affectation modifiée",
+  assignment_accepted: "Prise en charge confirmée",
+  assignment_override: "Prise en charge confirmée par l’administrateur",
   observation: "Observation",
   summary: "Synthèse",
 };
@@ -151,6 +154,9 @@ export default function OperationTimeline({
   canWrite,
   onChanged,
   onEventsLoaded,
+  requestRecord,
+  refreshKey,
+  showComposer = true,
 }: {
   equipmentId?: number;
   requestId?: number;
@@ -158,6 +164,9 @@ export default function OperationTimeline({
   canWrite?: boolean;
   onChanged?: () => Promise<void>;
   onEventsLoaded?: (events: OperationEvent[]) => void;
+  requestRecord?: RecordData;
+  refreshKey?: unknown;
+  showComposer?: boolean;
 }) {
   const canAdd =
     user.role !== "client" &&
@@ -191,6 +200,9 @@ export default function OperationTimeline({
       canWrite={canAdd}
       onChanged={onChanged}
       onEventsLoaded={onEventsLoaded}
+      requestRecord={requestRecord}
+      refreshKey={refreshKey}
+      showComposer={showComposer}
     />
   );
 }
@@ -202,6 +214,9 @@ function ScopedOperationTimeline({
   canWrite,
   onChanged,
   onEventsLoaded,
+  requestRecord,
+  refreshKey,
+  showComposer,
 }: {
   endpoint: string;
   isRequest: boolean;
@@ -209,6 +224,9 @@ function ScopedOperationTimeline({
   canWrite: boolean;
   onChanged?: () => Promise<void>;
   onEventsLoaded?: (events: OperationEvent[]) => void;
+  requestRecord?: RecordData;
+  refreshKey?: unknown;
+  showComposer: boolean;
 }) {
   const id = useId();
   const isClient = user.role === "client";
@@ -217,8 +235,19 @@ function ScopedOperationTimeline({
   const [loadError, setLoadError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<TimelineFilter>("all");
-  const [order, setOrder] = useState<"oldest" | "newest">("oldest");
+  const [order, setOrder] = useState<"oldest" | "newest">("newest");
   const [composerOpen, setComposerOpen] = useState(false);
+  const [draftBase, setDraftBase] = useState<{
+    status: string;
+    revision: number;
+  } | null>(null);
+  const draftIsStale = Boolean(
+    isRequest &&
+      draftBase &&
+      requestRecord &&
+      (draftBase.status !== requestRecord.status ||
+        draftBase.revision !== (requestRecord.assignment?.revision ?? 0)),
+  );
   const [kind, setKind] = useState<ManualKind>("observation");
   const [note, setNote] = useState("");
   const [targetStatus, setTargetStatus] = useState("");
@@ -301,15 +330,26 @@ function ScopedOperationTimeline({
       saveController.current?.abort();
     };
   }, [endpoint]);
+  useEffect(() => {
+    if (loaded) void load();
+  }, [refreshKey]);
 
   async function save() {
     if (!canWrite || isClient || submitting.current || loading) return;
+    if (draftIsStale) {
+      setSaveError(
+        "Le dossier ou son affectation a changé. Actualisez la base du suivi avant d’enregistrer.",
+      );
+      return;
+    }
     const value = note.trim();
-    if (kind !== "status_changed" && !value) {
+    if (!value) {
       setSaveError(
         kind === "summary"
           ? "Saisissez une synthèse avant de l’enregistrer."
-          : "Saisissez une observation avant de l’enregistrer.",
+          : kind === "status_changed"
+            ? "Une observation est obligatoire pour chaque changement d’état."
+            : "Saisissez une observation avant de l’enregistrer.",
       );
       return;
     }
@@ -336,7 +376,14 @@ function ScopedOperationTimeline({
       observation?: string;
       summary?: string;
       status_after?: string;
+      expected_status?: string;
+      assignment_revision?: number;
     } = { kind, is_internal: isInternal };
+    if (isRequest && requestRecord) {
+      payload.expected_status = draftBase?.status ?? requestRecord.status;
+      payload.assignment_revision =
+        draftBase?.revision ?? requestRecord.assignment?.revision ?? 0;
+    }
     if (kind === "summary") payload.summary = value;
     else if (value) payload.observation = value;
     if (kind === "status_changed") payload.status_after = targetStatus;
@@ -357,6 +404,8 @@ function ScopedOperationTimeline({
         return;
       setNote("");
       setTargetStatus("");
+      setDraftBase(null);
+      setComposerOpen(false);
       setIsInternal(true);
       setNotice(
         kind === "status_changed"
@@ -429,7 +478,7 @@ function ScopedOperationTimeline({
     kind === "summary"
       ? "Synthèse"
       : kind === "status_changed"
-        ? "Note d’accompagnement (facultative)"
+        ? "Observation"
         : "Observation";
 
   return (
@@ -460,14 +509,21 @@ function ScopedOperationTimeline({
             <RefreshCw size={14} className={loading ? "spin" : ""} />
             Actualiser
           </button>
-          {canWrite && !isClient && (
+          {canWrite && showComposer && !isClient && (
             <button
               type="button"
               className="button primary small"
               aria-expanded={composerOpen}
               aria-controls={`${id}-composer`}
               disabled={saving}
-              onClick={() => setComposerOpen((value) => !value)}
+              onClick={() => {
+                if (!composerOpen && !draftBase && isRequest && requestRecord)
+                  setDraftBase({
+                    status: requestRecord.status,
+                    revision: requestRecord.assignment?.revision ?? 0,
+                  });
+                setComposerOpen((value) => !value);
+              }}
             >
               <Plus size={15} />
               Ajouter une opération
@@ -485,8 +541,8 @@ function ScopedOperationTimeline({
       {!isClient && !canWrite && (
         <p className="operation-timeline-notice">
           <LockKeyhole size={15} />
-          Historique en lecture seule. Les ajouts dépendent de votre affectation
-          au dossier ou à ses interventions.
+          Historique en lecture seule. Les ajouts nécessitent l’affectation
+          courante et la confirmation de la prise en charge.
         </p>
       )}
       {notice && (
@@ -496,7 +552,7 @@ function ScopedOperationTimeline({
         </p>
       )}
 
-      {canWrite && !isClient && composerOpen && (
+      {canWrite && showComposer && !isClient && composerOpen && (
         <div
           id={`${id}-composer`}
           role="group"
@@ -544,7 +600,18 @@ function ScopedOperationTimeline({
                 >
                   <option value="">Choisir un état…</option>
                   {requestStatuses.map(([value, label]) => (
-                    <option key={value} value={value}>
+                    <option
+                      key={value}
+                      value={value}
+                      disabled={
+                        value !== requestRecord?.status &&
+                        (["ready_for_delivery", "return_to_client"].includes(
+                          value,
+                        ) ||
+                          (value === "new" &&
+                            Boolean(requestRecord?.assigned_technician)))
+                      }
+                    >
                       {label}
                     </option>
                   ))}
@@ -602,14 +669,37 @@ function ScopedOperationTimeline({
           </p>
           {user.role === "technician" && (
             <p className="operation-timeline-notice">
-              Les ajouts et changements d’état sont autorisés selon votre
-              affectation au dossier ou à l’une de ses interventions.
+              Les ajouts et changements d’état sont réservés au technicien
+              actuellement affecté, après confirmation de sa prise en charge.
             </p>
           )}
           {!isRequest && (
             <p className="operation-timeline-notice">
               Pour changer l’état d’un dossier SAV, ouvrez ce dossier.
             </p>
+          )}
+          {draftIsStale && (
+            <div className="sav-followup-warning" role="status">
+              <p>
+                L’état ou l’affectation a changé pendant votre saisie. Le texte
+                est conservé ; relisez-le avant de poursuivre.
+              </p>
+              <button
+                type="button"
+                className="button secondary small"
+                disabled={saving}
+                onClick={() => {
+                  if (requestRecord)
+                    setDraftBase({
+                      status: requestRecord.status,
+                      revision: requestRecord.assignment?.revision ?? 0,
+                    });
+                  setSaveError("");
+                }}
+              >
+                Utiliser l’état actuel
+              </button>
+            </div>
           )}
           {saveError && (
             <div className="operation-timeline-error" role="alert">
@@ -621,7 +711,9 @@ function ScopedOperationTimeline({
             <button
               type="button"
               className="button primary small"
-              disabled={saving || loading || !loaded || !!loadError}
+              disabled={
+                saving || loading || !loaded || !!loadError || draftIsStale
+              }
               onClick={() => void save()}
             >
               {saving ? (

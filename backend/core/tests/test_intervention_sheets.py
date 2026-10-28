@@ -16,6 +16,7 @@ from rest_framework.test import APIClient
 from core.intervention_workflow import report_checklists, validate_structured_data
 from core.models import Client, Contract, Equipment, Intervention, ServiceRequest, Warranty
 from core.pdf import intervention_report
+from core.request_assignment import assign_request, confirm_assignment
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -247,6 +248,8 @@ class StructuredInterventionTests(TestCase):
 
     def test_technician_can_edit_only_own_sheet_and_client_cannot_write(self):
         first = self.post()
+        self.request = assign_request(self.request.pk, actor=self.admin, technician_id=self.tech.pk, expected_revision=self.request.assignment_revision)
+        self.request = confirm_assignment(self.request.pk, actor=self.tech, expected_revision=self.request.assignment_revision, accept=True)
         self.api.force_authenticate(self.tech)
         response = self.api.patch(f'/api/interventions/{first.data["id"]}/', {'structured_data': {'preventive': {'dusting': True}}}, format='json')
         self.assertEqual(response.status_code, 200, response.data)

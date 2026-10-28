@@ -83,11 +83,11 @@ class RequestArrivalTests(TestCase):
 
     def test_timeline_closure_uses_same_model_lifecycle(self):
         self.api.patch(self.endpoint(), {'arrived_at': (timezone.now() - timedelta(days=3)).isoformat()}, format='json')
-        response = self.api.post(self.endpoint() + 'timeline/', {'kind': 'status_changed', 'status_after': 'closed'}, format='json')
+        response = self.api.post(self.endpoint() + 'timeline/', {'kind': 'status_changed', 'status_after': 'closed', 'observation': 'Clôture réelle après réception vérifiée.'}, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.request.refresh_from_db()
         self.assertIsNotNone(self.request.closed_at)
-        self.api.post(self.endpoint() + 'timeline/', {'kind': 'status_changed', 'status_after': 'pending'}, format='json')
+        self.api.post(self.endpoint() + 'timeline/', {'kind': 'status_changed', 'status_after': 'pending', 'observation': 'Réouverture explicite pour complément de suivi.'}, format='json')
         self.request.refresh_from_db()
         self.assertIsNone(self.request.closed_at)
 

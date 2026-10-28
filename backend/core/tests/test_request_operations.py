@@ -15,6 +15,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import Client, Contract, Equipment, Intervention, OperationEvent, Part, ServiceRequest, Warranty
+from core.request_assignment import assign_request, confirm_assignment
 
 User = get_user_model()
 
@@ -66,7 +67,7 @@ class RequestOperationTests(TestCase):
         self.assertTrue(self.request.operation_events.filter(is_internal=True, observation='SECRET_TEST_NOTE').exists())
         self.request.refresh_from_db()
         self.assertEqual(self.request.status, 'testing')
-        repeat = self.api.post(self.timeline(), {'kind': 'status_changed', 'status_after': 'testing'}, format='json')
+        repeat = self.api.post(self.timeline(), {'kind': 'status_changed', 'status_after': 'testing', 'observation': 'Rejeu explicite du même état.'}, format='json')
         self.assertEqual(repeat.status_code, 400)
 
     def test_notes_default_private_and_public_synthesis_is_explicit(self):
@@ -97,14 +98,20 @@ class RequestOperationTests(TestCase):
         self.request.status = 'pending'
         self.request.assigned_technician = self.tech
         self.request.save()
+        self.request = confirm_assignment(self.request.pk, actor=self.tech, expected_revision=self.request.assignment_revision, accept=True)
         self.assertEqual(self.api.post(self.timeline(), payload, format='json').status_code, 201)
         self.assertEqual(self.api.post(f'/api/equipment/{self.equipment.pk}/timeline/', payload, format='json').status_code, 201)
         self.assertEqual(self.api.post(self.timeline(self.other_request), payload, format='json').status_code, 403)
 
-    def test_assigned_intervention_also_allows_technician_timeline(self):
+    def test_old_intervention_requires_current_assignment_and_acceptance_for_timeline(self):
         Intervention.objects.create(service_request=self.request, technician=self.tech)
         self.api.force_authenticate(self.tech)
-        response = self.api.post(self.timeline(), {'kind': 'summary', 'summary': 'Travaux réalisés'}, format='json')
+        payload = {'kind': 'summary', 'summary': 'Travaux réalisés'}
+        # The new contract removes the old write grant from a visit alone.
+        self.assertEqual(self.api.post(self.timeline(), payload, format='json').status_code, 403)
+        self.request = assign_request(self.request.pk, actor=self.manager, technician_id=self.tech.pk, expected_revision=self.request.assignment_revision)
+        self.request = confirm_assignment(self.request.pk, actor=self.tech, expected_revision=self.request.assignment_revision, accept=True)
+        response = self.api.post(self.timeline(), payload, format='json')
         self.assertEqual(response.status_code, 201, response.data)
 
     def test_strict_append_validation_and_no_forged_dates_or_actors(self):
@@ -120,7 +127,7 @@ class RequestOperationTests(TestCase):
         for payload in cases:
             with self.subTest(payload=str(payload)[:80]):
                 self.assertEqual(self.api.post(self.timeline(), payload, format='json').status_code, 400)
-        self.assertEqual(self.api.post(f'/api/equipment/{self.equipment.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed'}, format='json').status_code, 400)
+        self.assertEqual(self.api.post(f'/api/equipment/{self.equipment.pk}/timeline/', {'kind': 'status_changed', 'status_after': 'closed', 'observation': 'Changement depuis le matériel au lieu du dossier.'}, format='json').status_code, 400)
 
     def test_categories_legacy_aliases_overdue_and_client_counts(self):
         now = datetime(2026, 10, 27, 9, 1, tzinfo=datetime_timezone.utc)
@@ -148,7 +155,7 @@ class RequestOperationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.api.patch(f'/api/requests/{self.request.pk}/', {'assigned_technician': self.tech.pk, 'status': 'pending'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
-        response = self.api.post(self.timeline(), {'kind': 'status_changed', 'status_after': 'new'}, format='json')
+        response = self.api.post(self.timeline(), {'kind': 'status_changed', 'status_after': 'new', 'observation': 'Retour impossible tant que le technicien reste affecté.'}, format='json')
         self.assertEqual(response.status_code, 400)
 
     def test_commercial_request_status_is_not_overwritten_by_report_edits(self):
@@ -258,7 +265,7 @@ class ConcurrentRequestOperationTests(TransactionTestCase):
                 client = APIClient()
                 client.force_authenticate(user)
                 ready.wait(timeout=10)
-                response = client.post(f'/api/requests/{service_request.pk}/timeline/', {'kind': 'status_changed', 'status_after': target}, format='json')
+                response = client.post(f'/api/requests/{service_request.pk}/timeline/', {'kind': 'status_changed', 'status_after': target, 'observation': f'Changement concurrent explicite vers {target}.'}, format='json')
                 return response.status_code
             finally:
                 connections.close_all()

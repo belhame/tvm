@@ -5,6 +5,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from .models import OperationEvent, ServiceRequest
+from .request_assignment import MAX_REVISION, require_accepted_assignment
 from .workflow import technician_can_write
 from .workflow_events import append_event
 
@@ -46,6 +47,13 @@ class AppendOperationSerializer(serializers.Serializer):
     summary = StrictText(max_length=10000, allow_blank=True, required=False, default='')
     is_internal = StrictBoolean(required=False, default=True)
     status_after = serializers.ChoiceField(choices=ServiceRequest.Status.choices, required=False)
+    expected_status = serializers.ChoiceField(choices=ServiceRequest.Status.choices, required=False)
+    assignment_revision = serializers.IntegerField(min_value=0, max_value=MAX_REVISION, required=False)
+
+    def validate_assignment_revision(self, value):
+        if type(self.initial_data.get('assignment_revision')) is not int:
+            raise ValidationError('Un entier JSON est requis.')
+        return value
 
     def to_internal_value(self, data):
         if not isinstance(data, dict):
@@ -80,50 +88,52 @@ def timeline_response(request, *, equipment=None, service_request=None):
         events = OperationEvent.objects.filter(Q(equipment=equipment) | Q(related_equipment=equipment))
     if request.method == 'GET':
         return Response(OperationEventSerializer(visible_events(events, request.user), many=True, context={'request': request}).data)
+    from .request_tracking import require_tracking_actor, write_followup
+    require_tracking_actor(request.user)
     role = request.user.effective_role
-    if role == 'client':
-        raise PermissionDenied('Le portail client permet uniquement la consultation de l’historique.')
     if role == 'technician':
         if service_request is not None:
             allowed = technician_can_write(request.user, service_request)
         else:
-            allowed = equipment.service_requests.filter(Q(assigned_technician=request.user) | Q(interventions__technician=request.user)).exists()
+            allowed = any(technician_can_write(request.user, item) for item in equipment.service_requests.filter(assigned_technician=request.user))
         if not allowed:
             raise PermissionDenied('Cette opération est réservée à l’équipe affectée au dossier.')
     serializer = AppendOperationSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    if service_request is not None:
+        payload = {
+            'status': data.get('status_after', service_request.status),
+            'observation': data['observation'], 'summary': data['summary'], 'is_internal': data['is_internal'],
+            **{key: data[key] for key in ('expected_status', 'assignment_revision') if key in data},
+        }
+        result = write_followup(
+            service_request.pk, payload, actor=request.user,
+            require_preconditions=role == 'technician' and data['kind'] == 'status_changed',
+            reject_unchanged=data['kind'] == 'status_changed',
+            note_kind='observation' if data['kind'] == 'status_changed' else data['kind'],
+            keep_status=data['kind'] != 'status_changed',
+        )
+        response = Response(OperationEventSerializer(result.events[0], context={'request': request}).data, status=201)
+        response['Cache-Control'] = 'private, no-store'
+        return response
+    if data['kind'] == 'status_changed':
+        raise ValidationError('Changez l’état depuis la timeline du dossier concerné.')
+    if 'expected_status' in data or 'assignment_revision' in data:
+        raise ValidationError('Les préconditions de suivi exigent le dossier concerné.')
     with transaction.atomic():
-        if service_request is not None:
-            service_request = ServiceRequest.objects.select_for_update().get(pk=service_request.pk)
-            if role == 'technician' and not technician_can_write(request.user, service_request):
+        actor = request.user
+        if role == 'technician':
+            candidates = equipment.service_requests.filter(assigned_technician=request.user).values_list('pk', flat=True)
+            locked = list(ServiceRequest.objects.select_for_update().filter(pk__in=candidates).order_by('pk'))
+            writable = next((item for item in locked if technician_can_write(request.user, item)), None)
+            if writable is None:
                 raise PermissionDenied()
-        elif role == 'technician':
-            candidates = equipment.service_requests.filter(Q(assigned_technician=request.user) | Q(interventions__technician=request.user)).values_list('pk', flat=True)
-            locked = list(ServiceRequest.objects.select_for_update().filter(pk__in=candidates))
-            if not any(technician_can_write(request.user, item) for item in locked):
-                raise PermissionDenied()
-        before = ''
-        after = ''
-        if data['kind'] == 'status_changed':
-            if service_request is None:
-                raise ValidationError('Changez l’état depuis la timeline du dossier concerné.')
-            before = service_request.status
-            after = data['status_after']
-            if after == 'new' and service_request.assigned_technician_id:
-                raise ValidationError({'status_after': 'Un dossier affecté ne peut pas revenir à Non affecté. Le responsable doit d’abord retirer l’affectation.'})
-            if before == after:
-                raise ValidationError({'status_after': 'Le dossier possède déjà cet état.'})
-            service_request._operation_manual_event = True
-            service_request.status = after
-            service_request.save(update_fields=['status', 'updated_at'])
-        private_status_note = data['kind'] == 'status_changed' and data['is_internal']
-        event = append_event(equipment=equipment, service_request=service_request, actor=request.user,
-                             kind=data['kind'], status_before=before, status_after=after,
-                             observation='' if private_status_note else data['observation'],
-                             summary='État de la demande modifié.' if private_status_note else data['summary'],
-                             is_internal=False if data['kind'] == 'status_changed' else data['is_internal'])
-        if private_status_note and (data['observation'] or data['summary']):
-            append_event(equipment=equipment, service_request=service_request, actor=request.user,
-                         kind='observation', observation=data['observation'], summary=data['summary'], is_internal=True)
+            actor = require_accepted_assignment(request.user, writable)
+        else:
+            # Also re-read a manager's active role before an equipment-only note.
+            from .request_assignment import require_internal_actor
+            actor = require_internal_actor(request.user)
+        event = append_event(equipment=equipment, service_request=service_request, actor=actor,
+                             kind=data['kind'], observation=data['observation'], summary=data['summary'], is_internal=data['is_internal'])
     return Response(OperationEventSerializer(event, context={'request': request}).data, status=201)

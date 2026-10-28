@@ -7,7 +7,9 @@ from .workflow_events import append_event
 
 
 TRACKED_MODELS = (Equipment, ServiceRequest, Intervention, Contract, Warranty, DeliveryNote)
-IGNORED = {'id', 'created_at', 'updated_at', 'completed_at', 'intake_data', 'intake_key'}
+IGNORED = {'id', 'created_at', 'updated_at', 'completed_at', 'intake_data', 'intake_key',
+           'assignment_revision', 'assigned_at', 'assignment_accepted_at',
+           'assignment_accepted_by', 'assignment_accepted_revision'}
 PRIVATE = {'internal_notes'}
 
 

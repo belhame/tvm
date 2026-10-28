@@ -82,6 +82,7 @@ class EquipmentSerializer(LegacySerializer):
 
 
 class ServiceRequestSerializer(LegacySerializer):
+    assignment = serializers.SerializerMethodField()
     disposition = serializers.SerializerMethodField()
     dispatch_kind = serializers.SerializerMethodField()
     exchange = serializers.SerializerMethodField()
@@ -101,21 +102,28 @@ class ServiceRequestSerializer(LegacySerializer):
     preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
-        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data']
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
+        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.is_authenticated and user.effective_role == 'client':
             fields.pop('intake_key', None)
             fields.pop('intake_data', None)
+            for key in ('assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision'):
+                fields.pop(key, None)
         return fields
+    def get_assignment(self, obj):
+        from .request_assignment import assignment_payload
+        return assignment_payload(obj, getattr(self.context.get('request'), 'user', None))
     def validate(self, attrs):
         if self.instance and 'equipment' in attrs and attrs['equipment'].pk != self.instance.equipment_id and (self.instance.interventions.exists() or self.instance.operation_events.exists()):
             raise serializers.ValidationError({'equipment': 'Un dossier ayant des interventions ne peut pas changer d’équipement.'})
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.effective_role == 'technician' and any(field in attrs for field in ('assigned_technician', 'due_on', 'planned_visit_count')):
             raise serializers.ValidationError('Le responsable gère les affectations, les échéances et le nombre de visites prévues.')
+        if user and user.effective_role == 'technician' and self.instance is None and attrs.get('status', 'new') != 'new':
+            raise serializers.ValidationError({'status': 'Une nouvelle demande est reçue en Non affecté. Le suivi technique commence après affectation et confirmation de prise en charge.'})
         assigned = attrs.get('assigned_technician', getattr(self.instance, 'assigned_technician', None))
         state = attrs.get('status', getattr(self.instance, 'status', 'new'))
         if assigned is not None and state == 'new':
@@ -268,10 +276,24 @@ class InterventionSerializer(LegacySerializer):
     @transaction.atomic
     def create(self, validated_data):
         service_request = ServiceRequest.objects.select_for_update().get(pk=validated_data['service_request'].pk)
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.effective_role == 'technician':
+            from .request_assignment import require_accepted_assignment
+            require_accepted_assignment(user, service_request)
+            if getattr(validated_data.get('technician'), 'pk', user.pk) != user.pk:
+                raise serializers.ValidationError({'technician': 'Vous pouvez créer uniquement vos propres fiches sur un dossier pris en charge.'})
         return self._save_state(super().create(validated_data), service_request)
     @transaction.atomic
     def update(self, instance, validated_data):
         service_request = ServiceRequest.objects.select_for_update().get(pk=instance.service_request_id)
+        instance = Intervention.objects.select_for_update().get(pk=instance.pk)
+        self.instance = instance
+        user = getattr(self.context.get('request'), 'user', None)
+        if user and user.effective_role == 'technician':
+            from .request_assignment import require_accepted_assignment
+            require_accepted_assignment(user, service_request)
+            if instance.technician_id != user.pk or getattr(validated_data.get('technician'), 'pk', user.pk) != user.pk:
+                raise serializers.ValidationError({'technician': 'Cette fiche n’est plus affectée à votre compte.'})
         sync_status = 'status' in validated_data and validated_data['status'] != instance.status
         return self._save_state(super().update(instance, validated_data), service_request, sync_status=sync_status)
 
@@ -368,18 +390,28 @@ class StockMovementSerializer(serializers.ModelSerializer):
         user = getattr(self.context.get('request'), 'user', None)
         intervention = attrs.get('intervention')
         if user and user.effective_role == 'technician':
-            if kind != 'out' or not intervention or intervention.technician_id != user.pk:
-                raise serializers.ValidationError('Les techniciens enregistrent uniquement les sorties pour leurs propres interventions.')
+            if kind != 'out' or not intervention or intervention.technician_id != user.pk or not technician_can_write(user, intervention.service_request):
+                raise serializers.ValidationError('Confirmez la prise en charge du dossier avant une sortie pour votre intervention.')
         return attrs
     @transaction.atomic
     def create(self, validated_data):
+        user = getattr(self.context.get('request'), 'user', None)
+        intervention = validated_data.get('intervention')
+        if intervention is not None:
+            service_request = ServiceRequest.objects.select_for_update().get(pk=intervention.service_request_id)
+            intervention = Intervention.objects.select_for_update().get(pk=intervention.pk)
+            if user and user.effective_role == 'technician':
+                from .request_assignment import require_accepted_assignment
+                require_accepted_assignment(user, service_request)
+                if intervention.technician_id != user.pk or validated_data.get('kind') != 'out':
+                    raise serializers.ValidationError('Cette sortie ne correspond plus à votre intervention courante.')
+            validated_data['intervention'] = intervention
         part = Part.objects.select_for_update().get(pk=validated_data['part'].pk)
         resulting_stock = part.stock_quantity + validated_data['quantity']
         if resulting_stock < 0:
             raise serializers.ValidationError({'quantity': f'Stock insuffisant : {part.stock_quantity} disponible(s).'})
         part.stock_quantity = resulting_stock
         part.save(update_fields=['stock_quantity'])
-        user = getattr(self.context.get('request'), 'user', None)
         validated_data['created_by'] = user if user and user.is_authenticated else None
         return super().create(validated_data)
 

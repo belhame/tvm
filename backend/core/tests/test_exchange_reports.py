@@ -163,9 +163,9 @@ class IndependentExchangeReportTests(TestCase):
 
     def test_timeline_status_detour_cannot_erase_exchange_requirement(self):
         endpoint = f'/api/requests/{self.request.pk}/timeline/'
-        response = self.api.post(endpoint, {'kind': 'status_changed', 'status_after': 'maintenance'}, format='json')
+        response = self.api.post(endpoint, {'kind': 'status_changed', 'status_after': 'maintenance', 'observation': 'Vérification du verrou après détour de statut.'}, format='json')
         self.assertIn(response.status_code, (201, 400), response.data)
-        response = self.api.post(endpoint, {'kind': 'status_changed', 'status_after': 'closed'}, format='json')
+        response = self.api.post(endpoint, {'kind': 'status_changed', 'status_after': 'closed', 'observation': 'Tentative de clôture sans facture confirmée.'}, format='json')
         self.assertEqual(response.status_code, 400, response.data)
         self.request.refresh_from_db()
         self.assertNotEqual(self.request.status, 'closed')

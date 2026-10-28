@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 import { fileURLToPath } from 'node:url';
 
 const catalogueFixture = fileURLToPath(new URL('../../backend/core/tests/fixtures/catalogue_synthetic.xls', import.meta.url));
@@ -15,10 +16,10 @@ async function login(page, username = 'admin', waitForData = true) {
   await page.getByLabel('Mot de passe', { exact: true }).fill(password);
   const loaded = waitForData ? page.waitForResponse(response => response.url().endsWith('/api/dashboard/') && response.status() === 200) : null;
   await page.getByRole('button', { name: /Se connecter/i }).click();
-  await expect(page.getByRole('heading', { name: /Tableau de bord|Mon espace/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Demandes SAV|Tableau de bord|Mon espace/i }).first()).toBeVisible();
   if (loaded) {
     await loaded;
-    await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+    await openLegacyDashboard(page);
   }
 }
 

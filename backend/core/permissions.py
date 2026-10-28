@@ -34,7 +34,9 @@ class BusinessPermission(BasePermission):
         if request.method in SAFE_METHODS or request.user.effective_role in ('admin', 'manager'):
             return True
         if request.user.effective_role == 'technician':
-            return getattr(obj, 'technician_id', None) == request.user.pk
+            from .workflow import technician_can_write
+            dossier = getattr(obj, 'service_request', None)
+            return bool(dossier and getattr(obj, 'technician_id', None) == request.user.pk and technician_can_write(request.user, dossier))
         return False
 
 

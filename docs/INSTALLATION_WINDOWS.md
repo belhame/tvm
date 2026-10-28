@@ -48,7 +48,7 @@ Sur une installation neuve, le mode démonstration est activé pour vous permett
 |---|---|
 | `admin` | Administration et gestion des comptes |
 | `responsable` | Gestion du SAV |
-| `technicien` | Interventions du technicien |
+| `technicien` | Suivi des dossiers après affectation et confirmation de prise en charge |
 | `livreur` | Réception physique et tournées affectées, sur une démo neuve |
 | `client` | Portail limité à sa société de démonstration |
 
@@ -56,7 +56,7 @@ L’interface signale le mode démonstration. Ces comptes servent à l’essai ;
 
 Si le navigateur ne s’ouvre pas automatiquement, ouvrez **http://localhost:8000** sur **ce même PC**. Si le Bloc-notes ne s’ouvre pas, ouvrez le fichier `.local\demo-access.txt` depuis l’Explorateur. Un ancien fichier d’accès peut ne plus correspondre aux comptes si vous avez changé leurs mots de passe ou réutilisé une configuration réelle ; l’installateur ne les réinitialise pas.
 
-Vous pouvez tester le parcours : client → équipement et numéro de série → demande SAV → intervention → rapport PDF. Une fenêtre privée permet d’essayer en parallèle le compte `client` et son accès limité.
+Les administrateurs, responsables et techniciens ouvrent **Demandes SAV**. Pour essayer le parcours, créer un client, son équipement et une demande, puis affecter un technicien comme administrateur ou responsable. Le technicien ouvre la demande dans une autre session et confirme sa prise en charge avec **Oui** avant d'ajouter son suivi. Les fiches d'intervention et leur rapport PDF restent accessibles depuis le dossier selon l'opération. Une fenêtre privée permet aussi d'essayer le compte `client` et son accès limité. Voir [le guide de suivi SAV](GUIDE_SUIVI_SAV.md#affecter-et-confirmer-la-prise-en-charge).
 
 ## 4. Utiliser l’application les jours suivants
 
@@ -86,6 +86,8 @@ Un nouveau dossier d’archive **ne crée pas une nouvelle base** : les lanceurs
 La version ajoute le suivi des échanges et une validation financière distincte. Après installation, l'administrateur peut accorder **Peut valider la facturation** dans **Comptes** aux personnes internes choisies. Ce droit n'est pas donné automatiquement au rôle Responsable SAV ou Technicien ; les délégations déjà enregistrées restent conservées.
 
 Les anciens échanges et visites restent conservés sans approbation technique ou facture inventée. La procédure **Échange → validation technique → Prêt à être livré**, puis **Échanges à facturer → Confirmer la facturation** est décrite dans [le guide](GUIDE_SUIVI_SAV.md#échange--remplacement-et-facturation). La mise à jour du code ne signifie pas que cette procédure a déjà été effectuée dans la base du PC.
+
+Les anciennes affectations restent conservées, sans confirmation de prise en charge supposée. Après mise à jour, le technicien actuellement désigné doit confirmer avant ses nouvelles écritures ; ses anciens suivis restent consultables. Une réaffectation demande une nouvelle confirmation.
 
 Le suivi commun **Prêt à être livré** et les devis de diagnostic TVM utilisent aussi cette mise à jour. Les anciens dossiers ne reçoivent pas de tests validés ou de gratuité par déduction. Après installation, saisir le résultat réel, les données du devis et les décisions financières dans votre instance, selon [le parcours prêt / retour](GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 

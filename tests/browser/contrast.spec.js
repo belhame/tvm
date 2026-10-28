@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 
@@ -10,7 +11,7 @@ async function login(page, username) {
   const loaded = page.waitForResponse(response => response.url().endsWith('/api/dashboard/') && response.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 // Regression check for the rendered operational surfaces. This checks normal

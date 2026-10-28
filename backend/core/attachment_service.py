@@ -10,6 +10,7 @@ from .attachment_models import RequestAttachment
 from .attachment_storage import private_path, private_storage
 from .attachment_validation import check_attachment
 from .models import AuditLog, ServiceRequest
+from .request_assignment import require_accepted_assignment
 from .workflow import technician_can_write
 from .workflow_events import append_event
 
@@ -56,6 +57,7 @@ def create_document(*, service_request, uploaded, label, client_visible, actor):
     try:
         with transaction.atomic():
             service_request = visible_request(actor, service_request.pk, lock=True)
+            actor = require_accepted_assignment(actor, service_request)
             if not can_write_documents(actor, service_request):
                 raise PermissionDenied('Vous n’êtes plus affecté à ce dossier.')
             generated = f'requests/{service_request.pk}/{uuid4().hex}.{checked.extension}'
@@ -110,6 +112,7 @@ def delete_document(*, document, actor):
     result = {'purged': False}
     with transaction.atomic():
         service_request = visible_request(actor, document.service_request_id, lock=True)
+        actor = require_accepted_assignment(actor, service_request)
         if not can_write_documents(actor, service_request):
             raise PermissionDenied('Vous n’êtes plus affecté à ce dossier.')
         document = visible_document(actor, document.pk, lock=True)

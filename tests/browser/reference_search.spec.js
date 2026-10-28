@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -12,7 +13,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -30,6 +31,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.reload();
   await loaded;
+  await openLegacyDashboard(page);
 }
 
 async function navigate(page, text) {

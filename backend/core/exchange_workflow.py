@@ -8,13 +8,14 @@ import unicodedata
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Exists, OuterRef, Q, Value
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .exchange_models import ExchangeProcess
 from .models import AuditLog, Equipment, Intervention, OperationEvent, ServiceRequest
 from .permissions import can_validate_billing
+from .request_assignment import require_accepted_assignment
 from .workflow import technician_can_write
 from .workflow_events import append_event, current_actor
 
@@ -32,13 +33,7 @@ def exchange_related(queryset):
 
 
 def workflow_permission_hints(queryset, actor):
-    """Read-only list capabilities avoid a visit query for every dossier.
-
-    Mutation services lock and re-fetch their records without these hints.
-    """
-    if actor.effective_role == 'technician':
-        return queryset.annotate(_editable_actor_id=Value(actor.pk),
-            _editable_has_visit=Exists(Intervention.objects.filter(service_request_id=OuterRef('pk'), technician_id=actor.pk)))
+    """Capabilities now use the current accepted assignment, never old visits."""
     return queryset
 
 
@@ -120,8 +115,6 @@ def _manager(actor):
 
 
 def _editable(actor, service_request):
-    if actor and actor.is_active and actor.effective_role == 'technician' and getattr(service_request, '_editable_actor_id', None) == actor.pk:
-        return service_request.assigned_technician_id == actor.pk or service_request._editable_has_visit
     return _manager(actor) or bool(actor and actor.is_active and actor.effective_role == 'technician' and technician_can_write(actor, service_request))
 
 
@@ -227,6 +220,7 @@ def _valid_identity(service_request, process):
 @transaction.atomic
 def prepare_exchange(identifier, data, *, actor):
     service_request = _locked_request(identifier)
+    actor = require_accepted_assignment(actor, service_request)
     if not _editable(actor, service_request):
         raise PermissionDenied('La préparation est réservée au responsable ou au technicien affecté au dossier.')
     _active(service_request)

@@ -17,6 +17,7 @@ from rest_framework.test import APIClient
 from core.disposition_workflow import (close_disposition, confirm_diagnostic_invoice, edit_quote_draft, issue_quote,
     mark_nonrepairable, mark_repaired)
 from core.models import AuditLog, Client, DiagnosticQuote, DiagnosticQuoteSequence, DispositionProcess, Equipment, OperationEvent, ServiceRequest
+from core.request_assignment import confirm_assignment
 
 
 User = get_user_model()
@@ -33,6 +34,7 @@ class DispositionWorkflowTests(TestCase):
         cls.finance = User.objects.create_user('diagnostic-finance', role='technician', can_validate_billing=True)
         cls.request = ServiceRequest.objects.create(equipment=cls.unit, subject='Diagnostic fictif', status='testing',
                                                     client_reference='000-CLIENT-DIAG', assigned_technician=cls.tech)
+        cls.request = confirm_assignment(cls.request.pk, actor=cls.tech, expected_revision=cls.request.assignment_revision, accept=True)
 
     def setUp(self):
         self.api = APIClient()
@@ -151,7 +153,7 @@ class DispositionWorkflowTests(TestCase):
         for index in range(4):
             ServiceRequest.objects.create(equipment=self.unit, subject=f'Autre diagnostic fictif {index}', status='testing')
         queryset = workflow_permission_hints(disposition_related(exchange_related(with_preventive_counts(
-            ServiceRequest.objects.select_related('equipment__client', 'assigned_technician')))), self.tech)
+            ServiceRequest.objects.select_related('equipment__client', 'assigned_technician', 'assignment_accepted_by')))), self.tech)
         with self.assertNumQueries(1):
             records = ServiceRequestSerializer(queryset, many=True, context={'request': SimpleNamespace(user=self.tech)}).data
         self.assertEqual(len(records), 5)

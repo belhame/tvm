@@ -10,6 +10,10 @@ import CallReference, { callIdentity } from "./CallReference";
 import PreventiveProgress from "./PreventiveProgress";
 import { ExchangePanel } from "./ExchangeWorkspace";
 import DispositionPanel, { type DispositionAction } from "./DispositionPanel";
+import RequestAssignment from "./RequestAssignment";
+import RequestFollowup from "./RequestFollowup";
+import { canWriteRequest } from "./requestAccess";
+import "./SAVFollowup.css";
 
 const tabs = [
   ["followup", "Suivi"],
@@ -70,20 +74,30 @@ export default function RequestDossier({
   const [timingError, setTimingError] = useState("");
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
+  const recordGeneration = useRef(0);
   async function refreshRecord() {
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
+    const stamp = ++recordGeneration.current;
     try {
       const fresh = await api<RecordData>(`requests/${initialRecord.id}/`, {
         signal: request.signal,
       });
-      if (!request.signal.aborted && mounted.current) {
+      if (
+        !request.signal.aborted &&
+        mounted.current &&
+        recordGeneration.current === stamp
+      ) {
         setRecord(fresh);
         setTimingError("");
       }
     } catch (error) {
-      if (!request.signal.aborted && mounted.current)
+      if (
+        !request.signal.aborted &&
+        mounted.current &&
+        recordGeneration.current === stamp
+      )
         setTimingError(
           error instanceof Error
             ? error.message
@@ -93,6 +107,7 @@ export default function RequestDossier({
   }
   useEffect(() => {
     controller.current?.abort();
+    recordGeneration.current += 1;
     setRecord(initialRecord);
     setTimingError("");
   }, [initialRecord]);
@@ -135,6 +150,14 @@ export default function RequestDossier({
     "request",
   );
   const [timelineEvents, setTimelineEvents] = useState<OperationEvent[]>([]);
+  const [timelineVersion, setTimelineVersion] = useState(0);
+  async function applyRecord(updated: RecordData) {
+    controller.current?.abort();
+    recordGeneration.current += 1;
+    setRecord(updated);
+    setTimelineVersion((value) => value + 1);
+    await onChanged();
+  }
   const equipment = data.equipment?.find((row) => row.id === record.equipment);
   const client = data.clients?.find((row) => row.id === equipment?.client);
   const interventions = (data.interventions || []).filter(
@@ -149,33 +172,21 @@ export default function RequestDossier({
     (row) => row.equipment === record.equipment,
   );
   const canManage = user.role === "admin" || user.role === "manager";
-  const canAddOperation =
-    canManage ||
-    (user.role === "technician" &&
-      (record.assigned_technician === user.id ||
-        interventions.some((row) => row.technician === user.id)));
-  const equipmentRequestIds = new Set(
-    (data.requests || [])
-      .filter((row) => row.equipment === record.equipment)
-      .map((row) => row.id),
-  );
+  const canAddOperation = canWriteRequest(record, user);
   const canWriteEquipment =
     canManage ||
-    (user.role === "technician" &&
-      ((data.requests || []).some(
-        (row) =>
-          equipmentRequestIds.has(row.id) &&
-          row.assigned_technician === user.id,
-      ) ||
-        (data.interventions || []).some(
-          (row) =>
-            equipmentRequestIds.has(row.service_request) &&
-            row.technician === user.id,
-        )));
+    (data.requests || []).some(
+      (row) =>
+        row.equipment === record.equipment &&
+        canWriteRequest(row.id === record.id ? record : row, user),
+    );
   const summaries = timelineEvents
     .filter(
       (event) =>
-        event.kind === "summary" &&
+        (event.kind === "summary" ||
+          (event.source === "followup" &&
+            event.summary?.trim() &&
+            event.summary !== "État de la demande modifié.")) &&
         event.service_request === record.id &&
         (!event.is_internal || user.role !== "client"),
     )
@@ -186,6 +197,60 @@ export default function RequestDossier({
   const shown = interventions.filter(
     (row) => (row.kind || "maintenance") === tab,
   );
+
+  function renderTimeline(showComposer: boolean) {
+    return (
+      <>
+        {" "}
+        <div
+          className="page-tabs request-dossier-timeline-scope"
+          role="group"
+          aria-label="Périmètre de l’historique"
+        >
+          <button
+            type="button"
+            aria-pressed={timelineScope === "request"}
+            className={timelineScope === "request" ? "active" : ""}
+            onClick={() => {
+              setTimelineEvents([]);
+              setTimelineScope("request");
+            }}
+          >
+            Historique du dossier
+          </button>
+          <button
+            type="button"
+            aria-pressed={timelineScope === "equipment"}
+            className={timelineScope === "equipment" ? "active" : ""}
+            onClick={() => {
+              setTimelineEvents([]);
+              setTimelineScope("equipment");
+            }}
+          >
+            Historique de l’onduleur
+          </button>
+        </div>
+        <OperationTimeline
+          requestId={timelineScope === "request" ? record.id : undefined}
+          equipmentId={
+            timelineScope === "equipment" ? record.equipment : undefined
+          }
+          user={user}
+          canWrite={
+            timelineScope === "request" ? canAddOperation : canWriteEquipment
+          }
+          onChanged={async () => {
+            await refreshRecord();
+            await onChanged();
+          }}
+          onEventsLoaded={setTimelineEvents}
+          requestRecord={timelineScope === "request" ? record : undefined}
+          refreshKey={timelineVersion}
+          showComposer={showComposer}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="request-dossier">
@@ -207,7 +272,8 @@ export default function RequestDossier({
             S/N : {record.equipment_serial || equipment?.serial_number}
           </span>
           <span>
-            {record.assigned_technician
+            {record.assigned_technician_name &&
+            record.assigned_technician_name !== "Non affecté"
               ? `Affecté à ${record.assigned_technician_name}`
               : "Non affecté"}
           </span>
@@ -216,6 +282,12 @@ export default function RequestDossier({
           </span>
         </div>
         <RequestTimer timing={record.timing} />
+        <RequestAssignment
+          record={record}
+          user={user}
+          technicians={data.users || []}
+          onChanged={applyRecord}
+        />
         {user.role !== "client" &&
           tab !== "dispatch" &&
           (record.disposition?.can_mark_repaired ||
@@ -295,92 +367,116 @@ export default function RequestDossier({
           aria-labelledby={`${tabId}-${tab}`}
         >
           {tab === "followup" && (
-            <section className="request-dossier-card">
-              <h3>Fiche de suivi du dossier</h3>
-              <dl className="request-dossier-facts">
-                <Fact
-                  label="Date d’arrivée"
-                  value={
-                    record.arrived_at
-                      ? dateFR(record.arrived_at, true)
-                      : "Non renseignée"
-                  }
+            <div className="sav-followup-layout">
+              <div className="sav-followup-history">
+                {renderTimeline(false)}
+              </div>
+              <aside className="sav-followup-sidebar">
+                <RequestFollowup
+                  record={record}
+                  user={user}
+                  onChanged={applyRecord}
                 />
-                <Fact
-                  label="Date de clôture"
-                  value={
-                    record.closed_at
-                      ? dateFR(record.closed_at, true)
-                      : "Non renseignée"
-                  }
-                />
-                <Fact
-                  label="N° d’appel TVM / n° d’intervention métier"
-                  value={callIdentity(record).tvm}
-                />
-                <Fact
-                  label="N° d’appel client / référence client"
-                  value={record.client_reference}
-                />
-                <Fact label="Client final" value={record.end_customer} />
-                <Fact label="Nom du contact" value={record.contact_name} />
-                <Fact
-                  label="Téléphone du contact"
-                  value={record.contact_phone}
-                />
-                <Fact label="E-mail du contact" value={record.contact_email} />
-                <Fact
-                  label="Retour de matériel"
-                  value={record.return_flag ? "Oui" : "Non"}
-                />
-                <Fact label="Emballage reçu" value={record.packaging} />
-                <Fact
-                  label="Lieu de prise en charge"
-                  value={
-                    (
-                      {
-                        workshop: "Atelier",
-                        depot: "Dépôt",
-                        onsite: "Sur site",
-                      } as Record<string, string>
-                    )[record.service_location]
-                  }
-                />
-                <Fact
-                  label="Matériel livré par"
-                  value={
-                    (
-                      { courier: "Livreur", client: "Client" } as Record<
-                        string,
-                        string
-                      >
-                    )[record.delivered_by]
-                  }
-                />
-                <Fact label="Nom du livreur" value={record.courier_name} />
-                <Fact
-                  label="Situation de garantie du dossier"
-                  value={
-                    (
-                      {
-                        unspecified: "Non précisée",
-                        warranty: "Garantie",
-                        quotation: "Devis",
-                        contract: "Contrat",
-                        billable: "Facturable",
-                      } as Record<string, string>
-                    )[record.warranty_status]
-                  }
-                />
-              </dl>
-              <h4>Accessoires reçus</h4>
-              <p>{record.accessories || "Non renseignés"}</p>
-              <p className="request-followup-note">
-                Les informations de réception et la situation du dossier sont
-                saisies par l’équipe. Le compteur reste inconnu tant qu’aucune
-                arrivée réelle n’est renseignée.
-              </p>
-            </section>
+                <details className="sav-followup-reception">
+                  <summary>Informations de réception et du dossier</summary>
+                  <section className="request-dossier-card">
+                    <h3>Fiche de suivi du dossier</h3>
+                    <dl className="request-dossier-facts">
+                      <Fact
+                        label="Date d’arrivée"
+                        value={
+                          record.arrived_at
+                            ? dateFR(record.arrived_at, true)
+                            : "Non renseignée"
+                        }
+                      />
+                      <Fact
+                        label="Date de clôture"
+                        value={
+                          record.closed_at
+                            ? dateFR(record.closed_at, true)
+                            : "Non renseignée"
+                        }
+                      />
+                      <Fact
+                        label="N° d’appel TVM / n° d’intervention métier"
+                        value={callIdentity(record).tvm}
+                      />
+                      <Fact
+                        label="N° d’appel client / référence client"
+                        value={record.client_reference}
+                      />
+                      <Fact label="Client final" value={record.end_customer} />
+                      <Fact
+                        label="Nom du contact"
+                        value={record.contact_name}
+                      />
+                      <Fact
+                        label="Téléphone du contact"
+                        value={record.contact_phone}
+                      />
+                      <Fact
+                        label="E-mail du contact"
+                        value={record.contact_email}
+                      />
+                      <Fact
+                        label="Retour de matériel"
+                        value={record.return_flag ? "Oui" : "Non"}
+                      />
+                      <Fact label="Emballage reçu" value={record.packaging} />
+                      <Fact
+                        label="Lieu de prise en charge"
+                        value={
+                          (
+                            {
+                              workshop: "Atelier",
+                              depot: "Dépôt",
+                              onsite: "Sur site",
+                            } as Record<string, string>
+                          )[record.service_location]
+                        }
+                      />
+                      <Fact
+                        label="Matériel livré par"
+                        value={
+                          (
+                            { courier: "Livreur", client: "Client" } as Record<
+                              string,
+                              string
+                            >
+                          )[record.delivered_by]
+                        }
+                      />
+                      <Fact
+                        label="Nom du livreur"
+                        value={record.courier_name}
+                      />
+                      <Fact
+                        label="Situation de garantie du dossier"
+                        value={
+                          (
+                            {
+                              unspecified: "Non précisée",
+                              warranty: "Garantie",
+                              quotation: "Devis",
+                              contract: "Contrat",
+                              billable: "Facturable",
+                            } as Record<string, string>
+                          )[record.warranty_status]
+                        }
+                      />
+                    </dl>
+                    <h4>Accessoires reçus</h4>
+                    <p>{record.accessories || "Non renseignés"}</p>
+                    <p className="request-followup-note">
+                      Les informations de réception et la situation du dossier
+                      sont saisies par l’équipe. Le compteur reste inconnu tant
+                      qu’aucune arrivée réelle n’est renseignée.
+                    </p>
+                  </section>
+                </details>
+              </aside>
+            </div>
           )}
           {tab === "documents" && (
             <RequestDocuments
@@ -720,6 +816,7 @@ export default function RequestDossier({
                       </button>
                       {(canManage ||
                         (user.role === "technician" &&
+                          canAddOperation &&
                           intervention.technician === user.id)) && (
                         <button
                           type="button"
@@ -790,46 +887,7 @@ export default function RequestDossier({
             </section>
           )}
         </div>
-        <div
-          className="page-tabs request-dossier-timeline-scope"
-          role="group"
-          aria-label="Périmètre de l’historique"
-        >
-          <button
-            type="button"
-            aria-pressed={timelineScope === "request"}
-            className={timelineScope === "request" ? "active" : ""}
-            onClick={() => {
-              setTimelineEvents([]);
-              setTimelineScope("request");
-            }}
-          >
-            Historique du dossier
-          </button>
-          <button
-            type="button"
-            aria-pressed={timelineScope === "equipment"}
-            className={timelineScope === "equipment" ? "active" : ""}
-            onClick={() => {
-              setTimelineEvents([]);
-              setTimelineScope("equipment");
-            }}
-          >
-            Historique de l’onduleur
-          </button>
-        </div>
-        <OperationTimeline
-          requestId={timelineScope === "request" ? record.id : undefined}
-          equipmentId={
-            timelineScope === "equipment" ? record.equipment : undefined
-          }
-          user={user}
-          canWrite={
-            timelineScope === "request" ? canAddOperation : canWriteEquipment
-          }
-          onChanged={onChanged}
-          onEventsLoaded={setTimelineEvents}
-        />
+        {tab !== "followup" && renderTimeline(true)}
       </div>
       <div className="modal-footer">
         <a

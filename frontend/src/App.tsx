@@ -102,6 +102,8 @@ import CourierWorkspace from "./CourierWorkspace";
 import ClientPickups from "./ClientPickups";
 import LogisticsWorkspace from "./LogisticsWorkspace";
 import type { LogisticsBootstrap } from "./logistics";
+import { canWriteRequest, canEditRequestIntervention } from "./requestAccess";
+import "./SAVFollowup.css";
 
 type DataMap = Record<string, RecordData[]>;
 type ModalState = {
@@ -121,11 +123,11 @@ const navGroups = [
   {
     label: "ESPACE DE TRAVAIL",
     items: [
+      { id: "requests", label: "Demandes SAV", icon: ClipboardList },
       { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
       { id: "interventions", label: "Interventions", icon: Wrench },
       { id: "clients", label: "Clients", icon: Users },
       { id: "equipment", label: "Équipements", icon: Zap },
-      { id: "requests", label: "Demandes SAV", icon: ClipboardList },
       { id: "exchange", label: "Échange", icon: Truck },
       {
         id: "exchange-billing",
@@ -211,14 +213,26 @@ function Badge({ value, label }: { value: any; label?: string }) {
     </span>
   );
 }
-function canManage(user: User, resource: string, record?: RecordData) {
+function homePageFor(user: User | null) {
+  return user?.role === "courier"
+    ? "courier/home"
+    : user?.role === "client"
+      ? "dashboard"
+      : "requests";
+}
+function canManage(
+  user: User,
+  resource: string,
+  record?: RecordData,
+  data?: DataMap,
+) {
   if (user.role === "admin") return true;
   if (user.role === "manager") return resource !== "users";
   if (user.role === "technician")
     return resource === "requests"
       ? !record
       : resource === "interventions" &&
-          (!record || record.technician === user.id);
+          (!record || canEditRequestIntervention(record, user, data?.requests));
   return false;
 }
 function Spinner() {
@@ -482,7 +496,9 @@ function EditForm({
   const formId = useId();
   const config = resources[modal.resource],
     editing = Boolean(modal.record),
-    readonly = modal.readonly;
+    readonly =
+      modal.readonly ||
+      (editing && !canManage(user, modal.resource, modal.record, data));
   const [values, setValues] = useState<RecordData>(() =>
     Object.fromEntries(
       config.fields.map((field) => {
@@ -528,17 +544,10 @@ function EditForm({
   const equipmentRequests = (data.requests || []).filter(
     (row) => row.equipment === modal.record?.id,
   );
-  const equipmentRequestIds = new Set(equipmentRequests.map((row) => row.id));
   const canWriteEquipmentTimeline =
     user.role === "admin" ||
     user.role === "manager" ||
-    (user.role === "technician" &&
-      (equipmentRequests.some((row) => row.assigned_technician === user.id) ||
-        (data.interventions || []).some(
-          (row) =>
-            equipmentRequestIds.has(row.service_request) &&
-            row.technician === user.id,
-        )));
+    equipmentRequests.some((row) => canWriteRequest(row, user));
   const canBackfillClosure =
     modal.resource === "requests" &&
     modal.record?.status === "closed" &&
@@ -597,13 +606,7 @@ function EditForm({
         return false;
       if (modal.resource !== "interventions") return true;
       if (resource === "requests" && user.role === "technician")
-        return (
-          row.assigned_technician === user.id ||
-          (data.interventions || []).some(
-            (entry) =>
-              entry.service_request === row.id && entry.technician === user.id,
-          )
-        );
+        return canWriteRequest(row, user);
       if (name === "replacement_equipment")
         return (
           sourceEquipment &&
@@ -643,10 +646,25 @@ function EditForm({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (
+      modal.resource === "interventions" &&
+      user.role === "technician" &&
+      !canWriteRequest(sourceRequest, user)
+    ) {
+      setError(
+        "Confirmez d’abord la prise en charge du dossier qui vous est affecté.",
+      );
+      return;
+    }
     setBusy(true);
     try {
       const payload: RecordData = {};
       for (const field of config.fields) {
+        if (
+          modal.resource === "requests" &&
+          ["status", "assigned_technician"].includes(field.name)
+        )
+          continue;
         if (
           field.managerOnly &&
           user.role !== "admin" &&
@@ -806,13 +824,24 @@ function EditForm({
                 </div>
               )}
             {modal.resource === "requests" && editing && (
-              <PreventiveProgress record={modal.record!} />
+              <>
+                <PreventiveProgress record={modal.record!} />
+                <p className="sav-generic-edit-note">
+                  L’état et l’affectation se modifient dans le suivi du dossier,
+                  avec leurs confirmations et observations.
+                </p>
+              </>
             )}
             {modal.resource === "interventions" &&
               values.kind === "preventive" &&
               sourceRequest && <PreventiveProgress record={sourceRequest} />}
             <div className="form-grid">
               {config.fields
+                .filter(
+                  (field) =>
+                    modal.resource !== "requests" ||
+                    !["status", "assigned_technician"].includes(field.name),
+                )
                 .filter(
                   (field) =>
                     field.section !== "reception" &&
@@ -1474,6 +1503,13 @@ function ResourcePage({
     new Set((data[resource] || []).map((r) => r.status).filter(Boolean)),
   );
   const readonly = !canManage(user, resource) || resource === "stock-movements";
+  const canCreate =
+    canManage(user, resource) &&
+    !(
+      resource === "interventions" &&
+      user.role === "technician" &&
+      !(data.requests || []).some((row) => canWriteRequest(row, user))
+    );
   return (
     <>
       <div
@@ -1488,7 +1524,7 @@ function ResourcePage({
           <h1>{config.title}</h1>
           <p>{config.description}</p>
         </div>
-        {canManage(user, resource) && (
+        {canCreate && (
           <button
             className="button primary"
             onClick={() =>
@@ -1500,6 +1536,14 @@ function ResourcePage({
           </button>
         )}
       </div>
+      {resource === "interventions" &&
+        user.role === "technician" &&
+        !canCreate && (
+          <p className="sav-generic-edit-note">
+            Confirmez d’abord la prise en charge d’une demande qui vous est
+            affectée. Vous pourrez ensuite créer ses fiches d’intervention.
+          </p>
+        )}
       {kind && ["preventive", "commissioning"].includes(kind) && (
         <div
           className="operation-list-summary"
@@ -1602,7 +1646,7 @@ function ResourcePage({
                 : `Commencez par ajouter votre premier ${config.singular}.`
             }
             action={
-              canManage(user, resource) && !search ? (
+              canCreate && !search ? (
                 <button
                   className="button secondary"
                   onClick={() =>
@@ -1681,36 +1725,43 @@ function Dashboard({
       ]
     : [
         {
-          label: "Interventions en cours",
-          value: m.active_interventions,
-          icon: Wrench,
-          color: "blue",
-          sub: "Planifiées, en cours et en test",
-        },
-        {
           label: "Demandes ouvertes",
           value: m.open_requests,
           icon: ClipboardList,
-          color: "purple",
-          sub: "Dossiers SAV à suivre",
+          color: "blue",
+          sub: "Tous les dossiers non clôturés",
         },
         {
-          label: "Stock critique",
-          value: m.critical_stock,
-          icon: Box,
+          label: "Non affectées",
+          value: m.unassigned_requests,
+          icon: Users,
           color: "orange",
-          sub: "Références sous le seuil",
+          sub: "Un technicien reste à désigner",
         },
         {
-          label: "Équipements suivis",
-          value: m.equipment_count,
-          icon: Activity,
+          label: "Prises en charge à confirmer",
+          value: m.awaiting_acceptance_requests,
+          icon: Clock3,
+          color: "purple",
+          sub: "Affectées, en attente d’acceptation",
+        },
+        {
+          label: "Prises en charge confirmées",
+          value: m.accepted_requests,
+          icon: CheckCheck,
           color: "green",
-          sub: `Sur ${m.client_count ?? 0} compte${m.client_count > 1 ? "s" : ""} client${m.client_count > 1 ? "s" : ""}`,
+          sub: "Affectations confirmées",
         },
       ];
   const activity = dashboard.activity || [],
-    distribution = dashboard.status_distribution || [];
+    distribution = client
+      ? dashboard.status_distribution || []
+      : (dashboard.request_status_distribution || []).map(
+          (row: RecordData) => ({
+            name: row.status || row.name,
+            value: row.count ?? row.value,
+          }),
+        );
   const total = distribution.reduce(
       (a: number, r: RecordData) => a + Number(r.value),
       0,
@@ -1731,6 +1782,7 @@ function Dashboard({
     ),
   );
   const recent = dashboard.recent_interventions || [];
+  const recentRequests = dashboard.recent_requests || [];
   return (
     <>
       <div className="page-heading">
@@ -1744,7 +1796,7 @@ function Dashboard({
           <p>
             {client
               ? "Bienvenue. Retrouvez le suivi de vos équipements et de vos dossiers."
-              : "Vue d’ensemble de vos activités de maintenance UPS."}
+              : "Vos demandes SAV, de la réception à la clôture. Les interventions restent rattachées à leur dossier."}
           </p>
         </div>
         <div className="today-label">
@@ -1764,7 +1816,9 @@ function Dashboard({
               onNavigate(
                 client
                   ? ["equipment", "requests", "interventions", "reports"][index]
-                  : ["interventions", "requests", "stock", "equipment"][index],
+                  : ["requests", "requests/unassigned", "requests", "requests"][
+                      index
+                    ],
               )
             }
           >
@@ -1774,7 +1828,7 @@ function Dashboard({
             <div className="metric-content">
               <span>{metric.label}</span>
               <div className="metric-value">
-                {loading && !dashboard.metrics ? "—" : (metric.value ?? 0)}
+                {loading && !dashboard.metrics ? "—" : (metric.value ?? "—")}
                 <span className={`metric-note ${metric.color}`}>
                   {index === 2 && !client ? (
                     "À surveiller"
@@ -1791,50 +1845,169 @@ function Dashboard({
       </div>
       <div className="dashboard-main">
         <section className="card recent-card">
-          <div className="card-heading">
-            <div>
-              <h2>Interventions récentes</h2>
-              <p>Les derniers dossiers de votre activité</p>
-            </div>
-            <button
-              className="text-button"
-              onClick={() => onNavigate("interventions")}
-            >
-              Tout voir <ArrowRight size={15} />
-            </button>
-          </div>
-          {recent.length ? (
-            <RecordTable
-              resource="interventions"
-              rows={recent.slice(0, 6)}
-              compact
-              user={user}
-              onEdit={onEdit}
-              onIntervention={onIntervention}
-            />
+          {client ? (
+            <>
+              {" "}
+              <div className="card-heading">
+                <div>
+                  <h2>Interventions récentes</h2>
+                  <p>Les derniers dossiers de votre activité</p>
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => onNavigate("interventions")}
+                >
+                  Tout voir <ArrowRight size={15} />
+                </button>
+              </div>
+              {recent.length ? (
+                <RecordTable
+                  resource="interventions"
+                  rows={recent.slice(0, 6)}
+                  compact
+                  user={user}
+                  onEdit={onEdit}
+                  onIntervention={onIntervention}
+                />
+              ) : (
+                <Empty
+                  title="Votre activité commence ici"
+                  text="Les interventions de votre équipe apparaîtront dans ce tableau."
+                  action={
+                    !client ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => onEdit({ resource: "interventions" })}
+                      >
+                        <Plus size={16} />
+                        Planifier une intervention
+                      </button>
+                    ) : undefined
+                  }
+                />
+              )}
+              <div className="recent-bottom">
+                <span className="live-dot" /> Données de votre espace partagé
+                <span>
+                  {data.interventions?.length || 0} interventions au total
+                </span>
+              </div>
+            </>
           ) : (
-            <Empty
-              title="Votre activité commence ici"
-              text="Les interventions de votre équipe apparaîtront dans ce tableau."
-              action={
-                !client ? (
-                  <button
-                    className="button secondary"
-                    onClick={() => onEdit({ resource: "interventions" })}
-                  >
-                    <Plus size={16} />
-                    Planifier une intervention
-                  </button>
-                ) : undefined
-              }
-            />
+            <>
+              {" "}
+              <div className="card-heading">
+                <div>
+                  <h2>Demandes SAV récentes</h2>
+                  <p>
+                    Ouvrez le dossier pour affecter, confirmer la prise en
+                    charge et suivre son évolution.
+                  </p>
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => onNavigate("requests")}
+                >
+                  Toutes les demandes <ArrowRight size={15} />
+                </button>
+              </div>
+              {recentRequests.length ? (
+                <div className="table-scroll sav-dashboard-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>N° d’appel TVM</th>
+                        <th>Client / équipement</th>
+                        <th>État</th>
+                        <th>Prise en charge</th>
+                        <th>
+                          <span className="sr-only">Ouvrir le dossier</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentRequests.slice(0, 8).map((row: RecordData) => (
+                        <tr key={row.id}>
+                          <td>
+                            <button
+                              className="sav-dashboard-reference"
+                              onClick={() =>
+                                onEdit({ resource: "requests", record: row })
+                              }
+                            >
+                              {callIdentity(row).tvm || "Non renseigné"}
+                            </button>
+                            <small>{row.subject}</small>
+                          </td>
+                          <td>
+                            <span>{row.client_name}</span>
+                            <small>
+                              {row.equipment_model ||
+                                data.equipment?.find(
+                                  (unit) => unit.id === row.equipment,
+                                )?.model ||
+                                row.equipment_serial}
+                            </small>
+                          </td>
+                          <td>
+                            <span className={`badge status-${row.status}`}>
+                              {requestStatusLabels[row.status] || row.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="sav-dashboard-assignment">
+                              <strong>
+                                {row.assignment?.technician_name ||
+                                  row.assigned_technician_name ||
+                                  "Non affecté"}
+                              </strong>
+                              <span>
+                                {!row.assigned_technician
+                                  ? "Non affecté"
+                                  : row.assignment?.accepted
+                                    ? "Prise en charge confirmée"
+                                    : "À confirmer"}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              className="icon-button"
+                              aria-label={`Ouvrir le dossier ${row.reference}`}
+                              onClick={() =>
+                                onEdit({ resource: "requests", record: row })
+                              }
+                            >
+                              <ChevronRight size={17} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <Empty
+                  title="Aucune demande SAV enregistrée"
+                  text="Créez un dossier pour démarrer son suivi, puis affectez le technicien chargé de sa prise en charge."
+                  action={
+                    <button
+                      className="button secondary"
+                      onClick={() => onEdit({ resource: "requests" })}
+                    >
+                      <Plus size={16} />
+                      Nouvelle demande
+                    </button>
+                  }
+                />
+              )}
+              <div className="recent-bottom">
+                <span className="live-dot" />
+                Dossiers de votre espace partagé
+                <span>{m.request_count ?? "—"} demandes au total</span>
+              </div>
+            </>
           )}
-          <div className="recent-bottom">
-            <span className="live-dot" /> Données de votre espace partagé
-            <span>
-              {data.interventions?.length || 0} interventions au total
-            </span>
-          </div>
         </section>
         <div className="dashboard-charts">
           <section className="card activity-card">
@@ -1914,7 +2087,7 @@ function Dashboard({
               >
                 <div>
                   <strong>{total}</strong>
-                  <span>interventions</span>
+                  <span>{client ? "interventions" : "demandes SAV"}</span>
                 </div>
               </div>
               <div className="distribution-legend">
@@ -1922,7 +2095,11 @@ function Dashboard({
                   distribution.map((r: RecordData, i: number) => (
                     <div key={r.name}>
                       <i style={{ background: palette[i % palette.length] }} />
-                      <span>{statuses[r.name] || r.name}</span>
+                      <span>
+                        {(client
+                          ? statuses[r.name]
+                          : requestStatusLabels[r.name]) || r.name}
+                      </span>
                       <strong>
                         {total
                           ? Math.round((Number(r.value) / total) * 100)
@@ -1932,13 +2109,49 @@ function Dashboard({
                     </div>
                   ))
                 ) : (
-                  <span className="muted">Aucune intervention</span>
+                  <span className="muted">
+                    {client ? "Aucune intervention" : "Aucune demande"}
+                  </span>
                 )}
               </div>
             </div>
           </section>
         </div>
       </div>
+      {!client && (
+        <section className="card sav-dashboard-visits">
+          <div className="card-heading">
+            <div>
+              <h2>Interventions liées aux dossiers</h2>
+              <p>
+                Fiches de maintenance, de mise en service et de visites
+                préventives.
+              </p>
+            </div>
+            <button
+              className="text-button"
+              onClick={() => onNavigate("interventions")}
+            >
+              Voir les interventions <ArrowRight size={15} />
+            </button>
+          </div>
+          {recent.length ? (
+            <RecordTable
+              resource="interventions"
+              rows={recent.slice(0, 4)}
+              compact
+              user={user}
+              onEdit={onEdit}
+              onIntervention={onIntervention}
+            />
+          ) : (
+            <p className="sav-dashboard-empty">
+              Aucune fiche d’intervention. Le suivi d’une demande peut être
+              renseigné directement dans son dossier.
+            </p>
+          )}
+        </section>
+      )}
       <div className="dashboard-bottom">
         <section className="card upcoming-card">
           <div className="card-heading">
@@ -2171,7 +2384,7 @@ function InterventionDetail({
           >
             Documents
           </button>
-          {canManage(user, "interventions", record) && (
+          {canManage(user, "interventions", record, data) && (
             <button
               className={tab === "pieces" ? "active" : ""}
               onClick={() => setTab("pieces")}
@@ -2436,7 +2649,7 @@ function InterventionDetail({
             Assistant diagnostic
           </button>
         )}
-        {canManage(user, "interventions", record) && (
+        {canManage(user, "interventions", record, data) && (
           <button
             className="button primary"
             onClick={() => {
@@ -2866,7 +3079,7 @@ export default function App() {
     [demo, setDemo] = useState(false),
     [sessionError, setSessionError] = useState("");
   const [page, setPage] = useState(
-      () => window.location.hash.slice(1) || "dashboard",
+      () => window.location.hash.slice(1) || "requests",
     ),
     [mobileMenu, setMobileMenu] = useState(false),
     [data, setData] = useState<DataMap>({}),
@@ -2897,6 +3110,11 @@ export default function App() {
         activeUserId.current = s.user?.id ?? null;
         setUser(s.user);
         setDemo(Boolean(s.demo_mode));
+        if (!window.location.hash.slice(1)) {
+          const landing = homePageFor(s.user);
+          setPage(landing);
+          window.history.replaceState(null, "", `#${landing}`);
+        }
       })
       .catch((err) => setSessionError(err.message))
       .finally(() => setInitialized(true));
@@ -2993,12 +3211,12 @@ export default function App() {
   }, [reload]);
   useEffect(() => {
     const listener = () => {
-      setPage(window.location.hash.slice(1) || "dashboard");
+      setPage(window.location.hash.slice(1) || homePageFor(user));
       setExternalSearch("");
     };
     window.addEventListener("hashchange", listener);
     return () => window.removeEventListener("hashchange", listener);
-  }, []);
+  }, [user?.role]);
   useEffect(() => {
     if (!toast) return;
     const timeout = window.setTimeout(() => setToast(""), 4500);
@@ -3044,8 +3262,7 @@ export default function App() {
     setLoading(false);
     setUser(nextUser);
     setDemo(nextDemo);
-    const firstPage =
-      nextUser?.role === "courier" ? "courier/home" : "dashboard";
+    const firstPage = homePageFor(nextUser);
     setPage(firstPage);
     window.history.replaceState(null, "", `#${firstPage}`);
   }
@@ -3407,6 +3624,8 @@ export default function App() {
               onOpen={setRequestDetail}
               onCreate={() => openModal({ resource: "requests" })}
               onCountsChange={setRequestCounts}
+              technicians={data.users || []}
+              onChanged={saved}
               refreshKey={data.requests}
               initialSearch={externalSearch}
             />

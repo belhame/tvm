@@ -1,0 +1,287 @@
+.sav-followup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(310px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.sav-followup-history,
+.sav-followup-sidebar {
+  min-width: 0;
+}
+.sav-followup-history .request-dossier-timeline-scope {
+  margin-top: 0;
+}
+.sav-followup-history .operation-timeline {
+  margin-top: 0;
+}
+.sav-followup-history .operation-timeline-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sav-followup-history .operation-timeline-controls {
+  flex-wrap: wrap;
+}
+.sav-followup-history .operation-timeline-list {
+  max-height: 740px;
+  overflow-y: auto;
+  padding-right: 8px;
+  overscroll-behavior: contain;
+}
+.sav-followup-sidebar {
+  display: grid;
+  gap: 16px;
+}
+.sav-followup-editor {
+  background: #f7faff;
+  border: 1px solid #dbe6f6;
+  border-radius: 13px;
+  padding: 19px;
+  color: #233d61;
+}
+.sav-followup-editor-heading {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 19px;
+}
+.sav-followup-editor h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #1f375b;
+}
+.sav-followup-editor form {
+  display: grid;
+  gap: 16px;
+}
+.sav-followup-editor .field {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  min-width: 0;
+}
+.sav-followup-editor .field label {
+  font-size: 13px;
+  color: #273e5e;
+  font-weight: 650;
+}
+.sav-followup-editor .field small {
+  font-size: 12px;
+  color: #506787;
+  line-height: 1.65;
+}
+.sav-followup-editor textarea {
+  resize: vertical;
+  min-height: 95px;
+}
+.sav-followup-private {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #344e70;
+  cursor: pointer;
+}
+.sav-followup-private input {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: #1b61f8;
+  flex-shrink: 0;
+}
+.sav-followup-private svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sav-followup-visibility {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #4c6484;
+}
+.sav-followup-visibility svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sav-followup-readonly {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  background: #edf3fb;
+  border-radius: 9px;
+  color: #3a5578;
+  font-size: 13px;
+}
+.sav-followup-readonly svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sav-followup-readonly strong {
+  color: #2b4568;
+  font-size: 13px;
+}
+.sav-followup-readonly p {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sav-followup-submit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.sav-followup-submit > .button {
+  flex: 1;
+  justify-content: center;
+}
+.sav-followup-warning {
+  padding: 12px 14px;
+  background: #fff4dd;
+  color: #775214;
+  border: 1px solid #eed9b0;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.sav-followup-reception {
+  border: 1px solid #e0e8f4;
+  border-radius: 11px;
+  background: #fff;
+  overflow: hidden;
+}
+.sav-followup-reception > summary {
+  padding: 16px;
+  color: #2d486d;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.sav-followup-reception > summary:hover {
+  background: #f5f8fd;
+}
+.sav-followup-reception .request-dossier-card {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #e1e9f5;
+  border-radius: 0;
+  padding: 17px;
+}
+.sav-followup-reception .request-dossier-facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sav-generic-edit-note {
+  color: #3d5d86;
+  background: #f0f6ff;
+  border: 1px solid #dce8fa;
+  border-radius: 9px;
+  padding: 13px 15px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sav-dashboard-table table {
+  min-width: 620px;
+}
+.sav-dashboard-table td {
+  vertical-align: middle;
+}
+.sav-dashboard-table td > small,
+.sav-dashboard-table td > span {
+  display: block;
+}
+.sav-dashboard-table td > small {
+  font-size: 12px;
+  color: #526987;
+  line-height: 1.6;
+  margin-top: 5px;
+  max-width: 250px;
+  white-space: normal;
+}
+.sav-dashboard-reference {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #1d59c7;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.sav-dashboard-reference:hover {
+  text-decoration: underline;
+}
+.sav-dashboard-assignment {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4c6383;
+}
+.sav-dashboard-assignment strong {
+  font-weight: 600;
+  color: #2d4769;
+}
+.sav-dashboard-visits {
+  margin: 22px 0;
+}
+.sav-dashboard-empty {
+  color: #516989;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 0 23px 20px;
+}
+.request-dossier > .modal-content > .request-assignment {
+  margin: 16px 0 22px;
+}
+.request-workspace .request-assignment-compact {
+  min-width: 180px;
+}
+@media (max-width: 850px) {
+  .sav-followup-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sav-followup-sidebar {
+    order: -1;
+  }
+  .sav-followup-history .operation-timeline-list {
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (max-width: 540px) {
+  .sav-followup-editor {
+    padding: 15px;
+  }
+  .sav-followup-editor-heading {
+    align-items: flex-start;
+  }
+  .sav-followup-submit {
+    flex-direction: column;
+  }
+  .sav-followup-submit > .button {
+    width: 100%;
+  }
+  .sav-followup-history .request-dossier-timeline-scope {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .sav-followup-history .request-dossier-timeline-scope button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .sav-followup-history .operation-timeline-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sav-followup-history .operation-timeline-filter {
+    width: 100%;
+  }
+  .sav-followup-history .operation-timeline-filter select {
+    width: 100%;
+  }
+}

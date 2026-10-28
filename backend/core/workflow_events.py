@@ -1,4 +1,6 @@
 from contextvars import ContextVar
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 
 _request_context = ContextVar('workflow_request', default=None)
@@ -20,6 +22,16 @@ def current_actor():
     request = _request_context.get()
     actor = getattr(request, 'user', None)
     return actor if actor and actor.is_authenticated else None
+
+
+@contextmanager
+def actor_context(actor):
+    """Trusted service actor also reaches the model's financial/logistics guards."""
+    token = _request_context.set(SimpleNamespace(user=actor))
+    try:
+        yield
+    finally:
+        _request_context.reset(token)
 
 
 def append_event(*, equipment, service_request=None, intervention=None, actor=None, **fields):

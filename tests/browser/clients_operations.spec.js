@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { confirmCurrentAssignment, openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 
@@ -10,7 +11,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -36,6 +37,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.reload();
   await loaded;
+  await openLegacyDashboard(page);
 }
 
 async function navigate(page, label) {
@@ -292,6 +294,7 @@ test('une prévision de trois visites reste un objectif et seules les préventiv
     const worker = await technicianContext.newPage();
     await login(customer, clientUsername);
     await login(worker, 'technicien');
+    await confirmCurrentAssignment(worker, campaign.id);
     expect(await api(customer, `requests/${campaign.id}/`)).toMatchObject(progress);
     expect((await response(customer, `requests/${campaign.id}/`, 'PATCH', { planned_visit_count: 4 })).status()).toBe(403);
     expect([400, 403]).toContain((await response(worker, `requests/${campaign.id}/`, 'PATCH', { planned_visit_count: 4 })).status());

@@ -12,7 +12,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
 | Catalogue Eaton BN | Import XLS versionné dans PostgreSQL et consultation interne ; provenance des lignes, empreinte SHA-256 et conservation des collisions | Import administrateur/responsable, lecture technicien, aucun accès client ; fichier privé à importer dans chaque instance, sans modification automatique des équipements |
-| Demandes SAV | Dossier lié à un équipement, description, priorité et état | Les significations exactes des anciens états WINDEV restent à valider |
+| Demandes SAV | Entrée principale des administrateurs, responsables et techniciens ; dossier lié à un équipement, affectation, confirmation de prise en charge et suivi avec observation obligatoire si l'état change | Une réaffectation exige une nouvelle confirmation ; aucune acceptation historique inventée ; les anciens états WINDEV restent à valider |
 | Numéros de dossier | N° d'intervention / appel TVM unique et commun aux visites ; N° d'appel client distinct, recherché dans le périmètre du compte | Références des centres conservées comme texte et non uniques globalement ; aucun client déduit du numéro |
 | Demande à partir d'une série | Recherche interne du modèle et de la garantie, puis création transactionnelle de la demande et, si nécessaire, de l'équipement et de sa garantie | Création d'équipement administrateur/responsable ; données existantes prioritaires ; cas ambigus ou dates imprécises à compléter explicitement |
 | Suivi et classement SAV | Vues par type d'opération et état, avec compteurs calculés depuis les dossiers accessibles | Les états web ne constituent pas une conversion automatique de tous les anciens codes WINDEV |
@@ -46,12 +46,16 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 |---|---|
 | Administrateur | Création et modification des données métier ; gestion des comptes, rôles et délégations de validation financière ; autorisation financière implicite |
 | Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
-| Technicien | Lecture des données métier internes ; création de demandes ; notes et changements d'état dans son périmètre d'affectation ; création de sa première intervention après affectation du dossier par le responsable, puis modification de ses interventions ; consommation de pièces pour ses interventions |
+| Technicien | Lecture des données métier internes ; création de demandes Non affecté ; suivi, fiches et consommation de pièces dans le cadre de son affectation courante confirmée, avec les limites propres à ses interventions |
 | Livreur TVM | Espace restreint : collectes affectées, réception atelier et remise enregistrée ; ses rappels/notifications, sans diagnostics internes, factures ou comptes |
 | Livreur client | Compte lié à sa société : uniquement ses livraisons/retours affectés et leur remise ; aucune collecte, réception, recherche de séries ou photo OCR |
 | Client | Consultation de sa société et demande d'enlèvement, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
+
+L'administrateur ou le responsable affecte le dossier ; le technicien désigné confirme avec **Oui**, tandis qu'**Annuler** ne produit aucun refus. Une réaffectation retire l'acceptation pour le travail à venir. Une ancienne visite permet de conserver l'accès en lecture, sans donner de droit de modification sur le dossier réaffecté. Seul l'administrateur peut confirmer au nom du technicien avec un motif historisé ; administrateur et responsable conservent leur suivi autorisé sans acceptation personnelle, avec les mêmes contrôles financiers et logistiques.
+
+Cette condition d'écriture du suivi ne retire pas la consultation de l'historique ni les contributions techniques autorisées à la bibliothèque depuis des interventions historiques terminées. Ces retours d'expérience restent soumis à leur propre validation.
 
 La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif éligible. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ou un livreur ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
 
@@ -66,6 +70,8 @@ L'import d'annuaire est réservé aux administrateurs et responsables. Il accept
 Les catégories des demandes donnent accès aux dossiers nouveaux, en maintenance, en test, traités, en devis, en attente, approuvés, rejetés, échangés, prêts, à retourner ou clôturés. Le dépassement en cours est calculé depuis l'arrivée au-delà de **48 heures cumulées du lundi au vendredi** et peut recouper un autre état. L'échéance manuelle reste distincte. Les compteurs sont produits par le serveur dans le périmètre autorisé ; ils ne sont pas des chiffres de démonstration ajoutés à l'interface.
 
 La chronologie d'une demande ou d'un onduleur expose les événements enregistrés, leur date et leur auteur, les changements d'état, les observations et les synthèses ajoutées. Les notes sont internes par défaut ; le portail client ne voit que les événements publics de ses propres dossiers. Une synthèse est un événement conservé, pas une réponse de l'assistant IA.
+
+Le formulaire **Mettre à jour le suivi** réunit l'état du dossier, l'observation et la synthèse facultative, sans exiger une fiche d'intervention. Un changement d'état exige une observation ; à état inchangé, une observation ou une synthèse suffit. L'état public et les notes internes sont enregistrés séparément. Un état ou une affectation devenus obsolètes imposent une actualisation avant l'enregistrement.
 
 Les fiches préexistantes disposent d'un état de référence distinct des nouveaux événements. Cet état ne reconstitue pas les étapes passées : **l'ancien historique HFSQL n'est pas importé dans la chronologie par cette mise à jour**. Voir [le guide du suivi SAV](GUIDE_SUIVI_SAV.md).
 

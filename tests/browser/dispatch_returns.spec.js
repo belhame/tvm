@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { confirmCurrentAssignment, openLegacyDashboard } from './legacy_navigation.js';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -12,7 +13,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -30,6 +31,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(result => result.url().endsWith('/api/dashboard/') && result.ok());
   await page.reload();
   await loaded;
+  await openLegacyDashboard(page);
 }
 
 async function navigate(page, label) {
@@ -200,7 +202,7 @@ test('un retour facturable exige diagnostic, devis TVM HT et TVA en TND, confirm
   expect(classified).toMatchObject({ status: 'return_to_client', closed_at: null, disposition: { outcome: 'nonrepairable', state: 'awaiting_quote', fee_mode: 'billable', requires_diagnostic_billing: true, quote: null } });
   for (const rejected of [
     await response(page, `requests/${record.id}/`, 'PATCH', { status: 'closed' }),
-    await response(page, `requests/${record.id}/timeline/`, 'POST', { kind: 'status_changed', status_after: 'closed' }),
+    await response(page, `requests/${record.id}/timeline/`, 'POST', { kind: 'status_changed', status_after: 'closed', observation: 'Tentative de clôture avant décision financière.' }),
     await response(page, dispositionPath(record, 'close'), 'POST', {}),
   ]) expect([400, 403]).toContain(rejected.status());
 
@@ -306,6 +308,7 @@ test('un diagnostic gratuit exige un devis nul à TVA explicite puis une approba
     const finance = await financeContext.newPage();
     const customer = await clientContext.newPage();
     await login(worker, 'technicien');
+    await confirmCurrentAssignment(worker, record.id);
     await login(finance, financeUsername);
     await login(customer, clientUsername);
     const freeReason = `DEMANDE-GRATUITE-INTERNE-${tag}`;

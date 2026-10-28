@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 const marker = () => `LAB-IA-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -10,7 +11,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboard/' && r.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toBeVisible();
+  await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -95,7 +96,7 @@ test('le retour technique exige une intervention terminée, une approbation et c
   const call = await api(page, 'requests/', 'POST', { equipment: unit.id, subject: 'Test technique fictif', description: 'NOTE CLIENT A NE PAS COPIER', status: 'maintenance' });
   const visit = await api(page, 'interventions/', 'POST', { service_request: call.id, status: 'completed', work_done: 'Essais fictifs terminés', performed_on: new Date().toISOString().slice(0, 10) });
   await page.reload();
-  await expect(page.locator('.metric-value').first()).toBeVisible();
+  await openLegacyDashboard(page);
   await assistant(page);
   await page.getByRole('button', { name: 'Retours validés', exact: true }).click();
   await page.getByRole('button', { name: 'Proposer un retour', exact: true }).click();

@@ -11,6 +11,8 @@ from core.client_import_views import client_import
 from core.serial_photo_views import recognize_serial
 from core import exchange_views
 from core import disposition_views
+from core import request_assignment_views
+from core.request_tracking_views import followup_view
 
 router = DefaultRouter()
 router.register('clients', views.ClientViewSet, basename='client')
@@ -43,6 +45,9 @@ urlpatterns = [
     path('api/logistics/', include('core.notification_urls')),
     path('api/logistics/', include('core.outbox_urls')),
     path('api/requests/intake/', intake_views.request_intake),
+    path('api/requests/<int:request_id>/assignment/', request_assignment_views.assignment_view),
+    path('api/requests/<int:request_id>/assignment/confirm/', request_assignment_views.confirmation_view),
+    path('api/requests/<int:request_id>/followup/', followup_view),
     path('api/exchanges/', exchange_views.exchange_list),
     path('api/dispatch/ready/', disposition_views.dispatch_list, {'queue': 'ready'}),
     path('api/dispatch/returns/', disposition_views.dispatch_list, {'queue': 'returns'}),

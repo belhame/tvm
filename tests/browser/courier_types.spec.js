@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -14,7 +15,7 @@ async function login(page, username = 'admin', courier = false) {
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
   if (courier) await expect(page.getByRole('navigation', { name: 'Navigation livreur', exact: true })).toBeVisible();
-  else await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  else await openLegacyDashboard(page);
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -52,6 +53,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(result => new URL(result.url()).pathname === '/api/dashboard/' && result.ok());
   await page.reload();
   await loaded;
+  await openLegacyDashboard(page);
 }
 
 function marker(prefix) {

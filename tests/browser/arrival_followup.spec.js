@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLegacyDashboard } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 async function login(page, username = 'admin') {
@@ -9,7 +10,7 @@ async function login(page, username = 'admin') {
   const loaded = page.waitForResponse(r => r.url().endsWith('/api/dashboard/') && r.ok());
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 async function response(page, path, method = 'GET', data) {
   const { csrfToken } = await (await page.request.get('/api/session/')).json();
@@ -24,7 +25,7 @@ async function reload(page) {
   const loaded = page.waitForResponse(r => r.url().endsWith('/api/dashboard/') && r.ok());
   await page.reload();
   await loaded;
-  await expect(page.locator('.metric-value').first()).toContainText(/\d/);
+  await openLegacyDashboard(page);
 }
 async function navigate(page, text) {
   const nav = page.getByRole('navigation', { name: 'Navigation principale' });
