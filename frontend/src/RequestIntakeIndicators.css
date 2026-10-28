@@ -1,0 +1,16 @@
+.request-intake-indicators { margin-top: 8px; }
+.request-intake-indicator-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.request-intake-indicator-badges > span {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; line-height: 1.5; font-weight: 650;
+  padding: 4px 8px; border-radius: 6px;
+}
+.request-intake-return { background: #fff0d7; color: #813b0a; border: 1px solid #edcd9e; }
+.request-intake-coverage { background: #eaf1fd; color: #224b86; border: 1px solid #cadcf7; }
+.request-intake-coverage.is-warranty { background: #e8f7ef; color: #16603c; border-color: #b4dfc8; }
+.request-intake-indicators.is-detailed { margin: 12px 0; }
+.request-intake-prior-calls { margin-top: 10px; padding: 12px; background: #fffaf1; border: 1px solid #edcd9e; border-radius: 8px; }
+.request-intake-prior-calls summary { cursor: pointer; color: #713b16; font-weight: 650; }
+.request-intake-prior-calls ul { display: grid; gap: 10px; padding-left: 20px; margin: 12px 0 0; }
+.request-intake-prior-calls li { color: #263d5a; overflow-wrap: anywhere; }
+.request-intake-prior-calls li > span { display: block; font-size: 13px; margin-top: 3px; }

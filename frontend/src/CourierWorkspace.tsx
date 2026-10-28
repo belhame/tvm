@@ -17,6 +17,7 @@ import {
   LogOut,
   MapPin,
   PackageCheck,
+  Plus,
   RefreshCw,
   ScanLine,
   Truck,
@@ -27,6 +28,7 @@ import {
 import { api, dateFR, initials, listResult, type User } from "./api";
 import CallReference from "./CallReference";
 import CourierReception from "./CourierReception";
+import SimpleSAVIntake from "./SimpleSAVIntake";
 import { HandoffReceipt } from "./ClientPickups";
 import NotificationCenter from "./NotificationCenter";
 import CourierRouting from "./CourierRouting";
@@ -97,6 +99,7 @@ export default function CourierWorkspace({
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
   const [selectedJob, setSelectedJob] = useState<OutboundJob | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [simpleIntakeOpen, setSimpleIntakeOpen] = useState(false);
   const [busyPickup, setBusyPickup] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const mounted = useRef(true);
@@ -409,18 +412,30 @@ export default function CourierWorkspace({
                   : "Vos missions affectées, avec confirmation de chaque étape."}
             </p>
           </div>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Actualiser mon espace livreur"
-            disabled={loading || listLoading}
-            onClick={() => void refreshed()}
-          >
-            <RefreshCw
-              size={18}
-              className={loading || listLoading ? "spin" : ""}
-            />
-          </button>
+          <div className="courier-intake-heading-actions">
+            {!external && bootstrap && (
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => setSimpleIntakeOpen(true)}
+              >
+                <Plus size={17} />
+                Nouvelle demande SAV
+              </button>
+            )}
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Actualiser mon espace livreur"
+              disabled={loading || listLoading}
+              onClick={() => void refreshed()}
+            >
+              <RefreshCw
+                size={18}
+                className={loading || listLoading ? "spin" : ""}
+              />
+            </button>
+          </div>
         </div>
         {[error, ...listErrors].filter(Boolean).map((message, index) => (
           <div className="error-box" role="alert" key={index}>
@@ -629,6 +644,20 @@ export default function CourierWorkspace({
               );
               await refreshed();
             }}
+          />
+        </Dialog>
+      )}
+      {simpleIntakeOpen && !external && (
+        <Dialog
+          title="Nouvelle demande SAV"
+          subtitle="Client et numéro de série. Votre compte livreur est associé automatiquement."
+          onClose={() => setSimpleIntakeOpen(false)}
+          wide
+        >
+          <SimpleSAVIntake
+            user={bootstrap?.user || user}
+            onSaved={refreshed}
+            onClose={() => setSimpleIntakeOpen(false)}
           />
         </Dialog>
       )}

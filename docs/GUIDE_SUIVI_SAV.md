@@ -4,9 +4,34 @@
 
 Le **dossier SAV** est le point de départ du travail : retrouver ou créer la demande, l'affecter, confirmer sa prise en charge, puis enregistrer son suivi. Il porte le numéro d'appel TVM commun à toutes ses opérations. Il n'est pas nécessaire de créer d'abord une intervention pour changer son état ou ajouter une observation.
 
-Après connexion, les comptes administrateur, responsable et technicien ouvrent **Demandes SAV**, également placé en premier dans leur navigation. Dans le dossier, **Suivi** présente l'historique, du plus récent au plus ancien, à côté du formulaire de mise à jour.
+Après connexion, les comptes administrateur, responsable et technicien ouvrent le **Tableau de bord**, placé en premier dans leur navigation. **Demandes SAV** donne accès aux dossiers. Dans le dossier, **Suivi** présente l'historique, du plus récent au plus ancien, à côté du formulaire de mise à jour.
 
 Les interventions restent les fiches détaillées des opérations réalisées : maintenance, mise en service, prévention ou échange. Les ouvrir depuis le dossier lorsqu'une opération doit être renseignée et donner lieu à son propre rapport. Elles ne remplacent ni l'affectation du dossier, ni la confirmation du technicien.
+
+## Enregistrer une arrivée avec le formulaire SAV simple
+
+À l'arrivée du matériel, ouvrir une **Nouvelle demande SAV**, choisir le **Client**, puis saisir le **Numéro de série**, éventuellement avec une douchette. Un administrateur, responsable ou technicien choisit aussi le **Livreur** actif qui apporte le matériel : un livreur TVM ou un livreur rattaché à cette société cliente. Pour un livreur TVM créant la demande, son propre compte apparaît dans **Livreur enregistré** et est utilisé automatiquement. Cette indication ne désigne pas le technicien de réparation. Un livreur client ne crée pas de demande par ce parcours.
+
+Cliquer sur **Rechercher le modèle et la garantie** pour consulter la couverture et les anciens dossiers. La touche Entrée d'une douchette lance cette vérification, sans créer de demande. La recherche est facultative avant l'enregistrement : le serveur vérifie à nouveau la série et les données lors de la création.
+
+Le modèle, l'objet et la description ne bloquent plus cette saisie simple. Une description peut être ajoutée si elle est connue. Si la série n'est pas reconnue, la demande reste enregistrable avec le modèle **À identifier** : ce libellé signale l'information manquante, sans inventer une référence de produit. L'administrateur et le responsable retrouvent l'ancien formulaire complet dans **Options avancées** ; **Saisie rapide** revient au formulaire simple.
+
+Avant d'enregistrer, lire les anciens passages présentés pour cette série : numéros d'appel TVM et client, dates connues et ancien matériel ou remplacement concerné. Une ancienne date absente reste inconnue. Ces éléments permettent de reconnaître un retour sans créer un nouvel historique à la place des anciens dossiers.
+
+Le résultat de garantie oriente le dossier :
+
+| Résultat disponible | Présentation et suite |
+|---|---|
+| Garantie globale / onduleur active établie par les données disponibles | Garantie |
+| Dates de garantie enregistrées en cours, mais étendue non précisée | Garantie en cours selon ces dates, provisoire ; étendue à confirmer |
+| Garantie expirée ou absence de couverture établie | Devis / facturable |
+| Garantie indéterminée ou pas encore commencée | Devis / facturable provisoire, avec la mention Garantie à vérifier ; aucune absence de garantie affirmée |
+
+Une garantie portant seulement sur un composant ne prouve pas une couverture globale de l'onduleur ; un contrat reste une information distincte. Une estimation catalogue ou une date reconstruite restent signalées et ne remplacent pas les garanties enregistrées. Cette orientation ne crée ni facture ni devis PDF émis automatiquement. Une garantie inconnue ne crée pas non plus une période de garantie fictive.
+
+Cliquer sur **Enregistrer** pour déclarer la réception. Le serveur date l'arrivée à l'heure courante et crée une demande **Non affecté**, sans technicien ni prise en charge acceptée. Le compteur utilise cette arrivée. Si un dossier ouvert existe déjà pour le matériel, utiliser **Ouvrir la demande existante** au lieu d'en créer un second : son arrivée, son état et son suivi restent conservés. Ouvrir ce dossier n'est pas une réouverture de statut et ne remet pas son compteur à zéro.
+
+Après une création réussie, le reçu reste affiché avec le numéro TVM, l'arrivée, la couverture et l'indication de retour éventuelle. Vérifier ces informations, puis utiliser **Terminer**.
 
 ## Affecter et confirmer la prise en charge
 
@@ -120,7 +145,7 @@ Les catégories de demandes correspondent aux états suivants :
 
 ## Compter les jours depuis l'arrivée
 
-La date et l'heure d'arrivée sont une donnée du formulaire. Lors d'une nouvelle saisie, l'interface propose l'heure courante ; il faut la vérifier, la corriger ou la laisser vide si elle est inconnue. Le serveur ne remplace pas une arrivée absente par la date de création de la fiche. Pour une ancienne demande sans arrivée connue, le compteur affiche **Durée inconnue / Dates à compléter** jusqu'à ce que la donnée soit complétée.
+Le formulaire SAV simple enregistre l'arrivée à l'heure serveur lors de la création. Dans le formulaire avancé, la date et l'heure d'arrivée restent une donnée explicite : vérifier l'heure proposée, la corriger ou la laisser vide si elle est inconnue. Le serveur ne remplace pas une arrivée historique absente par la date de création de la fiche. Pour une ancienne demande sans arrivée connue, le compteur affiche **Durée inconnue / Dates à compléter** jusqu'à ce que la donnée soit complétée.
 
 La règle confirmée est **deux jours ouvrés, samedi et dimanche exclus**, soit 48 heures cumulées du lundi au vendredi dans le fuseau de l'application. Un jour affiché correspond à 24 heures ainsi cumulées. Les jours fériés et les horaires de bureau ne sont pas exclus : aucun calendrier de cette nature n'est configuré.
 

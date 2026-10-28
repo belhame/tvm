@@ -86,6 +86,7 @@ const kindLabels: Record<string, string> = {
   disposition_reset: "Décision technique rouverte",
   assignment_claimed: "Demande prise en charge",
   assignment_taken_over: "Prise de relais",
+  simple_sav_received: "Réception SAV",
   assignment_changed: "Affectation modifiée",
   assignment_accepted: "Prise en charge confirmée",
   assignment_override: "Prise en charge confirmée par l’administrateur",

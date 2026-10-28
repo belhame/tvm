@@ -12,6 +12,7 @@ from core.serial_photo_views import recognize_serial
 from core import exchange_views
 from core import disposition_views
 from core import request_assignment_views
+from core import simple_intake_views
 from core.request_tracking_views import followup_view
 
 router = DefaultRouter()
@@ -41,6 +42,9 @@ urlpatterns = [
     path('api/knowledge/', include('core.knowledge_urls')),
     path('api/diagnostics/', include('core.diagnostic_urls')),
     path('api/logistics/recognize-serial/', recognize_serial),
+    path('api/logistics/sav-intake/options/', simple_intake_views.options),
+    path('api/logistics/sav-intake/lookup/', simple_intake_views.lookup),
+    path('api/logistics/sav-intake/create/', simple_intake_views.create),
     path('api/logistics/', include('core.logistics_urls')),
     path('api/logistics/', include('core.notification_urls')),
     path('api/logistics/', include('core.outbox_urls')),

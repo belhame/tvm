@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openRequestsWorkspace } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 const marker = () => `RELAIS-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -10,7 +11,7 @@ async function login(page, username = 'admin', client = false) {
   await page.getByLabel('Mot de passe', { exact: true }).fill(password);
   await page.getByRole('button', { name: /Se connecter/i }).click();
   await expect(page.getByRole('heading', {
-    name: client ? /Tableau de bord|Mon espace/ : 'Demandes SAV', exact: !client,
+    name: client ? /Tableau de bord|Mon espace/ : 'Tableau de bord', exact: !client,
   }).first()).toBeVisible();
 }
 
@@ -47,6 +48,7 @@ async function laboratory(page) {
 }
 
 async function rowFor(page, lab) {
+  await openRequestsWorkspace(page);
   await expect(page.getByRole('heading', { name: 'Demandes SAV', exact: true })).toBeVisible();
   await page.getByLabel('Rechercher une demande', { exact: true }).fill(lab.tag);
   await page.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();

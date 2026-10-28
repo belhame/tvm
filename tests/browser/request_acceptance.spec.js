@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openRequestsWorkspace } from './legacy_navigation.js';
 
 const password = process.env.TVM_DEMO_PASSWORD;
 const marker = () => `SAV-PRISE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -9,7 +10,7 @@ async function login(page, username = 'admin', client = false) {
   await page.getByLabel('Identifiant', { exact: true }).fill(username);
   await page.getByLabel('Mot de passe', { exact: true }).fill(password);
   await page.getByRole('button', { name: /Se connecter/i }).click();
-  await expect(page.getByRole('heading', { name: client ? /Tableau de bord|Mon espace/ : 'Demandes SAV', exact: !client }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: client ? /Tableau de bord|Mon espace/ : 'Tableau de bord', exact: !client }).first()).toBeVisible();
 }
 
 async function response(page, path, method = 'GET', data) {
@@ -35,6 +36,7 @@ async function laboratory(page) {
 }
 
 async function rowFor(page, lab) {
+  await openRequestsWorkspace(page);
   await expect(page.getByRole('heading', { name: 'Demandes SAV', exact: true })).toBeVisible();
   await page.getByLabel('Rechercher une demande', { exact: true }).fill(lab.tag);
   await page.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
@@ -89,15 +91,16 @@ async function followup(page, dialog, record, { status, observation, summary = '
   return result.json();
 }
 
-test('le SAV ouvre en premier et le technicien confirme explicitement avant le suivi commenté sans intervention', async ({ page, browser }) => {
+test('le tableau de bord ouvre en premier puis le technicien confirme explicitement avant le suivi SAV commenté sans intervention', async ({ page, browser }) => {
   await login(page);
   const nav = page.getByRole('navigation', { name: 'Navigation principale', exact: true });
   const labels = await nav.getByRole('button').allTextContents();
-  expect(labels[0]).toContain('Demandes SAV');
-  expect(labels.findIndex(x => x.includes('Demandes SAV'))).toBeLessThan(labels.findIndex(x => x === 'Interventions'));
+  expect(labels[0]).toContain('Tableau de bord');
+  expect(labels.findIndex(x => x === 'Tableau de bord')).toBeLessThan(labels.findIndex(x => x.includes('Demandes SAV')));
   const lab = await laboratory(page);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Demandes SAV', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tableau de bord', exact: true })).toBeVisible();
+  await openRequestsWorkspace(page);
   const assigned = await assignViaUI(page, lab, lab.techA);
   expect(assigned).toMatchObject({ status: 'pending', assignment: { accepted: false, technician: lab.techA.id } });
 

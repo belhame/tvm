@@ -86,6 +86,7 @@ import DiagnosticAssistant from "./DiagnosticAssistant";
 import EatonCatalogue from "./EatonCatalogue";
 import CatalogueModelPicker from "./CatalogueModelPicker";
 import RequestIntake from "./RequestIntake";
+import SimpleSAVIntake from "./SimpleSAVIntake";
 import RequestsWorkspace, {
   type RequestCategoryCount,
 } from "./RequestsWorkspace";
@@ -123,8 +124,8 @@ const navGroups = [
   {
     label: "ESPACE DE TRAVAIL",
     items: [
-      { id: "requests", label: "Demandes SAV", icon: ClipboardList },
       { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+      { id: "requests", label: "Demandes SAV", icon: ClipboardList },
       { id: "interventions", label: "Interventions", icon: Wrench },
       { id: "clients", label: "Clients", icon: Users },
       { id: "equipment", label: "Équipements", icon: Zap },
@@ -214,11 +215,7 @@ function Badge({ value, label }: { value: any; label?: string }) {
   );
 }
 function homePageFor(user: User | null) {
-  return user?.role === "courier"
-    ? "courier/home"
-    : user?.role === "client"
-      ? "dashboard"
-      : "requests";
+  return user?.role === "courier" ? "courier/home" : "dashboard";
 }
 function canManage(
   user: User,
@@ -535,6 +532,9 @@ function EditForm({
     modal.record?.structured_data || {},
   );
   const [equipmentSection, setEquipmentSection] = useState("record");
+  const [intakeMode, setIntakeMode] = useState<"simple" | "advanced">("simple");
+  const [intakeBusy, setIntakeBusy] = useState(false);
+  const [intakeCompleted, setIntakeCompleted] = useState(false);
   const sourceRequest = data.requests?.find(
     (row) => row.id === Number(values.service_request),
   );
@@ -625,21 +625,69 @@ function EditForm({
     });
   }
   if (modal.resource === "requests" && !editing && !readonly) {
+    const initialEquipment = data.equipment?.find(
+      (row) => row.id === modal.values?.equipment,
+    );
+    const advancedAllowed = user.role === "admin" || user.role === "manager";
     return (
       <Modal
-        title={config.button}
-        subtitle="Retrouvez le modèle, la garantie et l’historique depuis le numéro de série."
+        title="Nouvelle demande SAV"
+        subtitle={
+          intakeMode === "advanced"
+            ? "Formulaire complet : identification, garantie, réception et dossier."
+            : "Saisie rapide : client, numéro de série et livreur."
+        }
         onClose={onClose}
         wide
       >
-        <RequestIntake
-          user={user}
-          equipment={data.equipment || []}
-          clients={data.clients || []}
-          initialEquipmentId={modal.values?.equipment}
-          onSaved={onSaved}
-          onClose={onClose}
-        />
+        {advancedAllowed && !intakeCompleted && (
+          <div
+            className="simple-sav-mode-switch"
+            role="group"
+            aria-label="Mode de saisie SAV"
+          >
+            <button
+              type="button"
+              className={intakeMode === "simple" ? "active" : ""}
+              aria-pressed={intakeMode === "simple"}
+              disabled={intakeBusy}
+              onClick={() => setIntakeMode("simple")}
+            >
+              Saisie rapide
+            </button>
+            <button
+              type="button"
+              className={intakeMode === "advanced" ? "active" : ""}
+              aria-pressed={intakeMode === "advanced"}
+              disabled={intakeBusy}
+              onClick={() => setIntakeMode("advanced")}
+            >
+              Options avancées
+            </button>
+          </div>
+        )}
+        {advancedAllowed && intakeMode === "advanced" ? (
+          <RequestIntake
+            user={user}
+            equipment={data.equipment || []}
+            clients={data.clients || []}
+            initialEquipmentId={modal.values?.equipment}
+            onSaved={onSaved}
+            onClose={onClose}
+          />
+        ) : (
+          <SimpleSAVIntake
+            user={user}
+            initialClientId={initialEquipment?.client}
+            initialSerial={initialEquipment?.serial_number}
+            onSaved={async () => {
+              setIntakeCompleted(true);
+              await onSaved();
+            }}
+            onBusyChange={setIntakeBusy}
+            onClose={onClose}
+          />
+        )}
       </Modal>
     );
   }
@@ -1799,11 +1847,22 @@ function Dashboard({
               : "Vos demandes SAV, de la réception à la clôture. Les interventions restent rattachées à leur dossier."}
           </p>
         </div>
-        <div className="today-label">
-          <CalendarDays size={17} />
-          <div>
-            <strong>Aujourd’hui</strong>
-            <small>{dateFR(new Date().toISOString())}</small>
+        <div className="sav-dashboard-heading-actions">
+          {!client && (
+            <button
+              className="button primary"
+              onClick={() => onEdit({ resource: "requests" })}
+            >
+              <Plus size={17} />
+              Nouvelle demande SAV
+            </button>
+          )}{" "}
+          <div className="today-label">
+            <CalendarDays size={17} />
+            <div>
+              <strong>Aujourd’hui</strong>
+              <small>{dateFR(new Date().toISOString())}</small>
+            </div>
           </div>
         </div>
       </div>
@@ -1996,7 +2055,7 @@ function Dashboard({
                       onClick={() => onEdit({ resource: "requests" })}
                     >
                       <Plus size={16} />
-                      Nouvelle demande
+                      Créer le premier dossier
                     </button>
                   }
                 />
@@ -3079,7 +3138,7 @@ export default function App() {
     [demo, setDemo] = useState(false),
     [sessionError, setSessionError] = useState("");
   const [page, setPage] = useState(
-      () => window.location.hash.slice(1) || "requests",
+      () => window.location.hash.slice(1) || "dashboard",
     ),
     [mobileMenu, setMobileMenu] = useState(false),
     [data, setData] = useState<DataMap>({}),

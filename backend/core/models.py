@@ -197,6 +197,7 @@ class ServiceRequest(ReferencedModel):
     service_location = models.CharField(max_length=20, choices=ServiceLocation.choices, default='', blank=True)
     delivered_by = models.CharField(max_length=20, choices=DeliveredBy.choices, default='', blank=True)
     courier_name = models.CharField(max_length=150, blank=True)
+    arrival_courier = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='received_sav_requests', editable=False)
     accessories = models.TextField(blank=True)
     warranty_status = models.CharField(max_length=20, choices=WarrantyStatus.choices, default=WarrantyStatus.UNSPECIFIED)
     contact_name = models.CharField(max_length=150, blank=True)

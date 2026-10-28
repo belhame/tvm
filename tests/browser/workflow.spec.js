@@ -57,7 +57,8 @@ test('les formulaires réalisent le parcours SAV complet', async ({ page }) => {
   await page.getByLabel('Puissance (kVA)', { exact: true }).fill('100');
   await save();
   await navigate('Demandes SAV');
-  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Nouvelle demande SAV', exact: true }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Options avancées', exact: true }).click();
   const equipmentSelect = page.getByLabel(/Équipement concerné/);
   const equipmentValue = await equipmentSelect.getByRole('option').filter({ hasText: marker }).getAttribute('value');
   await equipmentSelect.selectOption(equipmentValue);
@@ -326,7 +327,8 @@ test('nouvelle demande depuis une série : modèle court, garantie plus six mois
   }
   expect(await api(page, `equipment/?serial=${serial}`)).toEqual([]);
   await navigation.getByText('Demandes SAV', { exact: true }).click();
-  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Nouvelle demande SAV', exact: true }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Options avancées', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/^Numéro de série/).fill(serial);
   const lookupResponse = page.waitForResponse(response => response.url().endsWith('/api/serial-lookup/') && response.request().method() === 'POST');
@@ -369,7 +371,8 @@ test('modifier une série efface les anciennes propositions et annuler ne crée 
   await login(page);
   await page.getByRole('button', { name: 'Ouvrir le menu', exact: true }).click();
   await page.getByRole('navigation', { name: 'Navigation principale' }).getByText('Demandes SAV', { exact: true }).click();
-  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Nouvelle demande SAV', exact: true }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Options avancées', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel(/^Numéro de série/).fill('GAB2A49999');
   await dialog.getByRole('button', { name: 'Rechercher le modèle et la garantie', exact: true }).click();

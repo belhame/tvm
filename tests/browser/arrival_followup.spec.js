@@ -48,7 +48,8 @@ test('la réception enregistre la vraie arrivée et les informations de suivi da
   const equipment = await api(page, 'equipment/', 'POST', { client: client.id, serial_number: marker, model: 'Onduleur de réception fictif' });
   await reload(page);
   await navigate(page, 'Demandes SAV');
-  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).click();
+  await page.getByRole('button', { name: 'Nouvelle demande SAV', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Options avancées', exact: true }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: /^Équipement concerné/ }).selectOption(String(equipment.id));
   await dialog.getByRole('textbox', { name: /^Objet du signalement/ }).fill(marker);

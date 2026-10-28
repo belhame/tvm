@@ -24,6 +24,17 @@ function cookieCsrf() {
       .join("=") || csrfToken
   );
 }
+export class ApiError extends Error {
+  readonly status: number;
+  readonly payload: unknown;
+  constructor(message: string, status: number, payload: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 export async function api<T = any>(
   path: string,
   options: RequestInit = {},
@@ -64,8 +75,10 @@ export async function api<T = any>(
                 )
                 .join(" · ")
             : String(value || "");
-    throw new Error(
+    throw new ApiError(
       flatten(body) || `La requête a échoué (${response.status}).`,
+      response.status,
+      body,
     );
   }
   return body as T;

@@ -1,0 +1,415 @@
+.simple-sav-lookup {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+  color: #233e63;
+  font-size: 13px;
+}
+.simple-sav-lookup > *,
+.simple-sav-lookup dd,
+.simple-sav-lookup p,
+.simple-sav-lookup strong,
+.simple-sav-lookup h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.simple-sav-lookup h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1e385e;
+}
+.simple-sav-lookup p {
+  line-height: 1.7;
+}
+.simple-sav-coverage {
+  padding: 20px;
+  border: 1px solid #c9dbf7;
+  border-radius: 13px;
+  background: #f0f6ff;
+}
+.simple-sav-coverage-active {
+  background: #eef9f3;
+  border-color: #c4e4d2;
+}
+.simple-sav-coverage-expired,
+.simple-sav-coverage-no_coverage {
+  background: #fff7e9;
+  border-color: #eddbbb;
+}
+.simple-sav-coverage-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.simple-sav-coverage-heading > div {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.simple-sav-lookup-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  color: #1b57bd;
+  background: #e0ecff;
+}
+.simple-sav-coverage-active .simple-sav-lookup-icon {
+  color: #176b45;
+  background: #d8efdf;
+}
+.simple-sav-coverage-expired .simple-sav-lookup-icon,
+.simple-sav-coverage-no_coverage .simple-sav-lookup-icon {
+  color: #80511b;
+  background: #f8e7c7;
+}
+.simple-sav-section-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #486385;
+}
+.simple-sav-provisional-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #755014;
+  background: #ffedc5;
+  border: 1px solid #ead09e;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.simple-sav-coverage-detail {
+  margin: 14px 0 0;
+}
+.simple-sav-coverage-detail p {
+  margin: 9px 0 0;
+  font-size: 12px;
+  color: #405c7f;
+}
+.simple-sav-financial-orientation {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #745014;
+}
+.simple-sav-financial-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.simple-sav-financial-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.simple-sav-return-alert {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  background: #fff0eb;
+  border: 2px solid #e9ae94;
+  border-radius: 12px;
+  color: #8c3519;
+}
+.simple-sav-return-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 11px;
+  background: #f9d8c9;
+  color: #9c3c1c;
+  flex-shrink: 0;
+}
+.simple-sav-return-alert strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #8b3217;
+}
+.simple-sav-return-alert p {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: #81442c;
+}
+.simple-sav-identity {
+  border: 1px solid #dce6f4;
+  background: #fff;
+  border-radius: 12px;
+  padding: 19px 20px;
+}
+.simple-sav-identity-heading {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  margin-bottom: 17px;
+}
+.simple-sav-identity-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #526986;
+}
+.simple-sav-identity-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 20px;
+  margin: 0;
+}
+.simple-sav-lookup dt {
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: #536986;
+  line-height: 1.6;
+}
+.simple-sav-lookup dd {
+  margin: 0;
+  font-size: 13px;
+  color: #294463;
+  line-height: 1.6;
+}
+.simple-sav-serial {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+}
+.simple-sav-model-note,
+.simple-sav-no-return,
+.simple-sav-history-truncated {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #506987;
+}
+.simple-sav-model-note {
+  margin: 15px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid #e5ecf6;
+}
+.simple-sav-model-note svg,
+.simple-sav-no-return svg,
+.simple-sav-history-truncated svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.simple-sav-no-return {
+  margin: 0;
+  padding: 0 3px;
+}
+.simple-sav-no-return svg {
+  color: #23714f;
+}
+.simple-sav-existing-request {
+  padding: 18px 20px;
+  background: #eef5ff;
+  border: 1px solid #bdd3f4;
+  border-radius: 12px;
+}
+.simple-sav-existing-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #1e56b5;
+}
+.simple-sav-existing-heading h3 {
+  font-size: 15px;
+}
+.simple-sav-existing-heading svg {
+  flex-shrink: 0;
+}
+.simple-sav-existing-request > p {
+  color: #415f88;
+  font-size: 13px;
+  margin: 9px 0 14px;
+}
+.simple-sav-reference-block {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px 14px;
+  align-items: baseline;
+  margin-bottom: 17px;
+}
+.simple-sav-reference-block > span {
+  font-size: 12px;
+  color: #526987;
+}
+.simple-sav-reference-block > strong {
+  color: #214e94;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.simple-sav-existing-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 18px;
+  margin: 0 0 17px;
+}
+.simple-sav-existing-request > .button {
+  font-size: 13px;
+}
+.simple-sav-history {
+  min-width: 0;
+}
+.simple-sav-history-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #345982;
+  margin-bottom: 12px;
+}
+.simple-sav-history-heading h3 {
+  font-size: 15px;
+}
+.simple-sav-history-heading > span {
+  margin-left: auto;
+  font-size: 12px;
+  color: #536986;
+}
+.simple-sav-history-list {
+  display: grid;
+  gap: 11px;
+}
+.simple-sav-history-card {
+  min-width: 0;
+  border: 1px solid #e0e7f1;
+  border-radius: 11px;
+  background: #fff;
+  padding: 16px 18px;
+}
+.simple-sav-history-card-heading {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.simple-sav-history-card-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.simple-sav-history-card-heading > div > span,
+.simple-sav-history-client-reference > span {
+  font-size: 12px;
+  color: #536986;
+  line-height: 1.6;
+}
+.simple-sav-history-card-heading strong {
+  color: #254b87;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.simple-sav-relation {
+  max-width: 50%;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #4d5d78;
+  background: #edf1f8;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.simple-sav-history-client-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+.simple-sav-history-client-reference > strong {
+  font-size: 13px;
+  color: #304d73;
+  line-height: 1.6;
+}
+.simple-sav-history-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+.simple-sav-history-card dl > div:last-child {
+  grid-column: 1 / -1;
+}
+.simple-sav-history-card .text-button {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #2055b0;
+  white-space: normal;
+  text-align: left;
+}
+.simple-sav-history-truncated {
+  margin: 12px 0 0;
+}
+.simple-sav-lookup-warnings {
+  padding: 15px 17px;
+  background: #fff7e8;
+  border: 1px solid #eedebc;
+  border-radius: 10px;
+  color: #73531d;
+}
+.simple-sav-lookup-warnings > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.simple-sav-lookup-warnings svg {
+  flex-shrink: 0;
+}
+.simple-sav-lookup-warnings ul {
+  padding-left: 22px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.simple-sav-lookup-warnings li {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .simple-sav-coverage,
+  .simple-sav-identity,
+  .simple-sav-existing-request {
+    padding: 16px;
+  }
+  .simple-sav-return-alert {
+    padding: 16px;
+    gap: 10px;
+  }
+  .simple-sav-return-icon {
+    width: 35px;
+    height: 35px;
+    border-radius: 9px;
+  }
+  .simple-sav-return-alert strong {
+    font-size: 14px;
+  }
+  .simple-sav-history-card {
+    padding: 15px;
+  }
+  .simple-sav-identity-facts,
+  .simple-sav-existing-facts,
+  .simple-sav-history-card dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .simple-sav-history-card dl > div:last-child {
+    grid-column: auto;
+  }
+  .simple-sav-history-card-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .simple-sav-relation {
+    max-width: 100%;
+  }
+  .simple-sav-reference-block {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .simple-sav-reference-block > strong {
+    margin-bottom: 6px;
+  }
+}

@@ -37,7 +37,7 @@ class CourierAPIAccessMiddleware:
     The force-auth attribute is Django REST Framework's in-process test helper,
     never an HTTP header or a user-controlled value in a real request.
     """
-    allowed = re.compile(r'^/api/(?:session|login|logout|health)/$|^/api/logistics/(?:bootstrap|clients|lookup|receive|recognize-serial|pickups|outbound|dispatch-candidates)/$|^/api/logistics/pickups/[0-9]+/(?:assign/|collect/|cancel/)?$|^/api/logistics/outbound/[0-9]+/(?:assign/|handoff/|cancel/)?$|^/api/logistics/notifications/(?:preferences/|[0-9]+/read/)?$')
+    allowed = re.compile(r'^/api/(?:session|login|logout|health)/$|^/api/logistics/(?:bootstrap|clients|lookup|receive|recognize-serial|pickups|outbound|dispatch-candidates)/$|^/api/logistics/sav-intake/(?:options|lookup|create)/$|^/api/logistics/pickups/[0-9]+/(?:assign/|collect/|cancel/)?$|^/api/logistics/outbound/[0-9]+/(?:assign/|handoff/|cancel/)?$|^/api/logistics/notifications/(?:preferences/|[0-9]+/read/)?$')
     def __init__(self, get_response):
         self.get_response = get_response
     def __call__(self, request):

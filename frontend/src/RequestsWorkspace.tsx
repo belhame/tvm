@@ -12,6 +12,7 @@ import { requestCategories, requestStatusLabels, statuses } from "./resources";
 import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import { callIdentity, callPrimary } from "./CallReference";
 import RequestAssignment from "./RequestAssignment";
+import RequestIntakeIndicators from "./RequestIntakeIndicators";
 
 export type RequestCategoryCount = {
   key: string;
@@ -138,7 +139,7 @@ export default function RequestsWorkspace({
         {user.role !== "client" && (
           <button type="button" className="button primary" onClick={onCreate}>
             <Plus size={18} />
-            Nouvelle demande
+            Nouvelle demande SAV
           </button>
         )}
       </div>
@@ -259,6 +260,7 @@ export default function RequestsWorkspace({
                       <div className="primary-cell">
                         <span>{callPrimary(row, user.role)}</span>
                         <small>{row.subject}</small>
+                        <RequestIntakeIndicators record={row} />
                       </div>
                     </td>
                     <td className="request-client-reference">

@@ -582,7 +582,8 @@ def guard_courier_identity_update(instance, update_fields=None):
     referenced = Client.objects.filter(Q(default_courier_id=instance.pk) | Q(internal_courier_id=instance.pk)).exists()
     history = (OutboundJob.objects.filter(Q(assigned_courier_id=instance.pk) | Q(handed_over_by_id=instance.pk)).exists()
                or PickupRequest.objects.filter(Q(assigned_courier_id=instance.pk) | Q(collected_by_id=instance.pk)).exists()
-               or CourierReceipt.objects.filter(actor_id=instance.pk).exists())
+               or CourierReceipt.objects.filter(actor_id=instance.pk).exists()
+               or ServiceRequest.objects.filter(arrival_courier_id=instance.pk).exists())
     if referenced or (previous['role'] == 'courier' and history):
         raise ValidationError({'courier_kind': 'Ce livreur est lié à des référents clients ou à des missions conservées. Retirez les référents ; pour changer son type ou sa société après une mission, désactivez ce compte et créez-en un nouveau.'})
 

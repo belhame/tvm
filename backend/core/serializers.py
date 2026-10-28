@@ -102,14 +102,15 @@ class ServiceRequestSerializer(LegacySerializer):
     preventive_remaining_visit_count = serializers.SerializerMethodField()
     class Meta:
         model = ServiceRequest
-        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
-        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision']
+        fields = ['id', 'reference', 'call_number', 'equipment', 'equipment_serial', 'client_name', 'subject', 'description', 'priority', 'status', 'assigned_technician', 'assigned_technician_name', 'assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier', 'due_on', 'planned_visit_count', 'preventive_completed_visit_count', 'preventive_total_visit_count', 'preventive_remaining_visit_count', 'category', 'is_overdue', 'is_due_overdue', 'timing', 'closed_at', 'created_at', 'updated_at', 'legacy_id', 'intake_key', 'intake_data', 'exchange', 'disposition', 'dispatch_kind', *FOLLOWUP_FIELD_NAMES]
+        read_only_fields = ['reference', 'created_at', 'intake_key', 'intake_data', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision', 'arrival_courier']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.is_authenticated and user.effective_role == 'client':
             fields.pop('intake_key', None)
             fields.pop('intake_data', None)
+            fields.pop('arrival_courier', None)
             for key in ('assignment', 'assignment_revision', 'assigned_at', 'assignment_accepted_at', 'assignment_accepted_by', 'assignment_accepted_revision'):
                 fields.pop(key, None)
         return fields

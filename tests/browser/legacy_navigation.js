@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
-// Existing scenarios explicitly exercise the dashboard. The request-acceptance
-// suite owns assertions about the new default SAV landing page.
+// Scenarios navigate explicitly to the workspace they exercise. The quick
+// intake suite also verifies the actual default dashboard landing page.
 export async function openLegacyDashboard(page) {
   const metric = page.locator('.metric-value').first();
   if (await metric.isVisible()) {
@@ -19,6 +19,19 @@ export async function openLegacyDashboard(page) {
   }
   await navigation.getByRole('button', { name: 'Tableau de bord', exact: true }).click();
   await expect(metric).toContainText(/\d/);
+}
+
+export async function openRequestsWorkspace(page) {
+  const heading = page.getByRole('heading', { name: 'Demandes SAV', exact: true });
+  if (await heading.isVisible()) return;
+  const navigation = page.getByRole('navigation', { name: 'Navigation principale', exact: true });
+  await expect(navigation).toBeAttached();
+  const openMenu = page.getByRole('button', { name: 'Ouvrir le menu', exact: true });
+  if (await openMenu.isVisible() && !await page.locator('.sidebar.open').count()) {
+    await openMenu.click();
+  }
+  await navigation.getByRole('button', { name: 'Demandes SAV', exact: true }).click();
+  await expect(heading).toBeVisible();
 }
 
 export async function confirmCurrentAssignment(page, requestId) {

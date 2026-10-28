@@ -12,6 +12,7 @@ import { ExchangePanel } from "./ExchangeWorkspace";
 import DispositionPanel, { type DispositionAction } from "./DispositionPanel";
 import RequestAssignment from "./RequestAssignment";
 import RequestFollowup from "./RequestFollowup";
+import RequestIntakeIndicators from "./RequestIntakeIndicators";
 import { canWriteRequest } from "./requestAccess";
 import "./SAVFollowup.css";
 
@@ -281,6 +282,7 @@ export default function RequestDossier({
             Échéance : {day(record.due_on)}
           </span>
         </div>
+        <RequestIntakeIndicators record={record} detailed />
         <RequestTimer timing={record.timing} />
         <RequestAssignment
           record={record}

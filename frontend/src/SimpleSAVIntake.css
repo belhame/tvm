@@ -1,0 +1,356 @@
+.simple-sav-intake {
+  color: #233e63;
+  min-width: 0;
+}
+.simple-sav-mode-switch {
+  display: flex;
+  gap: 7px;
+  padding: 17px 25px;
+  border-bottom: 1px solid #e2eaf5;
+  background: #f7faff;
+}
+.simple-sav-mode-switch > button {
+  border: 1px solid #d7e2f2;
+  border-radius: 8px;
+  background: #fff;
+  color: #3f597b;
+  padding: 9px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.simple-sav-mode-switch > button.active {
+  background: #e9f1ff;
+  border-color: #9cbef8;
+  color: #174dab;
+}
+.simple-sav-intro {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 24px 25px 0;
+}
+.simple-sav-intro > span {
+  width: 47px;
+  height: 47px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #1e58bf;
+  background: #e9f1ff;
+  flex-shrink: 0;
+}
+.simple-sav-intro h2 {
+  margin: 0;
+  color: #233d61;
+  font-size: 18px;
+  line-height: 1.4;
+}
+.simple-sav-intro p {
+  margin: 6px 0 0;
+  color: #4e6685;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.simple-sav-layout {
+  padding: 23px 25px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+.simple-sav-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+.simple-sav-fields .field {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  min-width: 0;
+}
+.simple-sav-fields label {
+  color: #273f61;
+  font-size: 13px;
+  font-weight: 650;
+}
+.simple-sav-fields .input {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+}
+.simple-sav-fields small {
+  color: #536b89;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.simple-sav-fields .simple-sav-serial {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+}
+.simple-sav-lookup-button {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+}
+.simple-sav-actor-courier {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #dce6f5;
+  border-radius: 10px;
+  background: #f3f7fd;
+}
+.simple-sav-actor-courier > svg {
+  color: #2f5c9c;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.simple-sav-actor-courier > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.simple-sav-actor-courier span {
+  color: #526b8a;
+  font-size: 12px;
+}
+.simple-sav-actor-courier strong {
+  font-size: 14px;
+  color: #263f63;
+  overflow-wrap: anywhere;
+}
+.simple-sav-optional {
+  border-top: 1px solid #e2eaf5;
+  margin-top: 2px;
+  padding-top: 18px;
+  display: grid;
+  gap: 16px;
+}
+.simple-sav-optional h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #4c6483;
+}
+.simple-sav-results {
+  min-width: 0;
+}
+.simple-sav-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  min-height: 270px;
+  padding: 25px;
+  border: 1px dashed #c9d8ed;
+  background: #f6f9fe;
+  border-radius: 13px;
+  color: #4b6383;
+}
+.simple-sav-placeholder > svg {
+  color: #2b60b9;
+  margin-bottom: 17px;
+}
+.simple-sav-placeholder h3 {
+  margin: 0;
+  color: #2b4568;
+  font-size: 16px;
+}
+.simple-sav-placeholder p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 11px 0;
+}
+.simple-sav-placeholder small {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #536b89;
+}
+.simple-sav-server-note {
+  display: flex;
+  gap: 10px;
+  margin: 0 25px 22px;
+  padding: 14px 16px;
+  border: 1px solid #dce7f8;
+  border-radius: 10px;
+  background: #f0f6ff;
+  color: #3a587f;
+}
+.simple-sav-server-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.simple-sav-server-note p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.simple-sav-intake > .error-box,
+.simple-sav-intake > .simple-sav-warning {
+  margin: 20px 25px;
+}
+.simple-sav-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  color: #4b6382;
+  padding: 22px;
+  font-size: 13px;
+}
+.simple-sav-warning {
+  padding: 15px;
+  background: #fff5e4;
+  border: 1px solid #ecd3a7;
+  border-radius: 9px;
+  color: #755216;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.simple-sav-warning p {
+  margin: 7px 0;
+}
+.simple-sav-receipt {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 22px;
+  margin: 24px 25px 18px;
+  color: #1b6747;
+  border: 1px solid #c9e6d5;
+  border-radius: 13px;
+  background: #eef9f2;
+}
+.simple-sav-receipt > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.simple-sav-receipt h2 {
+  margin: 0 0 8px;
+  color: #205d43;
+  font-size: 19px;
+}
+.simple-sav-receipt strong {
+  font-size: 16px;
+  color: #244c3d;
+}
+.simple-sav-receipt p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.simple-sav-receipt:focus {
+  outline: 2px solid #235ebe;
+  outline-offset: 3px;
+}
+.simple-sav-receipt-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0;
+  margin: 22px 25px;
+}
+.simple-sav-receipt-facts dt {
+  color: #516987;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.simple-sav-receipt-facts dd {
+  color: #2d4568;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.simple-sav-intake > .simple-sav-lookup {
+  margin: 22px 25px;
+}
+.sav-dashboard-heading-actions,
+.courier-intake-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.courier-intake-heading-actions > .button {
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 790px) {
+  .simple-sav-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .simple-sav-placeholder {
+    min-height: 180px;
+  }
+}
+@media (max-width: 540px) {
+  .simple-sav-mode-switch {
+    padding: 14px 17px;
+  }
+  .simple-sav-mode-switch > button {
+    flex: 1;
+    text-align: center;
+  }
+  .simple-sav-intro {
+    padding: 20px 17px 0;
+    align-items: flex-start;
+  }
+  .simple-sav-intro h2 {
+    font-size: 16px;
+  }
+  .simple-sav-intro > span {
+    width: 40px;
+    height: 40px;
+  }
+  .simple-sav-layout {
+    padding: 20px 17px;
+    gap: 19px;
+  }
+  .simple-sav-server-note {
+    margin: 0 17px 20px;
+    padding: 12px;
+  }
+  .simple-sav-intake > .error-box,
+  .simple-sav-intake > .simple-sav-warning {
+    margin: 17px;
+  }
+  .simple-sav-receipt {
+    margin: 20px 17px;
+    padding: 16px;
+  }
+  .simple-sav-receipt h2 {
+    font-size: 17px;
+  }
+  .simple-sav-receipt-facts {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 20px 17px;
+  }
+  .simple-sav-intake > .simple-sav-lookup {
+    margin: 20px 17px;
+  }
+  .sav-dashboard-heading-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .courier-intake-heading-actions {
+    justify-content: flex-start;
+  }
+  .courier-page-heading {
+    flex-wrap: wrap;
+  }
+  .courier-intake-heading-actions > .button {
+    flex: 1;
+  }
+}

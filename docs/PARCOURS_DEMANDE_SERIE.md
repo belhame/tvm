@@ -2,9 +2,9 @@
 
 ## Principe
 
-Dans **Nouvelle demande SAV**, saisir le numéro de série permet de rechercher d'abord l'équipement déjà enregistré dans TVM, puis les références du catalogue Eaton importé dans l'instance. L'utilisateur peut ainsi retrouver ou préciser le modèle et les informations de garantie avant d'enregistrer la demande.
+Le formulaire SAV simple est le parcours courant d'arrivée : client, numéro de série et livreur d'arrivée. Un employé choisit un livreur TVM ou un livreur actif de la société sélectionnée ; un livreur TVM créateur est enregistré lui-même. Il affiche les anciens passages et l'orientation de garantie. Une série inconnue n'oblige pas à inventer un modèle : **À identifier** reste explicite, et objet/description ne sont pas exigés. À la création, l'arrivée vient du serveur et la demande reste **Non affecté**. Un dossier déjà ouvert est proposé à la consultation, sans remise à zéro de son arrivée ou de son historique. Voir [la procédure simple et les résultats de garantie](GUIDE_SUIVI_SAV.md#enregistrer-une-arrivée-avec-le-formulaire-sav-simple).
 
-La recherche ne crée rien. Le bouton **Enregistrer** valide le dossier côté serveur. Pour un nouvel équipement, un administrateur ou responsable SAV peut créer l'équipement, la demande et, si les données nécessaires sont disponibles, la garantie dans une même transaction PostgreSQL. Un technicien crée une demande pour un équipement existant ; il ne crée pas de fiche équipement par ce parcours. Le portail client n'a pas accès à cette recherche interne.
+L'administrateur et le responsable disposent des boutons **Saisie rapide** et **Options avancées**. Ce dernier conserve l'ancien formulaire pour retrouver ou préciser un modèle, sélectionner les références du catalogue et compléter les données manuelles justifiées. Les sections ci-dessous décrivent ce **formulaire avancé**, dont les droits et exigences restent distincts du formulaire simple. Sa recherche ne crée rien. Le bouton **Enregistrer** valide le dossier côté serveur. Pour un nouvel équipement, un administrateur ou responsable SAV peut créer l'équipement, la demande et, si les données nécessaires sont disponibles, la garantie dans une même transaction PostgreSQL. Le portail client n'a pas accès à cette recherche interne.
 
 ## Règle TVM confirmée pour le début de garantie
 
@@ -14,9 +14,9 @@ Cette règle a été confirmée par l'utilisateur. Elle ne signifie pas « fabri
 
 L'écran indique explicitement la base du calcul : **règle TVM, fabrication + 6 mois**. La durée de garantie est une donnée distincte, provenant d'une référence choisie ou d'une saisie manuelle justifiée. Le résultat n'est pas une vérification en direct auprès d'Eaton, ni une décision automatique de prise en charge.
 
-## Utiliser le parcours
+## Utiliser le parcours avancé
 
-1. Ouvrir une nouvelle demande SAV. Choisir un **Équipement concerné** déjà enregistré, ou saisir son **Numéro de série**.
+1. Dans **Nouvelle demande SAV**, choisir **Options avancées**. Choisir un **Équipement concerné** déjà enregistré, ou saisir son **Numéro de série**.
 2. Cliquer sur **Rechercher le modèle et la garantie**. Vérifier si le résultat provient de la base TVM ou du catalogue de l'instance.
 3. Si l'équipement existe, conserver sa fiche et ses informations enregistrées. Si le catalogue présente plusieurs produits ou références de garantie, faire un choix explicite ; l'application ne prend pas arbitrairement la première ligne.
 4. Pour un nouvel équipement, sélectionner le client et vérifier le modèle, la précision de la date de fabrication et la durée retenue. Un administrateur ou responsable peut compléter les données manuellement avec une raison explicite si la recherche ne suffit pas.
