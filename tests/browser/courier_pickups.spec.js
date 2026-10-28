@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openLegacyDashboard } from './legacy_navigation.js';
+import { acceptCurrentOutboundMission, openLegacyDashboard } from './legacy_navigation.js';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
@@ -451,8 +451,10 @@ test('les transports affectés livrent le remplacement validé ou retournent l�
     const completed = [];
     for (const [index, job] of jobs.entries()) {
       await courierNavigate(courier, index === 0 ? 'Prêts' : 'Retours');
+      if (index === 0) await courier.getByRole('button', { name: 'Mes livraisons', exact: true }).click();
       const card = courier.locator('.courier-job-card').filter({ hasText: job.serial_number });
       await expect(card).toHaveCount(1);
+      await acceptCurrentOutboundMission(courier, card, job);
       await expect(card).toContainText('61 voie du laboratoire de remise fictif, Cotonou');
       await expectCourierContrast(courier, index === 0 ? 'Livraison livreur mobile' : 'Retour livreur mobile');
       expect(await courier.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)).toBe(false);

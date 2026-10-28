@@ -16,6 +16,7 @@ export type LogisticsBootstrap = {
     can_receive: boolean;
     can_lookup: boolean;
     can_pickups: boolean;
+    can_ready_queue?: boolean;
   };
 };
 export type Pickup = {
@@ -63,6 +64,10 @@ export type OutboundJob = {
   assigned_courier_name: string;
   can_handoff: boolean;
   can_assign: boolean;
+  accepted?: boolean;
+  accepted_at?: string | null;
+  accepted_revision?: number | null;
+  can_accept?: boolean;
   delivery_address?: string;
   contact_name?: string;
   contact_phone?: string;
@@ -149,4 +154,32 @@ export function logisticsReference(
   client_reference: string,
 ) {
   return { call_number, client_reference };
+}
+
+export type ReadyQueueItem = {
+  id: number;
+  job: number | null;
+  expected_revision: number;
+  client: LogisticsClient;
+  call_number: string;
+  client_reference: string;
+  equipment: number;
+  serial_number: string;
+  brand: string;
+  model: string;
+  routing_status: "available" | "reserved";
+  assigned_courier: number | null;
+  assigned_courier_name: string;
+  can_claim: boolean;
+  accepted?: boolean;
+  accepted_at?: string | null;
+  accepted_revision?: number | null;
+  assignment_revision?: number;
+};
+export function isCurrentMissionAccepted(job: OutboundJob) {
+  return (
+    job.accepted === true &&
+    typeof job.assignment_revision === "number" &&
+    job.accepted_revision === job.assignment_revision
+  );
 }

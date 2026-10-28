@@ -49,6 +49,11 @@ def _private(data):
 
 def _inbox(user):
     queryset = InAppNotification.objects.filter(recipient=user)
+    from .ready_notifications import ASSIGNMENT_EVENT, READY_EVENT, assignment_audience, ready_audience
+    if not ready_audience(user):
+        queryset = queryset.exclude(kind=InAppNotification.Kind.LOGISTICS, payload__event=READY_EVENT)
+    if not assignment_audience(user):
+        queryset = queryset.exclude(kind=InAppNotification.Kind.LOGISTICS, payload__event=ASSIGNMENT_EVENT)
     if user.effective_role == 'client':
         queryset = queryset.exclude(kind=InAppNotification.Kind.DAILY).filter(
             Q(service_request__equipment__client_id=user.client_id) |

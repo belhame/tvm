@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openLegacyDashboard } from './legacy_navigation.js';
+import { acceptCurrentOutboundMission, openLegacyDashboard } from './legacy_navigation.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -180,6 +180,7 @@ test('le livreur client est rattaché à sa société, reçoit ses missions auto
     await courierNavigate(driver, 'Prêts');
     await expect(driver.locator('.courier-job-card')).toHaveCount(1);
     await expect(driver.locator('.courier-job-card')).toContainText(data.unit.serial_number);
+    await acceptCurrentOutboundMission(driver, driver.locator('.courier-job-card'), job);
     await expect(driver.locator('.courier-app')).not.toContainText(foreignData.unit.serial_number);
     expect(await driver.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)).toBe(false);
     await driver.getByRole('button', { name: `Confirmer la remise ${job.call_number}`, exact: true }).click();

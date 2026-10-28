@@ -470,17 +470,33 @@ class PortalDeliveryLineSerializer(serializers.ModelSerializer):
 class DeliveryNoteSerializer(LegacySerializer):
     client_name = serializers.CharField(source='client.name', read_only=True)
     lines = DeliveryLineSerializer(many=True, required=False)
+    logistics_status = serializers.SerializerMethodField()
+    logistics_can_cancel = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
     class Meta:
         model = DeliveryNote
-        fields = ['id', 'reference', 'client', 'client_name', 'intervention', 'delivered_at', 'status', 'notes', 'lines', 'legacy_id']
+        fields = ['id', 'reference', 'client', 'client_name', 'intervention', 'delivered_at', 'status', 'notes', 'lines', 'legacy_id', 'logistics_status', 'logistics_can_cancel', 'pdf_url']
         read_only_fields = ['reference']
     def get_fields(self):
         fields = super().get_fields()
         user = getattr(self.context.get('request'), 'user', None)
         if user and user.is_authenticated and user.effective_role == 'client':
             fields['lines'] = PortalDeliveryLineSerializer(many=True, read_only=True)
+            fields.pop('logistics_status', None)
+            fields.pop('logistics_can_cancel', None)
+            fields.pop('pdf_url', None)
         return fields
+    def get_logistics_status(self, obj):
+        prepared = getattr(obj, 'logistics_snapshot', None)
+        return prepared.state if prepared else None
+    def get_pdf_url(self, obj):
+        return f'/api/logistics/delivery-notes/{obj.pk}/pdf/' if getattr(obj, 'logistics_snapshot', None) else None
+    def get_logistics_can_cancel(self, obj):
+        prepared = getattr(obj, 'logistics_snapshot', None)
+        return bool(prepared and prepared.state == 'prepared' and not any(link.job.handed_over_at for link in prepared.missions.all()))
     def validate(self, attrs):
+        if self.instance and getattr(self.instance, 'logistics_snapshot', None):
+            raise serializers.ValidationError('Le PDF et les lignes de ce bon préparé sont figés. Utilisez son action d’annulation logistique pour le remplacer.')
         intervention = attrs.get('intervention', getattr(self.instance, 'intervention', None))
         client = attrs.get('client', getattr(self.instance, 'client', None))
         if intervention and client and intervention.service_request.equipment.client_id != client.pk:

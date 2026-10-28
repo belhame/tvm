@@ -110,6 +110,12 @@ class OutboundAssignmentInput(AssignmentInput):
     delivery_address = StrictText(max_length=4000, allow_blank=True, required=False)
     contact_name = StrictText(max_length=150, allow_blank=True, required=False)
     contact_phone = StrictText(max_length=40, allow_blank=True, required=False)
+    expected_revision = serializers.IntegerField(min_value=0, max_value=2147483647, required=False)
+
+    def validate_expected_revision(self, value):
+        if type(self.initial_data.get('expected_revision')) is not int:
+            raise serializers.ValidationError('Un entier JSON est requis.')
+        return value
 
 
 class ReasonInput(StrictInput):
@@ -118,6 +124,12 @@ class ReasonInput(StrictInput):
 
 class HandoffInput(StrictInput):
     recipient_name = StrictText(max_length=150)
+    expected_revision = serializers.IntegerField(min_value=0, max_value=2147483647, required=False)
+
+    def validate_expected_revision(self, value):
+        if type(self.initial_data.get('expected_revision')) is not int:
+            raise serializers.ValidationError('Un entier JSON est requis.')
+        return value
 
 
 class ReconcileInput(StrictInput):

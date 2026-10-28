@@ -1,5 +1,5 @@
 """Courier missions and observed handoffs, distinct from SAV and invoicing."""
-from django.db import models
+from django.db import models, transaction
 
 
 class PickupRequest(models.Model):
@@ -76,6 +76,9 @@ class OutboundJob(models.Model):
     assignment_mode = models.CharField(max_length=12, choices=[('manual', 'Manuelle'), ('automatic', 'Automatique')], default='manual')
     routing_source = models.CharField(max_length=24, choices=[('manual', 'Manuelle'), ('default_courier', 'Livreur client par défaut'), ('internal_courier', 'Référent TVM')], default='manual')
     assignment_revision = models.PositiveIntegerField(default=1)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey('core.User', null=True, blank=True, on_delete=models.PROTECT, related_name='accepted_outbound_jobs')
+    accepted_revision = models.PositiveIntegerField(null=True, blank=True)
     delivery_address = models.TextField(blank=True)
     contact_name = models.CharField(max_length=150, blank=True)
     contact_phone = models.CharField(max_length=40, blank=True)
@@ -98,4 +101,19 @@ class OutboundJob(models.Model):
             models.UniqueConstraint(fields=['delivery_equipment'], condition=models.Q(active=True), name='outbound_active_unit_unique'),
             models.CheckConstraint(condition=models.Q(handed_over_at__isnull=True, handed_over_by__isnull=True, recipient_name='') | (models.Q(handed_over_at__isnull=False, handed_over_by__isnull=False) & ~models.Q(recipient_name='')), name='outbound_handoff_consistent'),
             models.CheckConstraint(condition=models.Q(handed_over_at__isnull=True, cancelled_at__isnull=True) | models.Q(active=False), name='outbound_active_stage_consistent'),
+            models.CheckConstraint(condition=models.Q(accepted_at__isnull=True, accepted_by__isnull=True, accepted_revision__isnull=True) | (models.Q(accepted_at__isnull=False, accepted_by__isnull=False, accepted_revision__isnull=False, accepted_revision=models.F('assignment_revision'), accepted_by=models.F('assigned_courier'))), name='outbound_acceptance_consistent'),
         ]
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        from .courier_dispatch import prepare_outbound_save
+        changed_fields = prepare_outbound_save(self, kwargs.get('update_fields'))
+        if kwargs.get('update_fields') is not None:
+            kwargs['update_fields'] = set(kwargs['update_fields']) | changed_fields
+        result = super().save(*args, **kwargs)
+        if 'assignment_revision' in changed_fields:
+            from .logistics_delivery_notes import invalidate_delivery_notes_for_job
+            from .workflow_events import current_actor
+            invalidate_delivery_notes_for_job(self, actor=getattr(self, '_dispatch_actor', None) or current_actor(),
+                reason=getattr(self, '_dispatch_change_reason', 'La mission a changé.'))
+        return result

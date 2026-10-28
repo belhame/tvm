@@ -21,6 +21,7 @@ type Notification = {
   channel: "in_app";
   call_number?: string;
   client_reference?: string;
+  target?: string;
 };
 type Preference = {
   schedule_mode?: "disabled" | "catch_up_today" | "next_08";
@@ -58,9 +59,13 @@ function scheduledDate(value: string, timezone: string) {
 export default function NotificationCenter({
   user,
   compact = false,
+  onOpenReady,
+  onOpenMissions,
 }: {
   user: User;
   compact?: boolean;
+  onOpenReady?: () => void;
+  onOpenMissions?: () => void;
 }) {
   const id = useId();
   const hasPreferences = user.role === "admin" || user.role === "courier";
@@ -173,6 +178,7 @@ export default function NotificationCenter({
         setUnread((count) =>
           Math.max(0, count - (notification.read_at ? 0 : 1)),
         );
+        window.dispatchEvent(new Event("tvm-notifications-changed"));
       }
     } catch (error) {
       if (mounted.current && !pending.signal.aborted)
@@ -345,6 +351,32 @@ export default function NotificationCenter({
                   <div>
                     <strong>{notification.title}</strong>
                     <p>{notification.body}</p>
+                    {onOpenReady && notification.target === "courier_ready_queue" && (
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        disabled={reading !== null}
+                        onClick={async () => {
+                          if (!notification.read_at) await markRead(notification);
+                          onOpenReady();
+                        }}
+                      >
+                        Voir les prêts à livrer
+                      </button>
+                    )}
+                    {onOpenMissions && notification.target === "courier_missions" && (
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        disabled={reading !== null}
+                        onClick={async () => {
+                          if (!notification.read_at) await markRead(notification);
+                          onOpenMissions();
+                        }}
+                      >
+                        Voir mes missions
+                      </button>
+                    )}
                     <small>
                       {dateFR(notification.created_at, true)} · Dans
                       l’application

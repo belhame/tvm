@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core import logistics_service as logistics
+from core.courier_dispatch import accept_outbound
 from core.models import Client, CourierReceipt, Equipment, OperationEvent, OutboundJob, ServiceRequest, User
 
 
@@ -50,6 +51,7 @@ class LogisticsWorkflowTests(TestCase):
         self.assertIsNone(job.cancelled_at)
         self.assertEqual(job.delivery_address, 'Nouvelle adresse fictive')
         self.assertEqual(OperationEvent.objects.filter(service_request=job.service_request, kind='outbound_cancelled').count(), 1)
+        accept_outbound(self.other_courier, job.pk, job.assignment_revision, True)
         logistics.handoff(self.other_courier, job.pk, {'recipient_name': 'Destinataire fictif'})
         with self.assertRaises(ValidationError):
             logistics.assign_outbound(self.admin, {'courier': self.courier.pk}, pk=job.pk)
@@ -75,6 +77,7 @@ class LogisticsWorkflowTests(TestCase):
 
     def test_rearrival_after_handoff_creates_another_unassigned_case_and_preserves_old_proof(self):
         job = self.job()
+        accept_outbound(self.courier, job.pk, job.assignment_revision, True)
         logistics.handoff(self.courier, job.pk, {'recipient_name': 'Destinataire laboratoire'})
         job.refresh_from_db()
         proof = job.handed_over_at
@@ -93,6 +96,7 @@ class LogisticsWorkflowTests(TestCase):
 
     def test_handed_over_request_and_unit_cannot_be_reparented_or_requalified_via_model(self):
         job = self.job()
+        accept_outbound(self.courier, job.pk, job.assignment_revision, True)
         logistics.handoff(self.courier, job.pk, {'recipient_name': 'Destinataire laboratoire'})
         other = Equipment.objects.create(client=self.company, serial_number='LOGISTICS-OTHER-LAB', model='Autre modèle fictif')
         record = ServiceRequest.objects.get(pk=job.service_request_id)
@@ -236,6 +240,7 @@ class LogisticsConcurrencyTests(TransactionTestCase):
         record = ServiceRequest.objects.create(equipment=self.unit, subject='Remise fictive concurrente')
         ServiceRequest.objects.filter(pk=record.pk).update(status='ready_for_delivery')
         job = logistics.assign_outbound(self.manager, {'service_request': record.pk, 'courier': self.courier.pk})
+        accept_outbound(self.courier, job.pk, job.assignment_revision, True)
         def handoff():
             return logistics.handoff(User.objects.get(pk=self.courier.pk), job.pk, {'recipient_name': 'Destinataire concurrent fictif'}).pk
         identifier = self.paused_identity_mutation({'serial_number': 'COURIER-CONCURRENT-UPDATED'}, handoff)

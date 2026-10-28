@@ -74,8 +74,15 @@ def notification_payload(item, user):
             'local_date': item.local_date, 'channel': 'in_app', 'channel_status': 'available',
             'service_request': None, 'call_number': '', 'client_reference': '', 'details': {}}
     if item.kind == InAppNotification.Kind.LOGISTICS:
-        from .outbox_service import logistics_in_app_payload
-        base.update(logistics_in_app_payload(item, user))
+        if item.payload.get('event') == 'ready_availability':
+            from .ready_notifications import ready_notification_payload
+            base.update(ready_notification_payload(item, user))
+        elif item.payload.get('event') == 'outbound_assignment':
+            from .ready_notifications import assignment_notification_payload
+            base.update(assignment_notification_payload(item, user))
+        else:
+            from .outbox_service import logistics_in_app_payload
+            base.update(logistics_in_app_payload(item, user))
     elif item.kind == InAppNotification.Kind.DAILY:
         workload = logistics_workload(user) if user.effective_role in ('courier', 'admin') else {'pickups': [], 'deliveries': []}
         pickup_ids = set(item.payload.get('pickup_ids', []))

@@ -14,7 +14,7 @@ Les interventions restent les fiches détaillées des opérations réalisées : 
 
 Cliquer sur **Rechercher le modèle et la garantie** pour consulter la couverture et les anciens dossiers. La touche Entrée d'une douchette lance cette vérification, sans créer de demande. La recherche est facultative avant l'enregistrement : le serveur vérifie à nouveau la série et les données lors de la création.
 
-Le modèle, l'objet et la description ne bloquent plus cette saisie simple. Une description peut être ajoutée si elle est connue. Si la série n'est pas reconnue, la demande reste enregistrable avec le modèle **À identifier** : ce libellé signale l'information manquante, sans inventer une référence de produit. L'administrateur et le responsable retrouvent l'ancien formulaire complet dans **Options avancées** ; **Saisie rapide** revient au formulaire simple.
+Le modèle, l'objet et la description ne bloquent plus cette saisie simple. Une description peut être ajoutée si elle est connue. Si la série n'est pas reconnue, la demande reste enregistrable et l'écran indique **Modèle non identifié** : aucune référence de produit n'est inventée. L'administrateur et le responsable retrouvent l'ancien formulaire complet dans **Options avancées** ; **Saisie rapide** revient au formulaire simple.
 
 Avant d'enregistrer, lire les anciens passages présentés pour cette série : numéros d'appel TVM et client, dates connues et ancien matériel ou remplacement concerné. Une ancienne date absente reste inconnue. Ces éléments permettent de reconnaître un retour sans créer un nouvel historique à la place des anciens dossiers.
 
@@ -283,7 +283,29 @@ Les photos JPEG/PNG/WEBP sont analysées localement sur le serveur, avec une lim
 
 Dans la fiche société, **Livreur client par défaut** désigne son livreur externe actif ; **Référent livreur TVM** sert de repli. Une nouvelle mise à disposition prête utilise d'abord le référent client valide, sinon le référent TVM. Sans référent disponible, le dossier reste dans les transports à affecter : aucun livreur n'est choisi par supposition. Les anciens dossiers prêts se reprennent avec l'action d'application du routage ; les affectations manuelles sont conservées.
 
-Pour une affectation manuelle, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve ses missions dans **Prêts** ou **Retours**. Avant remise, le responsable peut annuler puis réaffecter avec motif, en conservant la trace de l'annulation. Une remise enregistrée ne se réaffecte pas.
+Pour une affectation manuelle, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve ses missions dans **Prêts → Mes livraisons** ou **Retours**. Avant remise, le responsable peut annuler puis réaffecter avec motif, en conservant la trace de l'annulation. Une remise enregistrée ne se réaffecte pas.
+
+### Prendre une livraison dans la file partagée
+
+Dans **Prêts → File partagée**, le livreur TVM voit les onduleurs prêts de tous les clients, avec leur série, leurs références SAV et leur affectation éventuelle. Une livraison déjà affectée reste visible comme réservée : un autre livreur ne peut pas se l'approprier ; seul un responsable peut la réaffecter. Le livreur client externe garde uniquement ses propres missions et n'accède pas à cette file globale.
+
+Pour une livraison disponible, cliquer sur **Prendre la livraison**, vérifier le client et le matériel, puis répondre **Oui**. Le serveur affecte la livraison au compte connecté et confirme sa prise en charge dans la même opération. **Annuler** ne crée aucune réservation. Si un autre livreur l'a prise entre-temps, actualiser la file et relire sa situation.
+
+Une mission affectée par le responsable ou par le routage automatique attend une confirmation distincte : **Accepter la mission**, puis **Oui**. Cette règle vaut pour le livreur TVM et pour le livreur client désigné. Un changement de livreur, d'adresse, de contact ou une annulation remet la confirmation à faire sur la mission courante. Les anciennes missions ne sont pas considérées comme acceptées par la mise à jour.
+
+La confirmation de mission autorise le livreur à poursuivre la livraison ; elle n'est ni une remise physique ni la confirmation du technicien sur le dossier SAV. L'administrateur et le responsable conservent leurs actions autorisées d'affectation et de remise, sans enregistrer une acceptation au nom du livreur.
+
+### Préparer un bon de livraison PDF
+
+Le livreur TVM ouvre **Prêts → Bons de livraison**. Seules ses missions acceptées et encore à remettre sont proposées. Utiliser **Préparer le BL** pour une mission, ou sélectionner de **1 à 100 missions** puis **Générer le BL du lot**. Un lot doit concerner **un seul client et un seul livreur**. Des destinations différentes restent possibles : chaque ligne conserve son adresse.
+
+Dans **Vérifier le bon de livraison**, contrôler les séries, les deux numéros d'appel et les destinations, compléter si utile le **Commentaire du BL** — visible sur le PDF — puis **Créer le bon de livraison**. **Télécharger le BL PDF** permet de l'imprimer et de le réimprimer à l'identique. L'administration retrouve les documents, leur PDF et leur annulation contrôlée dans la liste générale **Bons de livraison**. Le livreur client n'accède pas à cette nouvelle génération de BL.
+
+Le bon conserve un instantané et un PDF immuables ; il ne se modifie pas comme une fiche manuelle. **Consulter le BL** retrouve un document de l'historique. Avant remise, **Annuler le BL** exige un **Motif d'annulation du BL**, puis **Confirmer l'annulation**. Une réaffectation, annulation ou modification d'une mission invalide la préparation de tout le lot : vérifier les missions puis préparer un nouveau bon. Le document initial et son annulation restent consultables par l'administration ; l'ancien livreur n'accède plus à un bon qui ne correspond plus à ses missions.
+
+Avant remise, un BL actif bloque la correction du numéro de série, de la marque, du modèle ou du client de son matériel. Annuler d'abord sa préparation avec un motif, effectuer la correction autorisée, puis préparer un nouveau bon.
+
+Un BL déjà lié à une remise physique ne s'annule pas manuellement. Le livreur conserve le PDF historique de ses livraisons dont l'identité et l'affectation restent cohérentes. **Créer ou imprimer un BL ne prouve pas la remise**, ne clôture aucun dossier, ne facture rien et ne débite pas le stock.
 
 Après remise physique, ouvrir **Confirmer la remise au client**, saisir le nom du destinataire, cocher **Je confirme avoir remis physiquement cet onduleur au destinataire indiqué**, puis **Enregistrer la remise**. L'heure et l'auteur viennent du serveur. Cette saisie atteste ce que le livreur déclare ; elle n'est ni une signature électronique ni un accusé de réception envoyé par le client. Le client consulte la remise de son propre dossier et reçoit une notification interne.
 
@@ -292,6 +314,10 @@ Après une remise, le remplacement et la qualification technique ne sont plus r�
 ## Notifications et rappels du livreur
 
 La rubrique **Notifications et rappels** affiche les messages du compte connecté. Le portail client reçoit les événements de réception et de remise enregistrés pour sa société ; **Marquer comme lue** concerne uniquement la lecture dans TVM, sans accusé externe ou accord du client.
+
+Lorsqu'un matériel devient réellement prêt à livrer, une notification **Onduleur prêt à livrer** est disponible pour les livreurs TVM actifs et les administrateurs. Elle ouvre la file partagée ; elle n'affecte pas la mission. Une notification distincte **Livraison affectée** invite seulement le livreur TVM désigné à confirmer sa mission. Une prise volontaire déjà confirmée ne crée pas une seconde invitation à l'accepter.
+
+Le compteur de notifications se relit toutes les **30 secondes** et au retour sur l'onglet. Le serveur recontrôle la disponibilité et l'affectation avant d'afficher les détails : une ancienne alerte ne permet pas de réserver un matériel retiré ou déjà remis. Ces messages restent dans l'application ; il n'y a ni notification push navigateur fermé ni envoi WhatsApp de ces alertes. WhatsApp reste à connecter séparément.
 
 Le livreur et l'administrateur disposent, pour leur propre compte, de **Rappel quotidien à 08:00**. Cocher **Activer le rappel quotidien dans l'application**, vérifier le **Fuseau horaire du rappel**, puis utiliser **Enregistrer les rappels**. Le réglage est désactivé au départ. Il utilise un fuseau IANA, par exemple `Africa/Tunis` ; l'heure reste 08:00 dans ce fuseau, chaque jour. Le rappel présente les enlèvements et livraisons encore affectés au compte, sans informations de facturation.
 

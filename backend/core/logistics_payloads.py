@@ -45,8 +45,10 @@ def pickup_payload(pickup, actor):
 
 
 def outbound_payload(job, actor):
+    from .courier_dispatch import outbound_is_accepted
     manager = logistics_manager(actor)
     courier = actor.role == 'courier' and job.assigned_courier_id == actor.pk
+    accepted = outbound_is_accepted(job)
     blocking = None
     if job.active:
         try:
@@ -58,6 +60,9 @@ def outbound_payload(job, actor):
     unit = job.delivery_equipment
     return {'id': job.pk, 'kind': job.kind, 'status': 'completed' if job.handed_over_at else 'cancelled' if job.cancelled_at else 'assigned',
         'active': job.active, 'assignment_mode': job.assignment_mode, 'routing_source': job.routing_source,
+        'accepted': accepted, 'accepted_at': job.accepted_at, 'accepted_revision': job.accepted_revision,
+        'accepted_by': job.accepted_by_id if actor.effective_role != 'client' else None,
+        'can_accept': courier and actor.is_active and job.active and not job.handed_over_at and not job.cancelled_at and not blocking and not accepted,
         'assignment_revision': job.assignment_revision, 'assigned_courier_kind': job.assigned_courier.courier_kind, 'service_request': job.service_request_id, 'call_number': job.service_request.reference,
         'client_reference': job.service_request.client_reference, 'client': _client(job.client), 'equipment': unit.pk,
         'serial_number': job.handed_over_serial if job.handed_over_at else unit.serial_number,
@@ -67,7 +72,7 @@ def outbound_payload(job, actor):
         'recipient_name': job.recipient_name, 'handed_over_at': job.handed_over_at,
         'handed_over_by_name': job.handed_over_actor_name, 'handed_over_by_role': job.handed_over_actor_role,
         'assigned_courier': job.assigned_courier_id, 'assigned_courier_name': _name(job.assigned_courier),
-        'cancelled_at': job.cancelled_at, 'can_handoff': (manager or courier) and job.active and not blocking,
+        'cancelled_at': job.cancelled_at, 'can_handoff': (manager or (courier and accepted)) and job.active and not blocking,
         'can_assign': manager and job.active, 'can_cancel': manager and job.active,
         'blocking_reason': blocking}
 
@@ -82,7 +87,7 @@ def bootstrap_payload(actor, q=''):
     missions = outbound_for(actor).filter(active=True)
     return {'user': {'id': actor.pk, 'username': actor.username, 'first_name': actor.first_name, 'last_name': actor.last_name,
                      'email': actor.email, 'role': actor.effective_role, 'courier_kind': actor.courier_kind, 'client': actor.client_id, 'can_validate_billing': actor.can_validate_billing},
-            'capabilities': {'can_receive': logistics_receiver(actor), 'can_lookup': logistics_receiver(actor), 'can_pickups': logistics_receiver(actor)},
+            'capabilities': {'can_receive': logistics_receiver(actor), 'can_lookup': logistics_receiver(actor), 'can_pickups': logistics_receiver(actor), 'can_ready_queue': logistics_manager(actor) or (actor.role == 'courier' and actor.courier_kind == 'internal')},
             'clients': list(clients.values('id', 'name')),
             'couriers': [{'id': user.pk, 'name': _name(user), 'courier_kind': user.courier_kind, 'client': user.client_id} for user in User.objects.filter(role='courier', is_active=True).order_by('username')] if logistics_manager(actor) else [],
             'metrics': {'pickups': pickups_for(actor).filter(status__in=['requested', 'assigned', 'collected']).count(),

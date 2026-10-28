@@ -1,0 +1,9 @@
+.courier-notification-bell { position: relative; overflow: visible; }
+.courier-notification-count {
+  position: absolute; top: -4px; right: -5px;
+  min-width: 20px; height: 20px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 12px; background: #b62130; color: #fff;
+  font-size: 11px; line-height: 1; font-weight: 750;
+  border: 2px solid #fff;
+}

@@ -26,7 +26,7 @@ Routes DRF avec slash final, listes JSON (tableaux), détail par ID, création P
 - `/api/stock-movements/` : `id,part,part_name,quantity,kind,reference,intervention,created_at` ; POST atomique (quantité signée : entrée positive, sortie négative) sans stock négatif. Types `in,out,adjustment`.
 - `/api/contracts/` : `id,number,client,client_name,equipment,starts_on,ends_on,coverage,visits_per_year,status,legacy_id`. Statuts `active,expired,draft`.
 - `/api/warranties/` : `id,equipment,equipment_serial,client_name,provider,starts_on,ends_on,terms,legacy_id`.
-- `/api/delivery-notes/` : `id,reference,client,client_name,intervention,delivered_at,status,notes,lines,legacy_id` ; lignes imbriquées `{part,description,quantity}`. Statuts `draft,ready,delivered`. Le BL documente une livraison ; le stock est débité une seule fois explicitement via les mouvements.
+- `/api/delivery-notes/` : `id,reference,client,client_name,intervention,delivered_at,status,notes,lines,legacy_id` ; lignes imbriquées `{part,description,quantity}`. Statuts `draft,ready,delivered`. La liste interne ajoute `logistics_status`, `logistics_can_cancel` et `pdf_url` en lecture seule pour les BL logistiques préparés, avec le même identifiant de base. Ces trois champs sont absents du portail client. Les fiches manuelles restent disponibles ; un BL doté d'un instantané/PDF préparé ne se modifie ni ne se supprime par ce CRUD. Le stock se règle explicitement par mouvements.
 - `/api/audit/` : lecture admin/manager.
 - `/api/integrations/` : résumé interne des intégrations sans secrets ; la configuration des notifications du centre se lit aussi par `/api/logistics/channels/`. L'IA reste non connectée. Les préférences de rappel interne de 08:00 du livreur sont distinctes des messages externes destinés au responsable du centre.
 - `/api/search/?q=...` : recherche autorisée `{equipment,clients,requests,interventions}`.
@@ -52,9 +52,12 @@ Les routes logistiques utilisent leurs propres projections minimales. Le rôle `
 | `GET /api/logistics/outbound/` et `GET /api/logistics/outbound/{id}/` | Transports dans le même périmètre responsables/livreur affecté/client propriétaire |
 | `POST /api/logistics/outbound/` | Administrateur/responsable : créer l'affectation depuis le dossier |
 | `POST /api/logistics/outbound/{id}/assign/` | Administrateur/responsable : modifier ou réactiver une mission avant remise |
-| `POST /api/logistics/outbound/{id}/handoff/` | Responsable ou livreur affecté : enregistrer la remise au destinataire |
+| `POST /api/logistics/outbound/{id}/accept/` | Livreur actuellement affecté, TVM ou client : confirmer la mission courante |
+| `POST /api/logistics/outbound/{id}/handoff/` | Responsable ou livreur affecté ayant confirmé sa mission : enregistrer la remise au destinataire |
 | `POST /api/logistics/outbound/{id}/cancel/` | Administrateur/responsable : annuler avec motif avant remise |
 | `POST /api/logistics/reconcile/` | Administrateur/responsable : appliquer les référents aux dossiers prêts ; ne remplace pas implicitement une affectation manuelle |
+| `GET /api/logistics/ready-queue/` | Administrateur/responsable/livreur TVM : file commune des prêts valides, tous clients ; livreur client interdit |
+| `POST /api/logistics/ready-queue/{service_request_id}/claim/` | Livreur TVM uniquement : prendre une livraison non réservée et confirmer la mission atomiquement |
 
 Les listes renvoient des tableaux et acceptent `q` jusqu'à 200 caractères pour les séries, références et clients pertinents. Les réponses sont privées et `no-store`. Les corps JSON sont stricts : champs inconnus refusés, identifiants entiers positifs, UUID sous forme de texte. Les mutations exigent session/CSRF et renvoient HTTP `200` avec l'objet relu ; erreurs de saisie ou de clé réutilisée avec un autre contenu `400`, rôle interdit `403`, ressource hors périmètre `404`.
 
@@ -70,7 +73,41 @@ La création d'un transport exige `{service_request,courier}` et accepte `delive
 
 Pour les nouvelles mises à disposition `ready_for_delivery`, le routage automatique utilise le livreur client référent valide, sinon le livreur TVM référent ; faute de référent valide, le dossier reste à affecter. Le DTO indique `assignment_mode:manual|automatic`, `routing_source`, `assignment_revision` et `assigned_courier_kind`. `reconcile` accepte `{client?,reassign_automatic?:false}` ; une réaffectation automatique existante demande `true` explicite, les choix manuels et preuves de remise restent conservés. Une vraie modification d'affectation incrémente la révision et crée un événement dédupliqué pour les notifications du centre.
 
+### File commune et acceptation de mission
+
+`GET /api/logistics/ready-queue/?q=...` retourne un tableau des demandes `ready_for_delivery` dont le matériel à livrer est cohérent : remplacement validé pour un échange, matériel du dossier pour les autres prêts. Les remises déjà enregistrées et remplacements incohérents sont exclus. Une mission réservée reste visible avec son livreur et `can_claim:false`. Cette file tous clients ne donne aucun accès à la finance ou au diagnostic interne.
+
+Une ligne comprend `{id,service_request,job,expected_revision,assignment_revision,call_number,client_reference,client,equipment,serial_number,brand,model,status,kind,routing_status,assigned_courier,assigned_courier_name,assigned_courier_kind,accepted,accepted_at,accepted_revision,can_claim,blocking_reason}`. `routing_status` vaut `available` ou `reserved`, `kind` vaut `delivery`. `expected_revision` est `0` sans mission existante, sinon la révision de celle-ci.
+
+`POST /api/logistics/ready-queue/{service_request_id}/claim/` exige `{expected_revision}` et retourne HTTP `200` avec le DTO de mission. Seul un livreur TVM actif peut prendre un dossier disponible, sans mission active réservée ou déjà remise. La transaction lui affecte la mission et enregistre son acceptation ; une révision obsolète ou une réservation concurrente renvoie `409`. Il ne peut pas reprendre une mission réservée à autrui : la réaffectation reste une action de responsable.
+
+`POST /api/logistics/outbound/{job_id}/accept/` exige `{expected_revision,accept}` : révision entière JSON et booléen strict. Seul le livreur actuellement désigné, actif et dans sa société pour un livreur client, peut confirmer. La réponse est HTTP `200` avec le DTO de mission. `accept:false` n'écrit rien ; un `true` déjà enregistré pour cette révision est sans effet. Une révision obsolète renvoie `409`. Les erreurs de contenu restent `400`, les droits refusés `403` et une mission hors périmètre `404`.
+
+Le DTO de mission expose en lecture seule `accepted`, `accepted_at`, `accepted_by`, `accepted_revision` et `can_accept`. L'acceptation exige la révision et le livreur courants. Réaffectation, modification de l'identité de livraison, de l'adresse ou du contact, et annulation incrémentent la révision et retirent l'acceptation précédente. Le livreur doit accepter avant sa remise ; administrateur/responsable conservent leur droit de remise sans fabriquer cette acceptation. Les anciennes missions ne reçoivent aucune date ni acceptation présumée par la migration.
+
 `handoff` exige `{recipient_name}` non vide, au plus 150 caractères. Le serveur conserve l'heure, l'auteur et son rôle réels ainsi que série/marque/modèle remis. Un rejeu identique garde la preuve ; remplacer son destinataire est refusé. Cette déclaration ne prouve ni signature du client, ni facture, ni paiement. La remise n'arrête pas automatiquement le compteur SAV et ne clôture pas le dossier : la clôture et ses contrôles financiers restent distincts. Après remise, les reprises de validation d'échange et de qualification technique sont refusées ; les devis et validations financières applicables restent possibles. L'annulation motivée retire seulement une mission non remise de la charge active. Elle peut être réaffectée avant remise, après nouvelle vérification de son dossier ; l'événement d'annulation et son motif restent conservés dans l'historique.
+
+### Bons de livraison logistiques préparés
+
+Ces routes sont autorisées aux administrateurs, responsables et livreurs TVM actifs ; les techniciens, clients et livreurs clients sont refusés. Le livreur TVM agit uniquement sur ses missions acceptées. Administrateur/responsable peuvent préparer pour un livreur cohérent sans acceptation préalable, sans enregistrer celle-ci à sa place. Toutes les réponses sont privées, `no-store` ; les POST exigent session/CSRF et JSON strict.
+
+| Route | Contrat |
+|---|---|
+| `GET /api/logistics/delivery-notes/` | Tableau des bons visibles ; le livreur est limité à ses bons encore applicables, l'administration conserve l'audit |
+| `POST /api/logistics/delivery-notes/` | `{request_key,job_ids,comment?}` ; UUID texte, 1–100 identifiants entiers distincts, commentaire public de 4 000 caractères maximum |
+| `GET /api/logistics/delivery-notes/{id}/` | DTO du bon autorisé |
+| `GET /api/logistics/delivery-notes/{id}/pdf/` | Octets PDF conservés et vérifiés par SHA-256 ; téléchargement protégé |
+| `POST /api/logistics/delivery-notes/{id}/cancel/` | `{reason}` non vide de 4 000 caractères maximum, uniquement avant toute remise physique du lot |
+
+Un lot comporte un seul client, un seul livreur et aucun onduleur répété. Les missions doivent être actives, non remises et cohérentes avec leur matériel canonique ; un livreur TVM doit en avoir accepté la révision courante. Des destinations différentes sont autorisées et figées par ligne. Les mélanges clients/livreurs et les identifiants répétés sont refusés. Une mission ne peut figurer dans deux préparations actives.
+
+La création retourne HTTP `201` avec le DTO et `created:true`. Même UUID, même acteur et même lot/commentaire retrouvent le bon toujours autorisé avec HTTP `200`, `created:false` ; une clé réutilisée autrement ou un conflit de préparation renvoie `409`. Un lot ou contenu invalide renvoie `400`, un rôle interdit `403` et un bon/une mission hors périmètre `404`. Le DTO contient `{id,reference,status,client,courier,created_at,line_count,lines,comment,pdf_url,pdf_sha256,can_cancel,cancelled_at,cancellation_reason}`. `status` vaut `prepared` ou `cancelled`. Les lignes conservent notamment missions/révisions, dossier et deux numéros d'appel, matériel d'origine, série réellement prévue, marque/modèle et adresse de livraison.
+
+Le BL réutilise une fiche `DeliveryNote` de la liste générale et scelle son instantané, ses lignes et son PDF. Les réimpressions ne régénèrent pas les données courantes. Une modification/réaffectation/annulation de mission invalide la préparation du lot entier ; ses liens actifs sont libérés pour une nouvelle préparation. Le PDF initial reste conservé pour l'administration, et un livreur ne récupère pas un ancien bon devenu hors de son périmètre. Après remise, il peut retrouver le PDF historique de ses missions dont la révision et l'identité correspondent toujours ; l'annulation manuelle d'un lot déjà remis est refusée. L'annulation change le statut consultable dans TVM, sans réécrire les octets du PDF initial.
+
+Un lien de BL actif bloque la modification de l'identité de l'équipement (`serial_number`, `brand`, `model`, `client`). Avant remise, annuler la préparation avec motif avant une correction autorisée, puis préparer un nouveau BL. Les données du compte ou de la société modifiées après préparation ne réécrivent pas le PDF conservé.
+
+Ces opérations ne créent ni remise, ni clôture SAV, ni mouvement de stock, ni facture. Les anciens BL manuels ne reçoivent pas automatiquement un instantané ou un PDF logistique.
 
 ## Photo de numéro de série
 
@@ -84,7 +121,14 @@ La réponse est `{candidates:[{serial_number,source}],method,status,message}` : 
 
 La réponse contient `{enabled,hour:8,minute:0,timezone,next_run_at,schedule_mode,editable,pickup_count,delivery_count,in_app_status,channel_status,whatsapp_connected,whatsapp_can_send,whatsapp_preview}`. `in_app_status` vaut `enabled` ou `disabled`. `schedule_mode` distingue `disabled` (`next_run_at:null`), `catch_up_today` (premier passage du worker après une activation/reprise tardive aujourd'hui) et `next_08` (prochain 08:00). Le canal WhatsApp reste `requires_credentials`, `whatsapp_connected:false`, `whatsapp_can_send:false`. Son aperçu contient `{text,scheduled_for,timezone,status:"preview_only",outbound_sent:false}` : il n'est ni un message envoyé ni une entrée de file d'envoi.
 
-`GET /api/logistics/notifications/` retourne les 100 dernières notifications du destinataire connecté sous `{results,unread_count,as_of}`. Une entrée expose `{id,kind,title,body,created_at,read_at,local_date,channel:"in_app",channel_status:"available",service_request,call_number,client_reference,details}`. `kind` vaut `daily_logistics`, `equipment_received`, `equipment_delivered` ou `logistics_update` pour un événement de centre. Le nombre non lu inclut aussi les entrées plus anciennes. `PATCH /api/logistics/notifications/{id}/read/` exige `{read:true}` et marque seulement une notification propre, sans changer sa date lors d'un rejeu. Ces écritures nécessitent session et CSRF ; un autre destinataire reçoit `404`.
+`GET /api/logistics/notifications/` retourne les 100 dernières notifications du destinataire connecté sous `{results,unread_count,as_of}`. Une entrée expose `{id,kind,title,body,created_at,read_at,local_date,channel:"in_app",channel_status:"available",service_request,call_number,client_reference,details}`, complété selon le sous-type par `event` et `target`. `kind` vaut `daily_logistics`, `equipment_received`, `equipment_delivered` ou `logistics_update` pour les événements logistiques. Le nombre non lu inclut aussi les entrées plus anciennes. `PATCH /api/logistics/notifications/{id}/read/` exige `{read:true}` et marque seulement une notification propre, sans changer sa date lors d'un rejeu. Ces écritures nécessitent session et CSRF ; un autre destinataire reçoit `404`.
+
+Deux sous-types utilisent le `kind` existant `logistics_update` :
+
+- `event:ready_availability`, `target:courier_ready_queue` : un véritable passage prêt, avec matériel cohérent et preuves techniques requises, crée après commit une notification par occurrence/destinataire pour les livreurs TVM actifs et administrateurs. Ni livreur client, client, technicien ni responsable sans rôle administrateur n'en reçoit. `details` contient `{available,request}` avec références et matériel minimaux, sans coordonnées, notes ou finance.
+- `event:outbound_assignment`, `target:courier_missions` : une affectation managériale ou automatique crée une invitation propre au livreur TVM désigné, dédupliquée par mission/révision. `details` contient `{available,job}`. Une prise volontaire déjà acceptée ne crée pas une seconde invitation à l'accepter.
+
+Les projections recontrôlent état, matériel, rôle et affectation à chaque lecture. Une alerte devenue inapplicable ne donne plus les anciens détails ni une cible active. Aucun ancien état prêt ne devient une fausse nouvelle transition à la migration. Le compteur du navigateur se relit toutes les 30 secondes et au retour sur l'onglet ; cette actualisation n'est ni un push navigateur fermé ni un envoi WhatsApp.
 
 Le rappel quotidien est créé au premier passage du worker à partir de 08:00 locale, une seule fois par jour et destinataire, même avec deux workers. Il couvre uniquement les enlèvements affectés non terminés et les remises encore affectées d'un dossier prêt ou à retourner. Les identifiants des missions sont conservés ; leurs détails sont relus dans les affectations actuelles, sans finance, pour ne pas exposer une mission réaffectée. Une désactivation empêche les nouveaux rappels ; une réactivation le même jour ne duplique pas celui déjà créé. Aucun rappel historique n'est préparé pour un futur envoi WhatsApp.
 

@@ -13,6 +13,8 @@ from core import exchange_views
 from core import disposition_views
 from core import request_assignment_views
 from core import simple_intake_views
+from core import courier_dispatch_views
+from core import logistics_delivery_note_views
 from core.request_tracking_views import followup_view
 
 router = DefaultRouter()
@@ -45,6 +47,13 @@ urlpatterns = [
     path('api/logistics/sav-intake/options/', simple_intake_views.options),
     path('api/logistics/sav-intake/lookup/', simple_intake_views.lookup),
     path('api/logistics/sav-intake/create/', simple_intake_views.create),
+    path('api/logistics/ready-queue/', courier_dispatch_views.ready_board),
+    path('api/logistics/ready-queue/<int:request_id>/claim/', courier_dispatch_views.claim),
+    path('api/logistics/outbound/<int:job_id>/accept/', courier_dispatch_views.accept),
+    path('api/logistics/delivery-notes/', logistics_delivery_note_views.delivery_notes),
+    path('api/logistics/delivery-notes/<int:note_id>/', logistics_delivery_note_views.delivery_note_detail),
+    path('api/logistics/delivery-notes/<int:note_id>/pdf/', logistics_delivery_note_views.delivery_note_pdf),
+    path('api/logistics/delivery-notes/<int:note_id>/cancel/', logistics_delivery_note_views.delivery_note_cancel),
     path('api/logistics/', include('core.logistics_urls')),
     path('api/logistics/', include('core.notification_urls')),
     path('api/logistics/', include('core.outbox_urls')),

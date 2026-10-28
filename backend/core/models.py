@@ -116,6 +116,8 @@ class Equipment(LegacyModel):
             guard_disposition_equipment_update(self, kwargs.get('update_fields'))
             from .logistics_service import guard_logistics_equipment_update
             guard_logistics_equipment_update(self, kwargs.get('update_fields'))
+            from .logistics_delivery_notes import guard_prepared_equipment
+            guard_prepared_equipment(self, kwargs.get('update_fields'))
         return super().save(*args, **kwargs)
 
 
@@ -413,6 +415,10 @@ class DeliveryNote(ReferencedModel):
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering = ['-created_at', '-id']
+    def save(self, *args, **kwargs):
+        from .logistics_delivery_notes import guard_prepared_note
+        guard_prepared_note(self)
+        return super().save(*args, **kwargs)
 
 
 class DeliveryLine(models.Model):
@@ -423,6 +429,14 @@ class DeliveryLine(models.Model):
     class Meta:
         ordering = ['id']
         constraints = [models.CheckConstraint(condition=models.Q(quantity__gte=1), name='delivery_quantity_positive')]
+    def save(self, *args, **kwargs):
+        from .logistics_delivery_notes import guard_prepared_line
+        guard_prepared_line(self)
+        return super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        from .logistics_delivery_notes import guard_prepared_line
+        guard_prepared_line(self)
+        return super().delete(*args, **kwargs)
 
 
 class AuditLog(models.Model):
@@ -467,3 +481,4 @@ from .logistics_models import CourierReceipt, OutboundJob, PickupRequest  # noqa
 from .outbox_models import ExternalNotification  # noqa: E402,F401
 from .knowledge_models import KnowledgeChunk, RepairCase, TechnicalDocument  # noqa: E402,F401
 from .diagnostic_models import DiagnosticGate, DiagnosticRun  # noqa: E402,F401
+from .logistics_delivery_note_models import DeliveryNoteMission, LogisticsDeliveryNote  # noqa: E402,F401

@@ -334,7 +334,7 @@ class WarrantyViewSet(BusinessViewSet):
 
 
 class DeliveryNoteViewSet(BusinessViewSet):
-    queryset = DeliveryNote.objects.select_related('client', 'intervention__service_request__equipment').prefetch_related('lines').all()
+    queryset = DeliveryNote.objects.select_related('client', 'intervention__service_request__equipment', 'logistics_snapshot').prefetch_related('lines', 'logistics_snapshot__missions__job').all()
     serializer_class = DeliveryNoteSerializer
     owner_path = 'client_id'
 

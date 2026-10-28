@@ -87,6 +87,8 @@ En mode Python local, après chargement du `.env`, lancer un second processus su
 
 Pour un contrôle ponctuel, ajouter `--once`. Ne pas utiliser la simple ouverture d'une page pour déclencher le traitement : les GET ne créent aucun rappel. Plusieurs workers gardent un seul rappel par destinataire et jour local ; un seul processus supervisé suffit à cette équipe. Le fuseau personnel du compte détermine 08:00, avec repli sur `TVM_TIMEZONE`. Aucun rappel ancien n'est conservé dans une file WhatsApp future.
 
+Les alertes **Onduleur prêt à livrer** et **Livraison affectée** sont distinctes du rappel personnel de 08:00 : elles proviennent des opérations serveur et restent dans TVM. Elles ne demandent ni clé WhatsApp ni préférence de rappel activée. La cloche relit son compteur toutes les 30 secondes et au retour sur l'onglet ; aucun push navigateur fermé n'est fourni. WhatsApp reste soumis à sa configuration séparée.
+
 ## Connecter les notifications externes du responsable client
 
 Les adaptateurs SMTP et WhatsApp Cloud API sont fournis, **désactivés par défaut**. Aucun accès SMTP ou WhatsApp réel n'a été fourni ou validé dans la version de travail. Les essais automatisés utilisent une boîte e-mail en mémoire et des transports simulés ; ils ne prouvent pas l'acceptation par votre fournisseur.
@@ -126,6 +128,8 @@ bash scripts/backup.sh
 ```
 
 La commande crée un dump PostgreSQL au format personnalisé dans `.local/backups/`, avec des permissions restrictives, puis vérifie que `pg_restore` peut lire son catalogue. Ce contrôle de lisibilité ne remplace pas un essai de restauration.
+
+Les instantanés et les octets des BL PDF préparés sont conservés dans PostgreSQL et font partie du dump. Ils ne se régénèrent pas depuis les fiches courantes ; conserver la base est donc nécessaire pour leurs réimpressions historiques. Les pièces jointes restent, elles, dans les fichiers média à sauvegarder avec la base.
 
 Elle produit un ensemble portant le même préfixe `tvm-<horodatage UTC>-<suffixe>` :
 

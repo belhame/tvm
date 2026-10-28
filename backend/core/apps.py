@@ -6,3 +6,4 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from . import workflow_signals  # noqa: F401
+        from . import ready_notifications  # noqa: F401

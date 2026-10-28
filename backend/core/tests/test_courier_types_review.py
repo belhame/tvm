@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import Client, Equipment, OutboundJob, ServiceRequest
+from core.courier_dispatch import accept_outbound
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -183,6 +184,7 @@ class IndependentCourierTypesReviewTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.assigned_courier_id, self.internal.pk)
         self.api.force_authenticate(self.internal)
+        accept_outbound(self.internal, job.pk, job.assignment_revision, True)
         response = self.api.post(f'/api/logistics/outbound/{job.pk}/handoff/', {'recipient_name': 'Destinataire fictif'}, format='json')
         self.assertEqual(response.status_code, 200, response.json())
         job.refresh_from_db()
@@ -203,6 +205,7 @@ class IndependentCourierTypesReviewTests(TestCase):
     def test_completed_mission_prevents_external_driver_reparenting_or_type_conversion(self):
         job = self.legacy_job()
         self.api.force_authenticate(self.external)
+        accept_outbound(self.external, job.pk, job.assignment_revision, True)
         response = self.api.post(f'/api/logistics/outbound/{job.pk}/handoff/', {'recipient_name': 'Destinataire fictif'}, format='json')
         self.assertEqual(response.status_code, 200, response.json())
         job.refresh_from_db()

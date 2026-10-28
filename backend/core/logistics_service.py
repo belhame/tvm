@@ -436,8 +436,13 @@ def assign_outbound(actor, data, pk=None):
     record = ServiceRequest.objects.select_for_update(of=('self',)).select_related('equipment__client').filter(pk=identifier).first()
     if not record:
         raise NotFound()
-    unit, kind = _locked_canonical(record)
     job = OutboundJob.objects.select_for_update().filter(service_request=record).first()
+    from .courier_dispatch import DispatchConflict, expected_revision, fresh_operator
+    if 'expected_revision' in data and expected_revision(data['expected_revision']) != (job.assignment_revision if job else 0):
+        raise DispatchConflict()
+    unit, kind = _locked_canonical(record)
+    actor = fresh_operator(actor)
+    _manager(actor)
     if job and job.handed_over_at:
         raise ValidationError('Cette mission possède déjà une remise physique. Son historique est conservé.')
     if OutboundJob.objects.filter(delivery_equipment=unit, active=True).exclude(service_request=record).exists():
@@ -454,6 +459,8 @@ def assign_outbound(actor, data, pk=None):
         return job
     if job:
         job.assignment_revision += 1
+        job._dispatch_actor = actor
+        job._dispatch_change_reason = 'La mission a été réaffectée ou modifiée.'
         job.active = True
         job.cancelled_at = None
         job.cancelled_by = None
@@ -478,7 +485,12 @@ def handoff(actor, pk, data):
     if not identifier:
         raise NotFound()
     record = ServiceRequest.objects.select_for_update(of=('self',)).select_related('equipment__client').get(pk=identifier)
-    job = outbound_for(actor).select_for_update(of=('self',)).get(pk=pk)
+    job = outbound_for(actor).select_for_update(of=('self',)).filter(pk=pk).first()
+    if job is None:
+        raise NotFound()
+    from .courier_dispatch import DispatchConflict, expected_revision
+    if 'expected_revision' in data and expected_revision(data['expected_revision']) != job.assignment_revision:
+        raise DispatchConflict()
     recipient = data.get('recipient_name', '').strip()
     if not recipient:
         raise ValidationError({'recipient_name': 'Indiquez le nom de la personne ayant reçu l’onduleur.'})
@@ -489,6 +501,8 @@ def handoff(actor, pk, data):
     if not job.active or job.cancelled_at:
         raise ValidationError('Cette mission a été annulée.')
     unit, kind = _locked_canonical(record)
+    from .courier_dispatch import require_outbound_acceptance
+    actor = require_outbound_acceptance(actor, job)
     if job.delivery_equipment_id != unit.pk or job.kind != kind or job.client_id != record.equipment.client_id:
         raise ValidationError('La préparation du dossier a changé. Un responsable doit vérifier la mission avant remise.')
     job.recipient_name = recipient
@@ -514,7 +528,12 @@ def cancel_outbound(actor, pk, data):
     if not identifier:
         raise NotFound()
     ServiceRequest.objects.select_for_update().get(pk=identifier)
-    job = outbound_for(actor).select_for_update(of=('self',)).get(pk=pk)
+    job = outbound_for(actor).select_for_update(of=('self',)).filter(pk=pk).first()
+    if job is None:
+        raise NotFound()
+    from .courier_dispatch import fresh_operator
+    actor = fresh_operator(actor)
+    _manager(actor)
     reason = data.get('reason', '').strip()
     if not reason:
         raise ValidationError({'reason': 'Indiquez le motif de l’annulation.'})
@@ -523,6 +542,8 @@ def cancel_outbound(actor, pk, data):
     if job.cancelled_at:
         return job
     job.cancelled_at = timezone.now()
+    job._dispatch_actor = actor
+    job._dispatch_change_reason = 'La mission a été annulée.'
     job.cancelled_by = actor
     job.cancellation_reason = reason
     job.active = False
@@ -635,6 +656,8 @@ def auto_assign_ready(identifier, *, actor=None, reassign_automatic=False):
             for key, value in values.items():
                 setattr(job, key, value)
             job.assignment_revision += 1
+            job._dispatch_actor = actor
+            job._dispatch_change_reason = 'La mission a été réaffectée automatiquement.'
             job.save()
         else:
             job = OutboundJob.objects.create(service_request=record, delivery_address=client.address,

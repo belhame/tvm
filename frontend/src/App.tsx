@@ -87,6 +87,7 @@ import EatonCatalogue from "./EatonCatalogue";
 import CatalogueModelPicker from "./CatalogueModelPicker";
 import RequestIntake from "./RequestIntake";
 import SimpleSAVIntake from "./SimpleSAVIntake";
+import LogisticsDeliveryNoteDetail from "./LogisticsDeliveryNoteDetail";
 import RequestsWorkspace, {
   type RequestCategoryCount,
 } from "./RequestsWorkspace";
@@ -223,6 +224,7 @@ function canManage(
   record?: RecordData,
   data?: DataMap,
 ) {
+  if (resource === "delivery-notes" && record?.logistics_status) return false;
   if (user.role === "admin") return true;
   if (user.role === "manager") return resource !== "users";
   if (user.role === "technician")
@@ -623,6 +625,26 @@ function EditForm({
         return sourceEquipment && row.equipment === sourceEquipment.id;
       return true;
     });
+  }
+  if (
+    modal.resource === "delivery-notes" &&
+    modal.record?.logistics_status &&
+    ["admin", "manager"].includes(user.role)
+  ) {
+    return (
+      <Modal
+        title="Bon de livraison préparé"
+        subtitle={modal.record.reference}
+        onClose={onClose}
+        wide
+      >
+        <LogisticsDeliveryNoteDetail
+          id={modal.record.id}
+          onClose={onClose}
+          onChanged={onSaved}
+        />
+      </Modal>
+    );
   }
   if (modal.resource === "requests" && !editing && !readonly) {
     const initialEquipment = data.equipment?.find(
@@ -1388,6 +1410,16 @@ function RecordTable({
                         visit={resource === "interventions"}
                         compact
                       />
+                    ) : resource === "delivery-notes" &&
+                      c.key === "status" &&
+                      row.logistics_status ? (
+                      <span
+                        className={`courier-bl-state ${row.logistics_status === "cancelled" ? "bl-cancelled" : "bl-prepared"}`}
+                      >
+                        {row.logistics_status === "cancelled"
+                          ? "Annulé"
+                          : "Préparé"}
+                      </span>
                     ) : c.type === "status" ? (
                       <Badge
                         value={val}
@@ -1457,6 +1489,19 @@ function RecordTable({
                 );
               })}
               <td className="action-cell">
+                {resource === "delivery-notes" &&
+                  row.logistics_status &&
+                  ["admin", "manager"].includes(user.role) && (
+                    <a
+                      className="icon-button"
+                      aria-label={`PDF du bon ${row.reference}`}
+                      href={`/api/logistics/delivery-notes/${row.id}/pdf/`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Download size={16} />
+                    </a>
+                  )}
                 {resource !== "stock-movements" && (
                   <button
                     className="icon-button row-action"

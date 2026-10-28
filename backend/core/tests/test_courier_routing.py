@@ -11,6 +11,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from core import logistics_service as logistics
+from core.courier_dispatch import accept_outbound
 from core.disposition_workflow import mark_nonrepairable, mark_repaired
 from core.exchange_workflow import prepare_exchange, ready_exchange, validate_exchange
 from core.models import Client, Equipment, OperationEvent, OutboundJob, ServiceRequest, User
@@ -87,6 +88,7 @@ class CourierRoutingTests(TestCase):
         self.assertEqual(result['skipped'], [record.pk])
         job.refresh_from_db()
         self.assertEqual(job.assignment_mode, 'manual')
+        accept_outbound(self.external, job.pk, job.assignment_revision, True)
         logistics.handoff(self.external, job.pk, {'recipient_name': 'Destinataire fictif'})
         proof = OutboundJob.objects.get(pk=job.pk).handed_over_at
         logistics.reconcile_dispatch(self.manager, client_id=self.company.pk, reassign_automatic=True)
