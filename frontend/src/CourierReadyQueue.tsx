@@ -16,7 +16,7 @@ import {
   Truck,
   UserCheck,
 } from "lucide-react";
-import { api, listResult, type User } from "./api";
+import { api, type User } from "./api";
 import CallReference from "./CallReference";
 import {
   isCurrentMissionAccepted,
@@ -36,94 +36,47 @@ export default function CourierReadyQueue({
   user,
   jobs,
   Dialog,
-  refreshKey,
+  rows,
+  loading,
+  error,
+  onReload,
+  initialFilter = "all",
   onChanged,
   onAccept,
 }: {
   user: User;
   jobs: OutboundJob[];
   Dialog: ComponentType<DialogProps>;
-  refreshKey: unknown;
+  rows: ReadyQueueItem[];
+  loading: boolean;
+  error: string;
+  onReload: () => Promise<void>;
+  initialFilter?: "all" | "available";
   onChanged: (job: OutboundJob) => Promise<void>;
   onAccept: (job: OutboundJob) => void;
 }) {
   const id = useId();
-  const [rows, setRows] = useState<ReadyQueueItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [client, setClient] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<string>(initialFilter);
   const [selected, setSelected] = useState<ReadyQueueItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
   const mounted = useRef(true);
-  const readController = useRef<AbortController | null>(null);
   const writeController = useRef<AbortController | null>(null);
-  const generation = useRef(0);
   const submitting = useRef(false);
-  const refreshSeen = useRef(refreshKey);
   const canRead = user.role === "courier" && user.courier_kind !== "client";
   async function load() {
-    if (!canRead) return;
-    readController.current?.abort();
-    const request = new AbortController();
-    readController.current = request;
-    const stamp = ++generation.current;
-    setLoading(true);
-    setError("");
-    try {
-      const result = await api<ReadyQueueItem[]>("logistics/ready-queue/", {
-        signal: request.signal,
-      });
-      if (
-        mounted.current &&
-        !request.signal.aborted &&
-        generation.current === stamp
-      )
-        setRows(listResult(result) as ReadyQueueItem[]);
-    } catch (failure) {
-      if (
-        mounted.current &&
-        !request.signal.aborted &&
-        generation.current === stamp
-      )
-        setError((failure as Error).message);
-    } finally {
-      if (
-        mounted.current &&
-        !request.signal.aborted &&
-        generation.current === stamp
-      )
-        setLoading(false);
-    }
+    if (canRead) await onReload();
   }
   useEffect(() => {
     mounted.current = true;
-    void load();
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void load();
-    }, 30000);
-    const visible = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", visible);
     return () => {
       mounted.current = false;
-      generation.current += 1;
-      readController.current?.abort();
       writeController.current?.abort();
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", visible);
     };
   }, [user.id, canRead]);
-  useEffect(() => {
-    if (refreshSeen.current !== refreshKey) {
-      refreshSeen.current = refreshKey;
-      void load();
-    }
-  }, [refreshKey]);
   const current = selected ? rows.find((row) => row.id === selected.id) : null;
   const stale = Boolean(
     selected &&
@@ -175,7 +128,6 @@ export default function CourierReadyQueue({
             "La livraison est prise en charge. Actualisez vos missions pour recharger les autres informations.",
           );
       }
-      if (mounted.current && !request.signal.aborted) await load();
     } catch (failure) {
       if (mounted.current && !request.signal.aborted) {
         setSaveError((failure as Error).message);
@@ -268,7 +220,7 @@ export default function CourierReadyQueue({
             id={`${id}-filter`}
             className="input"
             value={filter}
-            onChange={(event) => setFilter(event.target.value)}
+            onChange={(event) => setFilter(event.target.value as typeof filter)}
           >
             <option value="all">Tous les prêts</option>
             <option value="available">Disponibles</option>
@@ -289,7 +241,7 @@ export default function CourierReadyQueue({
           {notice}
         </div>
       )}
-      {loading && !rows.length ? (
+      {error && !rows.length ? null : loading && !rows.length ? (
         <div className="loading-state" role="status">
           <LoaderCircle className="spin" size={20} />
           Chargement des onduleurs prêts…

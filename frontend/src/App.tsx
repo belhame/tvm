@@ -92,6 +92,9 @@ import RequestsWorkspace, {
   type RequestCategoryCount,
 } from "./RequestsWorkspace";
 import RequestDossier from "./RequestDossier";
+import RepairQuotesWorkspace from "./RepairQuotesWorkspace";
+import NotificationCenter from "./NotificationCenter";
+import CourierNotificationBell from "./CourierNotificationBell";
 import OperationTimeline from "./OperationTimeline";
 import InterventionWorksheet from "./InterventionWorksheet";
 import RequestReceptionFields from "./RequestReceptionFields";
@@ -153,6 +156,7 @@ const navGroups = [
     label: "GESTION & SUIVI",
     items: [
       { id: "contracts", label: "Contrats & garanties", icon: ShieldCheck },
+      { id: "repair-quotes", label: "Devis", icon: FileText },
       { id: "stock", label: "Pièces & stock", icon: Package },
       { id: "delivery-notes", label: "Bons de livraison", icon: Truck },
       { id: "reports", label: "Rapports", icon: FileText },
@@ -178,6 +182,7 @@ const clientPages = new Set([
   "dispatch",
   "pickups",
   "contracts",
+  "repair-quotes",
   "delivery-notes",
   "reports",
   "scanner",
@@ -3202,6 +3207,7 @@ export default function App() {
     [contractTab, setContractTab] = useState("contracts"),
     [stockTab, setStockTab] = useState("parts"),
     [logoutBusy, setLogoutBusy] = useState(false),
+    [notificationsOpen, setNotificationsOpen] = useState(false),
     [toast, setToast] = useState(""),
     [diagnosticContext, setDiagnosticContext] = useState<{
       requestId?: number;
@@ -3357,6 +3363,7 @@ export default function App() {
     setRequestDetail(null);
     setRequestCounts(null);
     setDiagnosticContext({});
+    setNotificationsOpen(false);
     setModal(null);
     setSearchQuery("");
     setQuery("");
@@ -3445,7 +3452,14 @@ export default function App() {
         demo={demo}
       />
     );
-  const basePage = page.startsWith("requests/") ? "requests" : page;
+  const basePage = page.startsWith("requests/")
+    ? "requests"
+    : page.startsWith("repair-quotes/")
+      ? "repair-quotes"
+      : page;
+  const quoteSegments = page.split("/");
+  const quoteRouteId = Number(quoteSegments[1]);
+  const quoteRequestId = Number(quoteSegments[2]);
   const requestCategory = requestCategories.some(
     (entry) => entry.key === page.split("/")[1],
   )
@@ -3515,7 +3529,11 @@ export default function App() {
                   <Fragment key={item.id}>
                     <button
                       className={`nav-item ${allowedPage === item.id ? "active" : ""}`}
-                      aria-label={item.label}
+                      aria-label={
+                        item.id === "repair-quotes" && user.role === "client"
+                          ? "Mes devis"
+                          : item.label
+                      }
                       aria-expanded={
                         item.id === "requests"
                           ? allowedPage === "requests"
@@ -3524,7 +3542,11 @@ export default function App() {
                       onClick={() => navigate(item.id)}
                     >
                       <item.icon size={18} />
-                      <span>{item.label}</span>
+                      <span>
+                        {item.id === "repair-quotes" && user.role === "client"
+                          ? "Mes devis"
+                          : item.label}
+                      </span>
                       {item.id === "requests" &&
                         Number(dashboard.metrics?.open_requests) > 0 && (
                           <b>{dashboard.metrics.open_requests}</b>
@@ -3647,6 +3669,10 @@ export default function App() {
               <Bell size={19} />
               {Number(dashboard.metrics?.open_requests) > 0 && <span />}
             </button>
+            <CourierNotificationBell
+              userId={user.id}
+              onClick={() => setNotificationsOpen(true)}
+            />
             <button
               className="icon-button help-button"
               aria-label="Aide et intégrations"
@@ -3691,6 +3717,32 @@ export default function App() {
               {...common}
               dashboard={dashboard}
               onNavigate={navigate}
+            />
+          ) : allowedPage === "repair-quotes" ? (
+            <RepairQuotesWorkspace
+              key={`${user.id}:${user.role}`}
+              user={user}
+              requests={data.requests || []}
+              onChanged={reload}
+              quoteId={
+                Number.isSafeInteger(quoteRouteId) && quoteRouteId > 0
+                  ? quoteRouteId
+                  : undefined
+              }
+              requestId={
+                ["request", "new"].includes(quoteSegments[1]) &&
+                Number.isSafeInteger(quoteRequestId) &&
+                quoteRequestId > 0
+                  ? quoteRequestId
+                  : undefined
+              }
+              createRequested={quoteSegments[1] === "new"}
+              onNavigate={navigate}
+              onOpenRequest={(record) => {
+                navigate("requests");
+                setRequestDetail(record);
+              }}
+              Dialog={Modal}
             />
           ) : allowedPage === "pickups" ? (
             <ClientPickups
@@ -3925,6 +3977,7 @@ export default function App() {
                 setDiagnosticContext({});
                 navigate("diagnostic");
               }}
+              onOpenRepairQuote={(id) => navigate(`repair-quotes/${id}`)}
             />
           ) : resources[allowedPage] ? (
             <ResourcePage
@@ -3974,6 +4027,12 @@ export default function App() {
             data={data}
             user={user}
             onChanged={reload}
+            onOpenQuotes={(requestId, create) => {
+              setRequestDetail(null);
+              navigate(
+                `repair-quotes/${create ? "new" : "request"}/${requestId}`,
+              );
+            }}
             onOpenExchange={() => {
               setRequestDetail(null);
               navigate("exchange", currentRequestDetail.reference);
@@ -4013,6 +4072,24 @@ export default function App() {
           onSaved={saved}
         />
       )}{" "}
+      {notificationsOpen && (
+        <Modal
+          title="Notifications et rappels"
+          onClose={() => setNotificationsOpen(false)}
+          wide
+        >
+          <div className="modal-content">
+            <NotificationCenter
+              key={user.id}
+              user={user}
+              onOpenRepairQuote={(id) => {
+                setNotificationsOpen(false);
+                navigate(`repair-quotes/${id}`);
+              }}
+            />
+          </div>
+        </Modal>
+      )}
       {currentDetail && (
         <InterventionDetail
           record={currentDetail}

@@ -22,6 +22,8 @@ type Notification = {
   call_number?: string;
   client_reference?: string;
   target?: string;
+  target_id?: number | null;
+  actionable?: boolean;
 };
 type Preference = {
   schedule_mode?: "disabled" | "catch_up_today" | "next_08";
@@ -61,11 +63,13 @@ export default function NotificationCenter({
   compact = false,
   onOpenReady,
   onOpenMissions,
+  onOpenRepairQuote,
 }: {
   user: User;
   compact?: boolean;
   onOpenReady?: () => void;
   onOpenMissions?: () => void;
+  onOpenRepairQuote?: (id: number) => void;
 }) {
   const id = useId();
   const hasPreferences = user.role === "admin" || user.role === "courier";
@@ -158,7 +162,7 @@ export default function NotificationCenter({
     }
   }
   async function markRead(notification: Notification) {
-    if (reading !== null) return;
+    if (reading !== null) return false;
     const pending = new AbortController();
     controller.current = pending;
     setReading(notification.id);
@@ -179,6 +183,7 @@ export default function NotificationCenter({
           Math.max(0, count - (notification.read_at ? 0 : 1)),
         );
         window.dispatchEvent(new Event("tvm-notifications-changed"));
+        return true;
       }
     } catch (error) {
       if (mounted.current && !pending.signal.aborted)
@@ -187,6 +192,7 @@ export default function NotificationCenter({
             ? error.message
             : "La notification n’a pas pu être marquée comme lue.",
         ]);
+      return false;
     } finally {
       if (mounted.current && !pending.signal.aborted) setReading(null);
     }
@@ -351,32 +357,57 @@ export default function NotificationCenter({
                   <div>
                     <strong>{notification.title}</strong>
                     <p>{notification.body}</p>
-                    {onOpenReady && notification.target === "courier_ready_queue" && (
-                      <button
-                        type="button"
-                        className="button secondary small"
-                        disabled={reading !== null}
-                        onClick={async () => {
-                          if (!notification.read_at) await markRead(notification);
-                          onOpenReady();
-                        }}
-                      >
-                        Voir les prêts à livrer
-                      </button>
-                    )}
-                    {onOpenMissions && notification.target === "courier_missions" && (
-                      <button
-                        type="button"
-                        className="button secondary small"
-                        disabled={reading !== null}
-                        onClick={async () => {
-                          if (!notification.read_at) await markRead(notification);
-                          onOpenMissions();
-                        }}
-                      >
-                        Voir mes missions
-                      </button>
-                    )}
+                    {onOpenRepairQuote &&
+                      notification.target === "repair_quote" &&
+                      notification.actionable === true &&
+                      typeof notification.target_id === "number" &&
+                      Number.isSafeInteger(notification.target_id) &&
+                      notification.target_id > 0 && (
+                        <button
+                          type="button"
+                          className="button secondary small"
+                          disabled={reading !== null}
+                          onClick={async () => {
+                            const opened =
+                              notification.read_at ||
+                              (await markRead(notification));
+                            if (opened)
+                              onOpenRepairQuote(notification.target_id!);
+                          }}
+                        >
+                          Voir le devis
+                        </button>
+                      )}
+                    {onOpenReady &&
+                      notification.target === "courier_ready_queue" && (
+                        <button
+                          type="button"
+                          className="button secondary small"
+                          disabled={reading !== null}
+                          onClick={async () => {
+                            if (!notification.read_at)
+                              await markRead(notification);
+                            onOpenReady();
+                          }}
+                        >
+                          Voir les prêts à livrer
+                        </button>
+                      )}
+                    {onOpenMissions &&
+                      notification.target === "courier_missions" && (
+                        <button
+                          type="button"
+                          className="button secondary small"
+                          disabled={reading !== null}
+                          onClick={async () => {
+                            if (!notification.read_at)
+                              await markRead(notification);
+                            onOpenMissions();
+                          }}
+                        >
+                          Voir mes missions
+                        </button>
+                      )}
                     <small>
                       {dateFR(notification.created_at, true)} · Dans
                       l’application

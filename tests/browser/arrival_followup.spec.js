@@ -75,6 +75,8 @@ test('la réception enregistre la vraie arrivée et les informations de suivi da
   expect(saved).toMatchObject({ equipment: equipment.id, client_reference: `REF-${marker}`, return_flag: true, service_location: 'workshop', delivered_by: 'courier', warranty_status: 'quotation' });
   expect(saved.arrived_at).not.toBe(saved.created_at);
   expect(saved.timing).toMatchObject({ timer_state: 'running', clock_basis: 'business_hours_excluding_weekends', is_overdue_48h: true });
+  await page.getByLabel('Rechercher une demande', { exact: true }).fill(marker);
+  await page.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
   const row = page.locator('.request-workspace tbody tr').filter({ hasText: saved.reference });
   await expect(row.locator('.request-timer-overdue')).toContainText('2 jours ouvrés dépassé');
   dialog = await findRequest(page, marker, saved.reference);

@@ -17,6 +17,7 @@ class InAppNotification(models.Model):
         RECEIVED = 'equipment_received', 'Matériel reçu'
         DELIVERED = 'equipment_delivered', 'Remise enregistrée'
         LOGISTICS = 'logistics_update', 'Information logistique du centre'
+        REPAIR_QUOTE = 'repair_quote', 'Devis de réparation'
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='in_app_notifications')
     client = models.ForeignKey('core.Client', on_delete=models.PROTECT, null=True, blank=True, related_name='in_app_notifications')

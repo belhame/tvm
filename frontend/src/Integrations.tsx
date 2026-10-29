@@ -34,10 +34,12 @@ export default function Integrations({
   user,
   clients = [],
   onOpenDiagnostic,
+  onOpenRepairQuote,
 }: {
   user: User;
   clients?: RecordData[];
   onOpenDiagnostic: () => void;
+  onOpenRepairQuote?: (id: number) => void;
 }) {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState("");
@@ -373,7 +375,11 @@ export default function Integrations({
       )}
       {user.role === "admin" && (
         <div className="card integration-reminders">
-          <NotificationCenter key={user.id} user={user} />
+          <NotificationCenter
+            key={user.id}
+            user={user}
+            onOpenRepairQuote={onOpenRepairQuote}
+          />
         </div>
       )}
       <div

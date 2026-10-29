@@ -9,10 +9,7 @@ import {
 } from "react";
 import {
   AlertCircle,
-  ArrowRight,
-  Bell,
   CheckCircle2,
-  Home,
   LoaderCircle,
   LogOut,
   MapPin,
@@ -25,7 +22,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
-import { api, dateFR, initials, listResult, type User } from "./api";
+import { api, dateFR, type User } from "./api";
 import CallReference from "./CallReference";
 import CourierReception from "./CourierReception";
 import SimpleSAVIntake from "./SimpleSAVIntake";
@@ -36,6 +33,8 @@ import CourierReadyQueue from "./CourierReadyQueue";
 import CourierDeliveryNotes from "./CourierDeliveryNotes";
 import CourierMissionAcceptance from "./CourierMissionAcceptance";
 import CourierNotificationBell from "./CourierNotificationBell";
+import CourierHubNavigation from "./CourierHubNavigation";
+import { readCourierCollection } from "./courierHub";
 import {
   logisticsReference,
   isCurrentMissionAccepted,
@@ -43,6 +42,7 @@ import {
   type LogisticsBootstrap,
   type OutboundJob,
   type Pickup,
+  type ReadyQueueItem,
 } from "./logistics";
 
 type DialogProps = {
@@ -53,15 +53,15 @@ type DialogProps = {
   wide?: boolean;
 };
 const courierNavigation = [
-  { key: "home", label: "Accueil", icon: Home },
-  { key: "routes", label: "Tournées", icon: MapPin },
+  { key: "home", label: "À livrer", icon: Truck },
+  { key: "routes", label: "À récupérer", icon: MapPin },
   { key: "receive", label: "Réception", icon: ScanLine },
   { key: "ready", label: "Prêts", icon: Truck },
-  { key: "returns", label: "Retours", icon: Undo2 },
+  { key: "returns", label: "Historique", icon: CheckCircle2 },
 ];
 export default function CourierWorkspace({
   user,
-  bootstrap,
+  bootstrap: suppliedBootstrap,
   loading,
   error,
   page,
@@ -84,7 +84,12 @@ export default function CourierWorkspace({
   Dialog: ComponentType<DialogProps>;
   demo: boolean;
 }) {
-  const external = (bootstrap?.user || user).courier_kind === "client";
+  const bootstrap = suppliedBootstrap?.user.id === user.id &&
+    suppliedBootstrap.user.client === user.client &&
+    (!user.courier_kind || suppliedBootstrap.user.courier_kind === user.courier_kind)
+    ? suppliedBootstrap : null;
+  const currentUser = bootstrap?.user.id === user.id ? bootstrap.user : user;
+  const external = currentUser.courier_kind === "client";
   const canReadyQueue =
     !external && bootstrap?.capabilities?.can_ready_queue === true;
   const canPrepareBL = !external && Boolean(bootstrap);
@@ -94,13 +99,17 @@ export default function CourierWorkspace({
     bootstrap?.capabilities?.can_receive === true &&
     bootstrap?.capabilities?.can_lookup === true;
   const navigation = courierNavigation.filter(
-    (item) => item.key !== "receive" || canReceive,
+    (item) => (item.key !== "receive" || canReceive) &&
+      (item.key !== "routes" || canPickups) &&
+      (item.key !== "ready" || canReadyQueue),
   );
   const view = navigation.some((item) => `courier/${item.key}` === page)
     ? page.split("/")[1]
     : "home";
   const [pickups, setPickups] = useState<Pickup[]>([]);
   const [jobs, setJobs] = useState<OutboundJob[]>([]);
+  const [readyRows, setReadyRows] = useState<ReadyQueueItem[]>([]);
+  const [failedLists, setFailedLists] = useState<string[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listErrors, setListErrors] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
@@ -111,10 +120,11 @@ export default function CourierWorkspace({
   const [busyPickup, setBusyPickup] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [readyTab, setReadyTab] = useState<"shared" | "missions" | "notes">(
-    "shared",
+    "missions",
   );
   const [acceptingJob, setAcceptingJob] = useState<OutboundJob | null>(null);
   const [noteJobIds, setNoteJobIds] = useState<number[]>([]);
+  const [historyTab, setHistoryTab] = useState<"deliveries" | "pickups">("deliveries");
   const listController = useRef<AbortController | null>(null);
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
@@ -126,47 +136,70 @@ export default function CourierWorkspace({
     };
   }, []);
   useEffect(() => {
+    controller.current?.abort();
+    setPickups([]);
+    setJobs([]);
+    setReadyRows([]);
+    setSelectedPickup(null);
+    setSelectedJob(null);
+    setAcceptingJob(null);
+    setSimpleIntakeOpen(false);
+    setBusyPickup(null);
+    setNotice("");
+  }, [user.id, external, user.client]);
+  useEffect(() => {
     const pending = new AbortController();
     listController.current = pending;
     setListLoading(true);
     setListErrors([]);
+    setFailedLists([]);
     const tasks = [
       {
         key: "outbound",
-        read: () => api("logistics/outbound/", { signal: pending.signal }),
+        read: () => readCourierCollection<OutboundJob>("logistics/outbound/", pending.signal),
       },
       ...(canPickups
         ? [
             {
               key: "pickups",
-              read: () => api("logistics/pickups/", { signal: pending.signal }),
+              read: () => readCourierCollection<Pickup>("logistics/pickups/", pending.signal),
             },
           ]
         : []),
+      ...(canReadyQueue ? [{
+        key: "ready",
+        read: () => readCourierCollection<ReadyQueueItem>("logistics/ready-queue/", pending.signal),
+      }] : []),
     ];
     if (!canPickups) setPickups([]);
+    if (!canReadyQueue) setReadyRows([]);
     void Promise.allSettled(
       tasks.map(async (task) => [task.key, await task.read()] as const),
     ).then((results) => {
       if (pending.signal.aborted) return;
       const failures: string[] = [];
+      const failed: string[] = [];
       results.forEach((result, index) => {
         if (result.status === "fulfilled") {
           if (result.value[0] === "pickups")
-            setPickups(listResult(result.value[1]) as Pickup[]);
-          else setJobs(listResult(result.value[1]) as OutboundJob[]);
-        } else
+            setPickups(result.value[1] as Pickup[]);
+          else if (result.value[0] === "ready") setReadyRows(result.value[1] as ReadyQueueItem[]);
+          else setJobs(result.value[1] as OutboundJob[]);
+        } else {
+          failed.push(tasks[index].key);
           failures.push(
             result.reason instanceof Error
               ? result.reason.message
               : "Chargement de la tournée impossible.",
           );
+        }
       });
       setListErrors(failures);
+      setFailedLists(failed);
       setListLoading(false);
     });
     return () => pending.abort();
-  }, [revision, user.id, canPickups]);
+  }, [revision, view, user.id, external, user.client, canPickups, canReadyQueue]);
   useEffect(() => {
     const poll = () => {
       if (document.visibilityState === "visible")
@@ -179,6 +212,10 @@ export default function CourierWorkspace({
       document.removeEventListener("visibilitychange", poll);
     };
   }, [user.id]);
+  function navigateWorkspace(target: string) {
+    if (target === `courier/${view}`) setRevision((value) => value + 1);
+    onNavigate(target);
+  }
   async function missionChanged(job: OutboundJob) {
     listController.current?.abort();
     setJobs((rows) =>
@@ -186,6 +223,15 @@ export default function CourierWorkspace({
         ? rows.map((row) => (row.id === job.id ? job : row))
         : [...rows, job],
     );
+    setReadyRows((rows) => rows.map((row) => row.id === job.service_request ? {
+      ...row, job: job.id, assigned_courier: job.assigned_courier,
+      assigned_courier_name: job.assigned_courier_name,
+      routing_status: "reserved", can_claim: false,
+      expected_revision: job.assignment_revision ?? row.expected_revision,
+      accepted: job.accepted, accepted_at: job.accepted_at,
+      accepted_revision: job.accepted_revision,
+      assignment_revision: job.assignment_revision,
+    } : row));
     await refreshed();
   }
   async function refreshed() {
@@ -230,18 +276,15 @@ export default function CourierWorkspace({
       if (mounted.current && !pending.signal.aborted) setBusyPickup(null);
     }
   }
-  const activePickups = pickups.filter(
-    (pickup) => !["received", "cancelled"].includes(pickup.status),
-  );
-  const shownJobs = jobs.filter(
-    (job) =>
-      job.status !== "cancelled" &&
-      (view === "ready"
-        ? job.kind === "delivery"
-        : view === "returns"
-          ? job.kind === "return"
-          : true),
-  );
+  const ownPickups = canPickups ? pickups.filter((pickup) => pickup.assigned_courier === user.id) : [];
+  const activePickups = ownPickups.filter((pickup) => !["received", "cancelled"].includes(pickup.status));
+  const ownJobs = jobs.filter((job) => job.assigned_courier === user.id &&
+    (!external || job.client.id === currentUser.client));
+  const activeJobs = ownJobs.filter((job) => job.status === "assigned" && job.active !== false && !job.handed_over_at)
+    .sort((first, second) => Number(isCurrentMissionAccepted(first)) - Number(isCurrentMissionAccepted(second)) || first.id - second.id);
+  const historicalJobs = ownJobs.filter((job) => job.status === "completed");
+  const historicalPickups = ownPickups.filter((pickup) => ["received", "cancelled"].includes(pickup.status));
+  const availableReady = canReadyQueue ? readyRows.filter((row) => row.routing_status === "available" && row.can_claim) : [];
   function pickupCard(pickup: Pickup) {
     return (
       <article className="courier-job-card" key={`pickup:${pickup.id}`}>
@@ -304,7 +347,7 @@ export default function CourierWorkspace({
               className="button primary"
               onClick={() => {
                 setSelectedPickup(pickup);
-                onNavigate("courier/receive");
+                navigateWorkspace("courier/receive");
               }}
             >
               <PackageCheck size={17} />
@@ -389,7 +432,7 @@ export default function CourierWorkspace({
               onClick={() => {
                 setNoteJobIds([job.id]);
                 setReadyTab("notes");
-                onNavigate("courier/ready");
+                navigateWorkspace("courier/ready");
               }}
             >
               Préparer le BL
@@ -422,33 +465,32 @@ export default function CourierWorkspace({
           Chargement de la tournée…
         </div>
       );
-    const count =
-      view === "routes"
-        ? activePickups.length + shownJobs.length
-        : shownJobs.length;
+    const pickupView = view === "routes" || (view === "returns" && historyTab === "pickups");
+    const shownPickups = view === "returns" ? historicalPickups : activePickups;
+    const shownJobs = view === "returns" ? historicalJobs : activeJobs;
+    const count = pickupView ? shownPickups.length : shownJobs.length;
     return (
       <>
         <div className="courier-section-heading">
           <h2>
-            {view === "routes"
-              ? canPickups
-                ? "Enlèvements et remises"
-                : "Mes livraisons et retours"
-              : view === "ready"
-                ? "Mes livraisons"
-                : "Retours affectés"}
+            {view === "returns" ? pickupView ? "Enlèvements terminés" : "Remises effectuées" : pickupView ? "Mes enlèvements" : "Mes livraisons"}
           </h2>
-          <span>{count} mission(s)</span>
+          <span>{failedLists.includes(pickupView ? "pickups" : "outbound") ? "Nombre indisponible" : `${count} mission(s)`}</span>
         </div>
+        {view !== "returns" && (
+          <p className="courier-hub-missions-description">
+            {pickupView ? "Vos collectes chez les clients et leurs clients finaux. La prise en charge du transport ne confirme pas l’arrivée à l’atelier."
+              : "Livraisons et retours client affectés à votre compte. Acceptez la mission avant de confirmer la remise physique."}
+          </p>
+        )}
         <div className="courier-job-list">
-          {view === "routes" && activePickups.map(pickupCard)}
-          {shownJobs.map(jobCard)}
+          {pickupView ? shownPickups.map(pickupCard) : shownJobs.map(jobCard)}
         </div>
-        {count === 0 && (
+        {count === 0 && !failedLists.includes(pickupView ? "pickups" : "outbound") && (
           <div className="courier-empty-state">
             <Truck size={30} />
             <h3>Aucune mission dans cette vue</h3>
-            <p>Les transports affectés à votre compte apparaissent ici.</p>
+            <p>{view === "returns" ? "Les opérations terminées apparaissent dans cet historique." : "Les transports affectés à votre compte apparaissent ici."}</p>
           </div>
         )}
       </>
@@ -504,25 +546,45 @@ export default function CourierWorkspace({
             </span>
           </div>
         )}
+        <CourierHubNavigation
+          deliveries={activeJobs.length}
+          available={availableReady.length}
+          awaitingAcceptance={activeJobs.filter((job) => !isCurrentMissionAccepted(job)).length}
+          pickups={activePickups.length}
+          pickupsInTransit={activePickups.filter((pickup) => pickup.status === "collected").length}
+          loading={listLoading}
+          sharedLoading={listLoading}
+          hasDeliveryError={failedLists.includes("outbound")}
+          hasPickupError={failedLists.includes("pickups")}
+          hasSharedError={failedLists.includes("ready")}
+          canPickups={canPickups}
+          canReadyQueue={canReadyQueue}
+          view={view}
+          onDeliveries={() => {
+            setReadyTab("missions");
+            navigateWorkspace("courier/home");
+          }}
+          onPickups={() => navigateWorkspace("courier/routes")}
+        />
         <div className="courier-page-heading">
           <div>
             <span className="eyebrow">VOTRE ESPACE LIVREUR</span>
             <h1>
               {view === "home"
-                ? `Bonjour ${user.first_name || user.username}`
+                ? "À livrer"
                 : view === "routes"
-                  ? "Mes tournées"
+                  ? "À récupérer"
                   : view === "receive"
                     ? "Réception SAV"
                     : view === "ready"
                       ? "Prêts à livrer"
-                      : "Retours au client"}
+                      : "Historique des transports"}
             </h1>
             <p>
               {view === "home"
                 ? external
                   ? "Vos livraisons et retours pour votre société."
-                  : "Votre matériel, vos transports et les réceptions du jour."
+                  : "Vos livraisons et retours, puis les onduleurs disponibles de tous les clients."
                 : view === "receive"
                   ? "Le scan identifie le matériel ; seule votre confirmation enregistre son arrivée."
                   : "Vos missions affectées, avec confirmation de chaque étape."}
@@ -553,6 +615,22 @@ export default function CourierWorkspace({
             </button>
           </div>
         </div>
+        {canPrepareBL && view !== "receive" && (
+          <div className="courier-hub-secondary-actions">
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => {
+                setNoteJobIds([]);
+                setReadyTab("notes");
+                navigateWorkspace("courier/ready");
+              }}
+            >
+              <PackageCheck size={16} />
+              Préparer un bon de livraison
+            </button>
+          </div>
+        )}
         {[error, ...listErrors].filter(Boolean).map((message, index) => (
           <div className="error-box" role="alert" key={index}>
             <AlertCircle size={18} />
@@ -565,141 +643,7 @@ export default function CourierWorkspace({
             {notice}
           </div>
         )}
-        {view === "home" ? (
-          <>
-            <div
-              className={`courier-metrics ${!canPickups ? "courier-metrics-two" : ""}`}
-            >
-              {canPickups && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate("courier/routes")}
-                >
-                  <span>
-                    <MapPin size={21} />
-                  </span>
-                  <strong className="metric-value">
-                    {bootstrap?.metrics.pickups ?? "—"}
-                  </strong>
-                  <small>Enlèvements affectés</small>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setReadyTab("missions");
-                  onNavigate("courier/ready");
-                }}
-              >
-                <span>
-                  <Truck size={21} />
-                </span>
-                <strong className="metric-value">
-                  {bootstrap?.metrics.ready ?? "—"}
-                </strong>
-                <small>Mes livraisons affectées</small>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigate("courier/returns")}
-              >
-                <span>
-                  <Undo2 size={21} />
-                </span>
-                <strong className="metric-value">
-                  {bootstrap?.metrics.returns ?? "—"}
-                </strong>
-                <small>Retours affectés</small>
-              </button>
-            </div>
-            {canReadyQueue && (
-              <button
-                type="button"
-                className="courier-shared-ready-shortcut"
-                onClick={() => {
-                  setReadyTab("shared");
-                  onNavigate("courier/ready");
-                }}
-              >
-                <Truck size={25} />
-                <div>
-                  <strong>Tous les onduleurs prêts à livrer</strong>
-                  <span>
-                    Consulter les disponibilités de tous les clients et prendre
-                    une livraison.
-                  </span>
-                </div>
-                <ArrowRight size={20} />
-              </button>
-            )}
-            {canReceive && (
-              <button
-                type="button"
-                className="courier-reception-shortcut"
-                onClick={() => {
-                  setSelectedPickup(null);
-                  onNavigate("courier/receive");
-                }}
-              >
-                <ScanLine size={29} />
-                <div>
-                  <strong>Réceptionner un onduleur</strong>
-                  <span>Douchette USB, caméra, photo ou saisie manuelle</span>
-                </div>
-                <ArrowRight size={21} />
-              </button>
-            )}
-            <div className="courier-section-heading">
-              <h2>
-                {canPickups
-                  ? "Prochains enlèvements"
-                  : "Mes prochaines remises"}
-              </h2>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onNavigate("courier/routes")}
-              >
-                Voir ma tournée
-                <ArrowRight size={14} />
-              </button>
-            </div>
-            {listLoading ? (
-              <div className="loading-state">
-                <LoaderCircle size={18} className="spin" />
-                Chargement des missions…
-              </div>
-            ) : !canPickups ? (
-              jobs.filter((job) => job.status === "assigned").length ? (
-                <div className="courier-job-list">
-                  {jobs
-                    .filter((job) => job.status === "assigned")
-                    .slice(0, 3)
-                    .map(jobCard)}
-                </div>
-              ) : (
-                <div className="courier-empty-state">
-                  <Truck size={29} />
-                  <h3>Aucun transport affecté</h3>
-                  <p>
-                    Votre société et l’équipe TVM peuvent préparer les
-                    prochaines affectations.
-                  </p>
-                </div>
-              )
-            ) : activePickups.length ? (
-              <div className="courier-job-list">
-                {activePickups.slice(0, 3).map(pickupCard)}
-              </div>
-            ) : (
-              <div className="courier-empty-state">
-                <MapPin size={29} />
-                <h3>Aucun enlèvement en cours</h3>
-                <p>Les demandes affectées à votre compte apparaîtront ici.</p>
-              </div>
-            )}
-          </>
-        ) : view === "receive" ? (
+        {view === "receive" ? (
           <CourierReception
             key={selectedPickup?.id || "walk-in"}
             clients={bootstrap?.clients || []}
@@ -707,7 +651,7 @@ export default function CourierWorkspace({
             onReceived={refreshed}
             onClearPickup={() => setSelectedPickup(null)}
           />
-        ) : view === "ready" && (canReadyQueue || canPrepareBL) ? (
+        ) : (view === "ready" || view === "home") && (canReadyQueue || canPrepareBL) ? (
           <>
             <div
               className="courier-ready-tabs"
@@ -719,7 +663,10 @@ export default function CourierWorkspace({
                   type="button"
                   aria-pressed={readyTab === "shared"}
                   className={readyTab === "shared" ? "active" : ""}
-                  onClick={() => setReadyTab("shared")}
+                  onClick={() => {
+                    setReadyTab("shared");
+                    setRevision((value) => value + 1);
+                  }}
                 >
                   File partagée
                 </button>
@@ -736,7 +683,10 @@ export default function CourierWorkspace({
                     ? "active"
                     : ""
                 }
-                onClick={() => setReadyTab("missions")}
+                onClick={() => {
+                  setReadyTab("missions");
+                  setRevision((value) => value + 1);
+                }}
               >
                 Mes livraisons
               </button>
@@ -759,7 +709,10 @@ export default function CourierWorkspace({
                 user={bootstrap?.user || user}
                 jobs={jobs}
                 Dialog={Dialog}
-                refreshKey={revision}
+                rows={readyRows}
+                loading={listLoading}
+                error={failedLists.includes("ready") ? "La file des prêts n’a pas pu être actualisée." : ""}
+                onReload={refreshed}
                 onChanged={missionChanged}
                 onAccept={setAcceptingJob}
               />
@@ -772,8 +725,39 @@ export default function CourierWorkspace({
                 refreshKey={revision}
               />
             ) : (
-              ownMissions()
+              <>
+                <section className="courier-hub-in-progress" aria-label="Livraisons en cours">
+                  {ownMissions()}
+                </section>
+                {view === "home" && canReadyQueue && (
+                  <CourierReadyQueue
+                    key="home-available"
+                    user={currentUser}
+                    jobs={jobs}
+                    Dialog={Dialog}
+                    rows={readyRows}
+                    loading={listLoading}
+                    error={failedLists.includes("ready") ? "La file des prêts n’a pas pu être actualisée." : ""}
+                    onReload={refreshed}
+                    initialFilter="available"
+                    onChanged={missionChanged}
+                    onAccept={setAcceptingJob}
+                  />
+                )}
+              </>
             )}
+          </>
+        ) : view === "returns" ? (
+          <>
+            <div className="courier-ready-tabs" role="group" aria-label="Historique des transports">
+              <button type="button" aria-pressed={historyTab === "deliveries"} className={historyTab === "deliveries" ? "active" : ""} onClick={() => setHistoryTab("deliveries")}>
+                Livraisons et retours
+              </button>
+              {canPickups && <button type="button" aria-pressed={historyTab === "pickups"} className={historyTab === "pickups" ? "active" : ""} onClick={() => setHistoryTab("pickups")}>
+                Enlèvements
+              </button>}
+            </div>
+            {ownMissions()}
           </>
         ) : (
           ownMissions()
@@ -794,7 +778,8 @@ export default function CourierWorkspace({
             aria-current={view === item.key ? "page" : undefined}
             onClick={() => {
               if (item.key === "ready") setReadyTab("shared");
-              onNavigate(`courier/${item.key}`);
+              if (item.key === "home") setReadyTab("missions");
+              navigateWorkspace(`courier/${item.key}`);
             }}
           >
             <item.icon size={21} />
@@ -865,12 +850,13 @@ export default function CourierWorkspace({
               onOpenReady={() => {
                 setNotificationsOpen(false);
                 setReadyTab("shared");
-                onNavigate("courier/ready");
+                navigateWorkspace("courier/ready");
                 void refreshed();
               }}
               onOpenMissions={() => {
                 setNotificationsOpen(false);
-                onNavigate("courier/routes");
+                setReadyTab("missions");
+                navigateWorkspace("courier/home");
                 void refreshed();
               }}
             />

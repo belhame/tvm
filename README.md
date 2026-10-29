@@ -22,13 +22,15 @@ L'annuaire clients propose un import CSV avec prévisualisation, sans écraser l
 
 Pour la prévention, l'objectif de visites du dossier reste distinct du nombre calculé de fiches réellement terminées. Les visites conservent le même appel TVM et leurs références secondaires ; la mise en service dispose de sa fiche et de son PDF dédiés.
 
+Les administrateurs et responsables préparent des **devis de réparation** avec remise en pourcentage ou montant HT avant TVA. Dans **Mes devis**, le client consulte le PDF, accepte, refuse ou change d'avis sur la version courante. Une nouvelle révision conserve l'ancien PDF et exige un nouvel accord ; les avis ne remettent pas en arrière les opérations réalisées. Voir [les devis de réparation](docs/GUIDE_SUIVI_SAV.md#devis-de-réparation-et-réponse-du-client).
+
 Les demandes classées **Échange** alimentent automatiquement leur file de suivi. La validation technique du remplacement et la confirmation financière sont distinctes ; la clôture attend la confirmation d'une facture émise dans le système externe de l'entreprise.
 
 Le menu **Livraisons & retours** réunit les réparations testées et les échanges prêts, avec une colonne **À retourner au client** pour les non-réparables. TVM crée le devis PDF de diagnostic ; la clôture du retour exige une facture externe confirmée ou une gratuité approuvée et justifiée. Cette gratuité ne dispense pas un échange de sa facture. Voir [le parcours](docs/GUIDE_SUIVI_SAV.md#prêt-à-être-livré-et-retour-dun-matériel-non-réparable).
 
 Le portail permet de demander un enlèvement ; le responsable affecte les transports et le livreur enregistre la réception atelier puis la remise au client dans [son espace logistique](docs/GUIDE_SUIVI_SAV.md#enlèvement-réception-atelier-et-remise-au-client). La série peut venir d'une saisie, d'une douchette, d'une caméra compatible ou d'une photo, toujours vérifiée avant confirmation.
 
-Les livreurs TVM disposent d'une **file partagée des prêts à livrer**, avec prise volontaire ou confirmation de mission affectée et notifications dans l'application. Ils préparent leurs **BL PDF individuels ou par lot d'un même client**, conservés à l'identique. Le BL reste distinct de la remise physique, du stock et de la facture. Voir [le parcours livraison et BL](docs/GUIDE_SUIVI_SAV.md#prendre-une-livraison-dans-la-file-partagée).
+L'espace livreur met **À livrer** et **À récupérer** au premier plan : livraisons et retours actifs d'un côté, enlèvements affectés de l'autre, avec historique séparé. Les TVM gardent la **file partagée des prêts** et leurs **BL PDF individuels ou par lot d'un même client** ; les externes restent limités à leurs missions. Le BL reste distinct de la remise physique, du stock et de la facture. Voir [le parcours livraison et BL](docs/GUIDE_SUIVI_SAV.md#prendre-une-livraison-dans-la-file-partagée).
 
 Les notifications sont enregistrées dans TVM. Le livreur peut activer son rappel interne de 08:00. Un journal prépare aussi les messages e-mail/WhatsApp du responsable du centre pour les affectations et collectes. **Ces canaux restent désactivés et à connecter** ; les adaptateurs fournis ne relancent pas automatiquement les anciens messages bloqués. Voir [les notifications et leurs réglages](docs/GUIDE_SUIVI_SAV.md#notifications-et-rappels-du-livreur).
 

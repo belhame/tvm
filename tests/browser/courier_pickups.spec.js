@@ -217,7 +217,12 @@ test('le livreur utilise son espace dédié et la douchette prépare une récept
     expect(bootstrap.user.role).toBe('courier');
     expect(bootstrap.couriers).toEqual([]);
     for (const client of bootstrap.clients) expect(Object.keys(client).sort()).toEqual(['id', 'name']);
-    await expect(courier.locator('.courier-metrics .metric-value')).toHaveText([String(bootstrap.metrics.pickups), String(bootstrap.metrics.ready), String(bootstrap.metrics.returns)]);
+    const navigation = courier.getByRole('region', { name: 'Navigation des transports', exact: true });
+    const available = (await api(courier, 'logistics/ready-queue/')).filter(row => row.routing_status === 'available' && row.can_claim).length;
+    await expect(navigation.getByRole('button', { name: 'À livrer', exact: true }).locator('.courier-hub-section-content b'))
+      .toHaveText([String(bootstrap.metrics.ready + bootstrap.metrics.returns), String(available)]);
+    await expect(navigation.getByRole('button', { name: 'À récupérer', exact: true }).locator('.courier-hub-section-content b'))
+      .toHaveText([String(bootstrap.metrics.pickups)]);
     await expectCourierContrast(courier, 'Accueil livreur mobile');
     expect(await courier.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)).toBe(false);
     for (const path of ['dashboard/', 'clients/', 'equipment/', 'requests/', 'interventions/', 'users/', 'parts/', 'audit/', 'search/?q=secret', 'interventions/1/report/', 'requests/1/documents/', 'diagnostic-quotes/1/pdf/'])
@@ -349,7 +354,7 @@ test('un enlèvement demandé par le client reste sans arrivée SAV jusqu’à l
     expect((await response(foreignCustomer, `logistics/pickups/${pickup.id}/`)).status()).toBe(404);
 
     await login(courier, courierA.username, true);
-    await courierNavigate(courier, 'Tournées');
+    await courierNavigate(courier, 'À récupérer');
     const job = courier.locator('.courier-job-card').filter({ hasText: unit.serial_number });
     await expect(job).toHaveCount(1);
     await expect(job).toContainText('42 voie du laboratoire fictif, Cotonou');
@@ -450,7 +455,7 @@ test('les transports affectés livrent le remplacement validé ou retournent l�
     await login(courier, courierAccountA.username, true);
     const completed = [];
     for (const [index, job] of jobs.entries()) {
-      await courierNavigate(courier, index === 0 ? 'Prêts' : 'Retours');
+      await courierNavigate(courier, index === 0 ? 'Prêts' : 'À livrer');
       if (index === 0) await courier.getByRole('button', { name: 'Mes livraisons', exact: true }).click();
       const card = courier.locator('.courier-job-card').filter({ hasText: job.serial_number });
       await expect(card).toHaveCount(1);

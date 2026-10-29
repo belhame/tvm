@@ -487,3 +487,4 @@ from .outbox_models import ExternalNotification  # noqa: E402,F401
 from .knowledge_models import KnowledgeChunk, RepairCase, TechnicalDocument  # noqa: E402,F401
 from .diagnostic_models import DiagnosticGate, DiagnosticRun  # noqa: E402,F401
 from .logistics_delivery_note_models import DeliveryNoteMission, LogisticsDeliveryNote  # noqa: E402,F401
+from .repair_quote_models import RepairQuote, RepairQuoteBook, RepairQuoteDecision  # noqa: E402,F401

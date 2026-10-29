@@ -73,7 +73,10 @@ def notification_payload(item, user):
     base = {'id': item.pk, 'kind': item.kind, 'created_at': item.created_at, 'read_at': item.read_at,
             'local_date': item.local_date, 'channel': 'in_app', 'channel_status': 'available',
             'service_request': None, 'call_number': '', 'client_reference': '', 'details': {}}
-    if item.kind == InAppNotification.Kind.LOGISTICS:
+    if item.kind == InAppNotification.Kind.REPAIR_QUOTE:
+        from .repair_quote_service import quote_notification_payload
+        base.update(quote_notification_payload(item, user))
+    elif item.kind == InAppNotification.Kind.LOGISTICS:
         if item.payload.get('event') == 'ready_availability':
             from .ready_notifications import ready_notification_payload
             base.update(ready_notification_payload(item, user))

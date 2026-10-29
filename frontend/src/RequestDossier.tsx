@@ -23,6 +23,7 @@ const tabs = [
   ["followup", "Suivi"],
   ["equipment", "Matériel"],
   ["contracts", "Contrat"],
+  ["quotes", "Devis"],
   ["maintenance", "Maintenance"],
   ["commissioning", "Mise en service"],
   ["preventive", "Préventive"],
@@ -61,6 +62,7 @@ export default function RequestDossier({
   onChanged,
   onOpenExchange,
   onOpenDispatch,
+  onOpenQuotes,
 }: {
   record: RecordData;
   data: Record<string, RecordData[]>;
@@ -72,6 +74,7 @@ export default function RequestDossier({
   onChanged: () => Promise<void>;
   onOpenExchange?: () => void;
   onOpenDispatch?: () => void;
+  onOpenQuotes?: (requestId: number, create?: boolean) => void;
 }) {
   const tabId = useId();
   const [record, setRecord] = useState<RecordData>(initialRecord);
@@ -286,6 +289,25 @@ export default function RequestDossier({
           </span>
         </div>
         <RequestIntakeIndicators record={record} detailed />
+        {canManage && onOpenQuotes && (
+          <div className="request-test-decision-bar">
+            <div>
+              <strong>Devis de réparation</strong>
+              <span>
+                Préparez un chiffrage et demandez l’accord du client sur une
+                version précise.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => onOpenQuotes(record.id, true)}
+            >
+              <FileText size={16} />
+              Créer un devis
+            </button>
+          </div>
+        )}
         <RequestTimer timing={record.timing} />
         <RequestAssignment
           record={record}
@@ -498,6 +520,40 @@ export default function RequestDossier({
               user={user}
               onChanged={onChanged}
             />
+          )}
+          {tab === "quotes" && (
+            <section className="request-dossier-card">
+              <h3>Devis de réparation</h3>
+              <p>
+                Les devis publiés conservent leurs versions, leur PDF et
+                l’historique des réponses du client. Préparer un brouillon ou
+                changer de réponse ne déclenche aucune facture ni livraison
+                automatique.
+              </p>
+              {onOpenQuotes && (
+                <div className="request-dossier-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => onOpenQuotes(record.id)}
+                  >
+                    <FileText size={16} />
+                    {user.role === "client"
+                      ? "Consulter mes devis du dossier"
+                      : "Consulter les devis du dossier"}
+                  </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className="button primary"
+                      onClick={() => onOpenQuotes(record.id, true)}
+                    >
+                      Créer un devis
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
           )}
           {tab === "dispatch" && (
             <>

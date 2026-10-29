@@ -89,6 +89,8 @@ Pour un contrôle ponctuel, ajouter `--once`. Ne pas utiliser la simple ouvertur
 
 Les alertes **Onduleur prêt à livrer** et **Livraison affectée** sont distinctes du rappel personnel de 08:00 : elles proviennent des opérations serveur et restent dans TVM. Elles ne demandent ni clé WhatsApp ni préférence de rappel activée. La cloche relit son compteur toutes les 30 secondes et au retour sur l'onglet ; aucun push navigateur fermé n'est fourni. WhatsApp reste soumis à sa configuration séparée.
 
+Les notifications des devis de réparation restent elles aussi dans TVM : émission vers le centre client, nouvel avis vers l'administration. Elles ne déclenchent pas d'e-mail ou de WhatsApp et n'exigent aucune clé fournisseur pour ce parcours.
+
 ## Connecter les notifications externes du responsable client
 
 Les adaptateurs SMTP et WhatsApp Cloud API sont fournis, **désactivés par défaut**. Aucun accès SMTP ou WhatsApp réel n'a été fourni ou validé dans la version de travail. Les essais automatisés utilisent une boîte e-mail en mémoire et des transports simulés ; ils ne prouvent pas l'acceptation par votre fournisseur.
@@ -129,7 +131,7 @@ bash scripts/backup.sh
 
 La commande crée un dump PostgreSQL au format personnalisé dans `.local/backups/`, avec des permissions restrictives, puis vérifie que `pg_restore` peut lire son catalogue. Ce contrôle de lisibilité ne remplace pas un essai de restauration.
 
-Les instantanés et les octets des BL PDF préparés sont conservés dans PostgreSQL et font partie du dump. Ils ne se régénèrent pas depuis les fiches courantes ; conserver la base est donc nécessaire pour leurs réimpressions historiques. Les pièces jointes restent, elles, dans les fichiers média à sauvegarder avec la base.
+Les instantanés et les octets des BL PDF préparés et des devis de réparation émis sont conservés dans PostgreSQL et font partie du dump, avec les réponses client historisées. Ils ne se régénèrent pas depuis les fiches courantes ; conserver la base est donc nécessaire pour leurs réimpressions historiques. Les pièces jointes restent, elles, dans les fichiers média à sauvegarder avec la base.
 
 Elle produit un ensemble portant le même préfixe `tvm-<horodatage UTC>-<suffixe>` :
 

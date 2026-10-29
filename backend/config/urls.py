@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/clients/import/', client_import),
     path('api/knowledge/', include('core.knowledge_urls')),
     path('api/diagnostics/', include('core.diagnostic_urls')),
+    path('api/repair-quotes/', include('core.repair_quote_urls')),
     path('api/logistics/recognize-serial/', recognize_serial),
     path('api/logistics/sav-intake/options/', simple_intake_views.options),
     path('api/logistics/sav-intake/lookup/', simple_intake_views.lookup),

@@ -1,0 +1,80 @@
+.courier-hub-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 25px;
+}
+.courier-hub-single { grid-template-columns: minmax(0, 1fr); }
+.courier-hub-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+  min-height: 142px;
+  padding: 22px;
+  background: #fff;
+  border: 2px solid #c4d4eb;
+  border-radius: 17px;
+  color: #23456f;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.courier-hub-section.active {
+  background: #174da6;
+  border-color: #174da6;
+  color: #fff;
+}
+.courier-hub-section:hover { border-color: #174da6; }
+.courier-hub-section:focus-visible {
+  outline: 3px solid #dc8100;
+  outline-offset: 4px;
+}
+.courier-hub-section-icon {
+  display: grid;
+  place-items: center;
+  width: 47px;
+  height: 47px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  background: #eaf2ff;
+  color: #174da6;
+}
+.courier-hub-section-content {
+  display: grid;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.courier-hub-section-content > strong { font-size: 21px; line-height: 1.4; }
+.courier-hub-section-content > span { font-size: 13px; line-height: 1.8; }
+.courier-hub-detail { display: block; }
+.courier-hub-section > svg { flex-shrink: 0; margin-top: 6px; }
+.courier-hub-secondary-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 21px;
+}
+.courier-hub-in-progress {
+  margin: 0 0 25px;
+}
+.courier-hub-missions-description {
+  margin: -7px 0 18px;
+  color: #3c5577;
+  font-size: 13px;
+  line-height: 1.8;
+}
+@media (max-width: 650px) {
+  .courier-hub-navigation { gap: 9px; }
+  .courier-hub-section { padding: 14px 12px; gap: 9px; flex-wrap: wrap; }
+  .courier-hub-section-icon { width: 36px; height: 36px; }
+  .courier-hub-section-content > strong { font-size: 18px; }
+  .courier-hub-section-content > span { font-size: 12px; }
+  .courier-hub-section > svg { display: none; }
+}
+@media (max-width: 360px) {
+  .courier-hub-navigation { grid-template-columns: minmax(0, 1fr); }
+}

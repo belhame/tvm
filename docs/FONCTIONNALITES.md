@@ -7,7 +7,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Domaine | Comportement de cette version | Limite à connaître |
 |---|---|---|
 | Comptes | Administrateur, responsable SAV, technicien, livreur et client ; sessions serveur ; gestion des comptes par l'administrateur | Pas de SSO ni d'authentification multifacteur fournis |
-| Portail client | Consultation des dossiers de sa société, demande d'enlèvement et notifications propres | Pas de modification des dossiers SAV ni de création publique de compte |
+| Portail client | Dossiers de sa société, demande d'enlèvement, avis sur ses devis de réparation et notifications propres | Pas de modification libre des dossiers SAV ni de création publique de compte ; réponse sur la version émise courante uniquement |
 | Clients | Annuaire recherchable, contacts, coordonnées, matricule fiscal et notes internes ; import CSV avec prévisualisation | Aucun écrasement de fiche ni reprise de compte ; conflits et valeurs incertaines à vérifier, CSV réel séparé des sources publiques |
 | Onduleurs | Affectation client, modèle, marque, puissance, site et numéro de série unique | Le rattachement des anciens onduleurs HFSQL doit être confirmé |
 | Lecture des séries Eaton | Analyse consultative en cinq segments dans la fiche équipement et le scanner, d'après le classeur fourni | Format de dix caractères à valider sur des étiquettes réelles ; aucun modèle, année civile ou garantie déduits automatiquement |
@@ -23,6 +23,7 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Échanges à facturer | Confirmation financière séparée avec référence et date de facture externe ; contrôle avant clôture | Droit délégué par l'administrateur ; aucun ERP, envoi de facture ou paiement confirmé par cette saisie |
 | Prêt à être livré | File commune des réparations avec tests validés et des échanges effectivement prêts ; colonne séparée des non-réparables à retourner | Un test absent ou échoué ne vaut pas validation ; aucune expédition physique automatique |
 | Devis de diagnostic | Devis PDF créé dans TVM avec prix HT, TVA et devise explicites, document émis immuable | Aucun taux fiscal déduit ; aucune révision du devis émis dans cette version ; retour clôturable après facture ou gratuité approuvée, sans exemption de facture pour un échange |
+| Devis de réparation | Préparation/émission admin-responsable, lignes et remise HT avant TVA, PDF immuable par version ; client accepte/refuse/change d'avis sur la courante | Nouvel accord exigé après réémission ; validité facultative sans expiration automatique des avis ; aucun paiement, facture, mouvement de stock ou remise physique automatique |
 | Planning | Vue des interventions datées enregistrées sur le serveur | Pas de synchronisation Outlook/Google Calendar |
 | Visites préventives | Objectif par dossier et nombre réalisé calculé depuis ses fiches préventives terminées ; progression sur la fiche et le PDF | L'objectif ne crée pas de visites ; aucune date ou ancienne prévision inventée, aucun autre dossier inclus |
 | Rapports | Rapport PDF d'intervention structuré d'après le modèle fourni et fiche PDF de suivi du dossier, soumis aux droits d'accès | Documents générés depuis la base ; pas de signature électronique, d'envoi automatique ni d'historique PDF immuable |
@@ -34,9 +35,9 @@ Cette version fournit une application serveur et son code source, avec des compt
 | Bons de livraison | Fiches manuelles conservées ; BL logistique avec PDF immuable, individuel ou lot de 1–100 missions d'un même client et livreur | TVM : ses missions acceptées ; préparation du lot invalidée si une mission change ; aucune remise, clôture, facture ou sortie de stock implicite |
 | Tableau de bord | Première rubrique et accueil des administrateurs, responsables et techniciens ; compteurs, activité et états issus de la base | Pas de statistiques historiques importées avant reprise des données |
 | Recherche | Recherche de clients, dossiers, interventions et séries selon les droits du compte | Aucun accès implicite à une autre société via une recherche |
-| Notifications internes | Boîte propre au compte ; disponibilité prête pour TVM/admin, mission affectée pour le TVM désigné, réception/remise pour le portail et rappel opt-in de 08:00 | Compteur réel relu toutes les 30 s et au retour sur l'onglet ; aucune notification push navigateur fermé ni envoi WhatsApp de ces alertes |
+| Notifications internes | Boîte propre au compte ; disponibilité et missions TVM, réception/remise du portail, émission et avis des devis de réparation, rappel opt-in de 08:00 | Compteur réel relu toutes les 30 s et au retour sur l'onglet ; aucun push navigateur fermé ni message e-mail/WhatsApp réel pour ces devis |
 | Notifications du centre | Journal des affectations et collectes, destinataire responsable de la société, canaux e-mail/WhatsApp opt-in, aperçu et relance contrôlée | Canaux désactivés et accès absents dans l'instance de travail ; aucune reprise automatique des anciennes entrées bloquées ; accepté ne signifie pas reçu/lu |
-| Logistique | Enlèvements, réception, file partagée TVM tous clients, missions confirmées et preuve de remise | Réservation protégée ; externe limité à ses missions ; acceptation distincte de la remise et de la clôture financière |
+| Logistique | Hub À livrer / À récupérer, retours actifs avec les livraisons, historique séparé ; réception, file partagée TVM et missions confirmées | Réservation protégée ; externe limité à ses missions et sans enlèvements ; acceptation distincte de la remise et de la clôture financière |
 | Traçabilité | Journal des opérations accessible aux administrateurs / responsables via `/api/audit/` | Consultation via l'API ; pas de vue dédiée dans cette étape |
 
 Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue pas à lui seul un contrôle d'accès. Les rapports et recherches doivent rester dans le périmètre autorisé ; les notes internes n'ont pas vocation à être exposées au client.
@@ -45,12 +46,12 @@ Les droits sont appliqués dans l'API. Masquer une rubrique du menu ne constitue
 
 | Rôle | Autorisations métier |
 |---|---|
-| Administrateur | Création et modification des données métier ; gestion des comptes, rôles et délégations de validation financière ; autorisation financière implicite |
-| Responsable SAV | Création et modification des données métier, affectation et suivi ; consultation de la traçabilité ; aucune gestion des comptes |
+| Administrateur | Données métier et devis de réparation ; comptes, rôles et délégations de validation financière ; autorisation financière implicite |
+| Responsable SAV | Données métier, préparation/émission des devis de réparation, affectation et suivi ; traçabilité ; aucune gestion des comptes |
 | Technicien | Lecture des données métier internes ; création de demandes Non affecté ; prise en charge directe ou relais motivé d'un dossier non clôturé ; suivi, fiches et consommation de pièces dans le cadre de son affectation courante confirmée, avec les limites propres à ses interventions |
 | Livreur TVM | Espace restreint : collectes affectées, SAV simple/réception, file partagée des prêts, prise ou confirmation de mission, ses BL et remises ; notifications, sans diagnostics internes, factures ou comptes |
 | Livreur client | Compte lié à sa société : ses livraisons/retours affectés, confirmation puis remise ; aucune file globale, nouveau BL PDF, collecte, réception, recherche de séries ou photo OCR |
-| Client | Consultation de sa société et demande d'enlèvement, recherche prioritairement par son N° d'appel client ; aucun accès au stock, aux comptes, à la traçabilité ou aux intégrations |
+| Client | Sa société, demande d'enlèvement, recherche par son N° d'appel client ; accepte/refuse/change d'avis sur ses devis de réparation courants ; aucun stock, compte, journal technique ou intégration |
 
 Le technicien ne supprime pas de dossier et ne modifie pas les fiches clients, équipements, contrats, garanties, pièces ou bons de livraison. Les droits du portail sont liés à la société du compte, non à un simple filtre choisi dans l'interface.
 
@@ -61,6 +62,8 @@ Un technicien peut aussi **Prendre en charge** un dossier sans personne désign�
 Cette condition d'écriture du suivi ne retire pas la consultation de l'historique ni les contributions techniques autorisées à la bibliothèque depuis des interventions historiques terminées. Ces retours d'expérience restent soumis à leur propre validation.
 
 La validation financière est une autorisation distincte : hors administrateur, elle doit être accordée explicitement à un compte interne actif éligible. Elle couvre la confirmation des factures et l'approbation d'une gratuité de diagnostic. Cette gratuité ne supprime pas l'exigence de facture d'un échange. Le rôle Responsable SAV ou Technicien n'accorde pas automatiquement ce droit ; un client ou un livreur ne peut jamais en bénéficier et sa gestion reste réservée à l'administrateur.
+
+Le devis de réparation est un autre parcours : administrateur et responsable le préparent, le client donne son avis. La remise s'applique au HT avant TVA ; modifier une proposition émise passe par une nouvelle version et un nouvel accord, sans hériter des anciennes réponses. Le PDF émis reste inchangé lorsque le client répond. Un avis tardif reste enregistré et notifié sans annuler travaux, transports ou décisions financières déjà réalisés. Voir [le guide des devis](GUIDE_SUIVI_SAV.md#devis-de-réparation-et-réponse-du-client).
 
 Le client peut être un centre SAV qui confie une réparation à TVM. Son numéro de dossier est enregistré dans `client_reference`, sans remplacer le numéro TVM ni servir à déterminer ses droits. L'appartenance au centre vient de la relation client du compte et de l'équipement. Le champ texte Client final ne crée pas une autre autorisation de portail.
 

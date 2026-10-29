@@ -177,7 +177,7 @@ test('le livreur client est rattaché à sa société, reçoit ses missions auto
     expect((await response(driver, 'dashboard/')).status()).toBe(403);
     await expect(driver.getByRole('navigation', { name: 'Navigation livreur', exact: true }).getByRole('button', { name: 'Réception', exact: true })).toHaveCount(0);
     await expect(driver.getByRole('button', { name: 'Réception atelier', exact: true })).toHaveCount(0);
-    await courierNavigate(driver, 'Prêts');
+    await courierNavigate(driver, 'À livrer');
     await expect(driver.locator('.courier-job-card')).toHaveCount(1);
     await expect(driver.locator('.courier-job-card')).toContainText(data.unit.serial_number);
     await acceptCurrentOutboundMission(driver, driver.locator('.courier-job-card'), job);
@@ -383,7 +383,7 @@ test('une collecte chez le client final conserve le centre demandeur, exige son 
     await login(internalDriver, internal.username, true);
     const internalBootstrap = await api(internalDriver, 'logistics/bootstrap/');
     expect(internalBootstrap.capabilities).toMatchObject({ can_receive: true, can_lookup: true, can_pickups: true });
-    await courierNavigate(internalDriver, 'Tournées');
+    await courierNavigate(internalDriver, 'À récupérer');
     const card = internalDriver.locator('.courier-job-card').filter({ hasText: unit.serial_number });
     await expect(card).toContainText(owner.name);
     await expect(card).toContainText(finalName);

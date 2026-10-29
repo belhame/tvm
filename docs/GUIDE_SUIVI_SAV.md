@@ -165,7 +165,7 @@ La mise à jour ne remplit ni l'arrivée ni la clôture des anciennes fiches. Il
 
 ## Lire une fiche et sa chronologie
 
-Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Livraison / Retour**, **Conclusion** et **Documents**. Les actions d'affectation et de prise en charge concernent ce dossier. **Modifier le dossier**, réservé à l'administrateur ou au responsable, reste disponible pour ses informations de gestion ; l'état et le technicien se règlent par les actions de suivi et d'affectation.
+Depuis une liste, **Ouvrir REF** ouvre le dossier SAV. L'onglet **Suivi** s'ouvre par défaut ; les autres regroupent **Matériel**, **Contrat**, **Devis**, **Maintenance**, **Mise en service**, **Préventive**, **Échange**, **Livraison / Retour**, **Conclusion** et **Documents**. Les actions d'affectation et de prise en charge concernent ce dossier. **Modifier le dossier**, réservé à l'administrateur ou au responsable, reste disponible pour ses informations de gestion ; l'état et le technicien se règlent par les actions de suivi et d'affectation.
 
 La fiche d'une demande regroupe son équipement, le client, l'état du dossier et les informations de traitement. L'historique de l'onduleur permet de retrouver les demandes et interventions rattachées au même matériel. La fiche équipement propose les onglets **Matériel** et **Historique des opérations** ; le dossier distingue **Historique du dossier** et **Historique de l'onduleur**.
 
@@ -234,6 +234,23 @@ Le PDF présente les **visites réalisées / prévues**, les **visites enregistr
 
 La fiche et le PDF de **Mise en service** présentent séparément le matériel, le site, le client final, le contact et la date de réalisation. Ils ne sont pas comptés comme une visite préventive ; une date manquante reste explicitement non renseignée.
 
+## Devis de réparation et réponse du client
+
+Pour chiffrer une réparation, notamment hors garantie, l'administrateur ou le responsable utilise **Devis**, ou **Créer un devis** depuis le dossier SAV. Ce devis de réparation est distinct du devis de diagnostic d'un matériel non réparable décrit plus bas. Le statut Devis d'une demande ne crée pas à lui seul un document.
+
+1. Dans **Créer un devis de réparation**, choisir le **Dossier SAV concerné**, puis renseigner la **Description**, la **Quantité** et le **Prix unitaire HT** de chaque ligne.
+2. Renseigner la **Devise du devis** et le **Taux de TVA du devis (%)**, y compris zéro. Choisir le **Type de remise** : aucune, pourcentage ou montant HT. La remise se déduit du sous-total **avant** le calcul de la TVA. Les montants acceptent trois décimales en TND, deux en EUR/USD ; le pourcentage et la TVA en acceptent deux.
+3. Ajouter si nécessaire les **Conditions / notes publiques** et **Valable jusqu'au (facultatif)**. Les conditions figurent sur le PDF destiné au client ; conserver les notes privées dans le suivi SAV. **Enregistrer le brouillon** ne le publie pas au portail.
+4. Vérifier le calcul serveur, puis cliquer sur **Émettre le devis**. **Télécharger le devis PDF** retrouve le document figé, avec sa référence et sa version.
+
+Le client ouvre **Mes devis**, consulte le document puis choisit **Accepter le devis** ou **Refuser le devis**, et **Oui, confirmer**. **Annuler** n'enregistre aucune réponse. Seule la version émise courante reçoit un nouvel avis. Après une réponse, **Changer d'avis** permet de revenir sur ce choix ; l'**Historique des réponses** conserve chaque avis, son auteur et sa date. Une date de validité renseignée ne provoque pas d'expiration automatique : le client peut toujours enregistrer son avis sur la version courante.
+
+Tant que le dossier reste en attente commerciale sans opération réalisée, l'émission peut le classer Devis, puis la réponse client Validé ou Refusé. Si des travaux, tests, échanges, décisions financières ou transports sont déjà enregistrés, le nouvel avis est conservé et signalé à l'administration sans remettre ces faits en arrière. Il ne constitue ni un ordre automatique de réparation, ni une annulation de livraison ou de facture.
+
+Un devis émis ne se corrige pas en place. **Créer une nouvelle révision** prépare un autre brouillon ; la version émise précédente reste courante jusqu'à l'émission de la suivante. Cette nouvelle émission exige un nouvel accord : **l'acceptation d'un ancien prix ou d'une ancienne remise n'est pas reprise**. Les anciens PDF et réponses restent consultables, sans pouvoir répondre à une version remplacée. Une remise totale ne valide ni un paiement ni la gratuité financière du diagnostic non réparable.
+
+L'émission notifie les comptes du centre client dans TVM ; un avis client notifie les administrateurs et responsables. **Voir le devis** ouvre la version concernée. Aucun message WhatsApp/e-mail, facture, paiement, mouvement de stock ou remise physique n'est créé par ces actions.
+
 ## Prêt à être livré et retour d'un matériel non réparable
 
 Le menu **Livraisons & retours** présente deux colonnes. **Prêts à être livrés** regroupe les onduleurs réparés dont les tests ont été explicitement validés et les échanges dont le remplacement a été validé et déclaré prêt. Une fiche simplement terminée, un test échoué ou un test non renseigné ne suffit pas à y placer le matériel.
@@ -252,7 +269,7 @@ TVM génère le PDF du devis. Saisir explicitement le **prix HT**, le **taux de 
 
 Utiliser **Renseigner les conditions du devis**, puis **Enregistrer les conditions du devis**. Après vérification, **Émettre le devis PDF** attribue le numéro et fige les données ; **Télécharger le devis PDF** ouvre le document émis. Les conditions du devis figurent dans ce PDF destiné au client ; conserver les informations privées dans les champs internes.
 
-Le serveur calcule la TVA avec arrondi à la précision de la devise, puis le total TTC. Un devis **émis** conserve son numéro, sa date et son contenu : son PDF n'est pas réécrit après une modification du dossier. Vérifier les conditions avant l'émission. Cette version ne propose pas encore de révision d'un devis émis, d'avoir ou de devis de remplacement ; une observation peut préciser une correction dans l'historique sans modifier le document officiel. Émettre le devis ne signifie pas l'avoir envoyé, fait accepter ou signer par le client.
+Le serveur calcule la TVA avec arrondi à la précision de la devise, puis le total TTC. Un devis **de diagnostic émis** conserve son numéro, sa date et son contenu : son PDF n'est pas réécrit après une modification du dossier. Vérifier les conditions avant l'émission. Ce parcours de diagnostic ne propose pas de révision, d'avoir ou de devis de remplacement ; les révisions des devis de réparation constituent un autre parcours. Une observation peut préciser une correction dans l'historique sans modifier le document officiel. Émettre ce devis de diagnostic ne signifie pas l'avoir envoyé, fait accepter ou signer par le client.
 
 Les coordonnées légales de l'émetteur et les conditions commerciales complémentaires non fournies ne sont pas inventées ; le PDF signale qu'elles ne sont pas renseignées.
 
@@ -266,7 +283,9 @@ Avant émission du devis, le responsable ou l'administrateur peut reprendre la q
 
 L'administrateur crée un compte **Livreur** dans **Comptes & accès**, puis choisit son type. Le **livreur TVM** n'est rattaché à aucune société cliente : il assure les collectes et la réception atelier. Le **livreur client** est obligatoirement lié à son centre et ne voit que ses livraisons/retours affectés dans ce centre ; il n'a ni collecte, ni recherche de séries, ni réception ou photo OCR. Aucun des deux types n'accède à la finance, aux comptes ou aux diagnostics techniques internes.
 
-L'espace TVM adapté au téléphone regroupe **Accueil**, **Tournées**, **Réception**, **Prêts** et **Retours** ; celui du livreur client affiche seulement ses actions autorisées. Les noms de sociétés proposés lors d'une réception servent à identifier le propriétaire. Le livreur ne peut pas créer une société ou modifier les données d'un équipement connu.
+L'espace TVM adapté au téléphone met **À livrer** et **À récupérer** au premier plan. **À livrer** regroupe ses livraisons et retours client actifs, y compris les missions à accepter ; **À récupérer** regroupe ses enlèvements affectés, avec ceux déjà collectés en transport vers l'atelier. **Historique** sépare les remises effectuées et les enlèvements terminés. **Réception** et **Prêts** restent accessibles. Les compteurs proviennent des missions accessibles au compte ; un chargement en erreur affiche une valeur inconnue plutôt qu'un faux zéro.
+
+Le livreur client reste limité à ses missions dans sa société : il n'accède ni aux enlèvements ni aux disponibilités globales des autres centres. Les noms de sociétés proposés lors d'une réception servent à identifier le propriétaire. Le livreur ne peut pas créer une société ou modifier les données d'un équipement connu.
 
 Depuis son portail, le client ouvre **Mes enlèvements → Demander un enlèvement** pour sa société : choisir son équipement ou renseigner sa série et son modèle, décrire le problème et préciser l'adresse, le contact et son téléphone. Le responsable peut aussi demander une collecte **chez un client final** en conservant le centre propriétaire ; renseigner alors le nom du client final et les coordonnées de collecte. Cette demande de transport ne prouve pas encore l'arrivée physique et ne crée pas automatiquement une réception SAV. Les collectes sont affectées à l'équipe TVM, jamais au livreur du centre client.
 
@@ -283,11 +302,11 @@ Les photos JPEG/PNG/WEBP sont analysées localement sur le serveur, avec une lim
 
 Dans la fiche société, **Livreur client par défaut** désigne son livreur externe actif ; **Référent livreur TVM** sert de repli. Une nouvelle mise à disposition prête utilise d'abord le référent client valide, sinon le référent TVM. Sans référent disponible, le dossier reste dans les transports à affecter : aucun livreur n'est choisi par supposition. Les anciens dossiers prêts se reprennent avec l'action d'application du routage ; les affectations manuelles sont conservées.
 
-Pour une affectation manuelle, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve ses missions dans **Prêts → Mes livraisons** ou **Retours**. Avant remise, le responsable peut annuler puis réaffecter avec motif, en conservant la trace de l'annulation. Une remise enregistrée ne se réaffecte pas.
+Pour une affectation manuelle, le responsable utilise **Logistique → Livraisons et retours à affecter**, vérifie l'adresse et le contact, choisit le livreur puis **Affecter le transport**. La livraison d'un échange concerne le remplacement validé ; une réparation ou un retour concerne le matériel du dossier. Le livreur retrouve ses missions actives dans **À livrer → Mes livraisons**, avec la mention **Retour client** si nécessaire. Les remises terminées sont dans **Historique → Livraisons et retours**. Avant remise, le responsable peut annuler puis réaffecter avec motif, en conservant la trace de l'annulation. Une remise enregistrée ne se réaffecte pas.
 
 ### Prendre une livraison dans la file partagée
 
-Dans **Prêts → File partagée**, le livreur TVM voit les onduleurs prêts de tous les clients, avec leur série, leurs références SAV et leur affectation éventuelle. Une livraison déjà affectée reste visible comme réservée : un autre livreur ne peut pas se l'approprier ; seul un responsable peut la réaffecter. Le livreur client externe garde uniquement ses propres missions et n'accède pas à cette file globale.
+Dans **À livrer → File partagée** — également accessible par **Prêts** — le livreur TVM voit les onduleurs prêts de tous les clients, avec leur série, leurs références SAV et leur affectation éventuelle. Une livraison déjà affectée reste visible comme réservée : un autre livreur ne peut pas se l'approprier ; seul un responsable peut la réaffecter. Le livreur client externe garde uniquement ses propres missions et n'accède pas à cette file globale.
 
 Pour une livraison disponible, cliquer sur **Prendre la livraison**, vérifier le client et le matériel, puis répondre **Oui**. Le serveur affecte la livraison au compte connecté et confirme sa prise en charge dans la même opération. **Annuler** ne crée aucune réservation. Si un autre livreur l'a prise entre-temps, actualiser la file et relire sa situation.
 
@@ -297,7 +316,7 @@ La confirmation de mission autorise le livreur à poursuivre la livraison ; elle
 
 ### Préparer un bon de livraison PDF
 
-Le livreur TVM ouvre **Prêts → Bons de livraison**. Seules ses missions acceptées et encore à remettre sont proposées. Utiliser **Préparer le BL** pour une mission, ou sélectionner de **1 à 100 missions** puis **Générer le BL du lot**. Un lot doit concerner **un seul client et un seul livreur**. Des destinations différentes restent possibles : chaque ligne conserve son adresse.
+Le livreur TVM ouvre **À livrer → Bons de livraison**, également accessible par **Prêts**. Seules ses missions acceptées et encore à remettre sont proposées. Utiliser **Préparer le BL** pour une mission, ou sélectionner de **1 à 100 missions** puis **Générer le BL du lot**. Un lot doit concerner **un seul client et un seul livreur**. Des destinations différentes restent possibles : chaque ligne conserve son adresse.
 
 Dans **Vérifier le bon de livraison**, contrôler les séries, les deux numéros d'appel et les destinations, compléter si utile le **Commentaire du BL** — visible sur le PDF — puis **Créer le bon de livraison**. **Télécharger le BL PDF** permet de l'imprimer et de le réimprimer à l'identique. L'administration retrouve les documents, leur PDF et leur annulation contrôlée dans la liste générale **Bons de livraison**. Le livreur client n'accède pas à cette nouvelle génération de BL.
 
