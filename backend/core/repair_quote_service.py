@@ -6,13 +6,14 @@ from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Count, F, Q, Window
 from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 
 from .models import AuditLog, ServiceRequest
 from .repair_quote_models import RepairQuote, RepairQuoteBook, RepairQuoteDecision
 from .request_assignment import assignment_is_accepted, require_accepted_assignment, technician_has_accepted_assignment
+from .repair_quote_workflow import quote_status_transition
 from .workflow_events import actor_context, append_event
 
 MAX_REVISION = 9_223_372_036_854_775_807
@@ -151,12 +152,16 @@ def _safe_phase(record):
     from .disposition_models import DispositionProcess
     from .exchange_models import ExchangeProcess
     from .logistics_models import OutboundJob
-    if record.status not in ('new', 'pending', 'quotation', 'approved', 'rejected'):
+    if record.status not in ('new', 'pending', 'quotation', 'quote_sent', 'to_repair', 'approved', 'rejected'):
         return False
     if record.interventions.filter(Q(performed_on__isnull=False) | Q(completed_at__isnull=False) | Q(status__in=['in_progress', 'testing', 'completed'])).exists():
         return False
-    if record.operation_events.filter(Q(status_after__in=['maintenance', 'in_progress', 'testing', 'resolved', 'ready_for_delivery', 'return_to_client', 'closed']) |
-                                      Q(status_before__in=['maintenance', 'in_progress', 'testing', 'resolved', 'ready_for_delivery', 'return_to_client', 'closed'])).exists():
+    # A technician may explicitly return from an initial diagnostic to pricing.
+    # Historic diagnostic statuses alone do not block that commercial phase.
+    # Current technical work, actual performed visits and completed/handoff
+    # history still win over a later client opinion.
+    if record.operation_events.filter(Q(status_after__in=['resolved', 'ready_for_delivery', 'return_to_client', 'closed']) |
+                                      Q(status_before__in=['resolved', 'ready_for_delivery', 'return_to_client', 'closed'])).exists():
         return False
     return not (ExchangeProcess.objects.filter(service_request=record).exists()
                 or DispositionProcess.objects.filter(service_request=record).filter(Q(classified_at__isnull=False) | Q(finance_validated_at__isnull=False) | Q(requires_diagnostic_billing=True)).exists()
@@ -167,7 +172,7 @@ def _status(record, status, actor):
     if record.status == status or not _safe_phase(record):
         return False
     record.status = status
-    with actor_context(actor):
+    with actor_context(actor), quote_status_transition(record):
         record.save(update_fields=['status', 'updated_at'])
     return True
 
@@ -270,9 +275,9 @@ def issue_quote(actor, identifier, *, request_key, expected_revision):
     book.current_quote, book.current_decision = quote, None
     book.decision_revision += 1
     book.save(update_fields=['current_quote', 'current_decision', 'decision_revision'])
-    changed = _status(record, 'quotation', actor)
+    changed = _status(record, 'quote_sent', actor)
     _event(record, actor, 'repair_quote_issued', f'Devis de réparation {quote.reference} émis, révision {quote.version}. Accord client en attente.' +
-           ('' if changed or record.status == 'quotation' else ' Les opérations déjà réalisées restent conservées.'))
+           ('' if changed or record.status == 'quote_sent' else ' Les opérations déjà réalisées restent conservées.'))
     AuditLog.objects.create(actor=actor, action='issue_repair_quote', resource='repairquote', resource_id=str(quote.pk))
     _notice_on_commit(quote.pk, 'issued', quote.pk)
     return visible_quote(actor, quote.pk), True
@@ -298,7 +303,7 @@ def decide_quote(actor, identifier, *, request_key, expected_revision, decision)
         raise QuoteConflict('Ce devis ou votre avis a changé. Ouvrez la révision courante.')
     if book.decision_revision >= MAX_REVISION:
         raise ValidationError('La révision de décision a atteint sa limite.')
-    changed = _status(record, 'approved' if decision == 'accepted' else 'rejected', actor)
+    changed = _status(record, 'to_repair' if decision == 'accepted' else 'rejected', actor)
     entry = RepairQuoteDecision.objects.create(quote=quote, revision=book.decision_revision + 1,
         request_key=key, expected_revision=expected, decision=decision, actor=actor,
         actor_label=actor.get_full_name() or actor.username, decided_at=timezone.now(), status_changed=changed)
@@ -336,6 +341,18 @@ def quote_payload(quote, actor):
         'can_decide': bool(actor.is_active and actor.effective_role == 'client' and current and quote.client_id == actor.client_id == record.equipment.client_id)}
 
 
+def pending_client_quotes(actor):
+    """Exact own-account count, bounded current unanswered quote preview."""
+    actor = _allowed(actor)
+    if actor.effective_role != 'client':
+        raise PermissionDenied('Cet accueil de devis est réservé au compte client connecté.')
+    query = quotes_for(actor).filter(state='issued', pk=F('book__current_quote_id'), book__current_decision__isnull=True)
+    # One statement counts before LIMIT, so an issue/reply committed between
+    # two reads cannot disagree with the bounded home preview.
+    rows = list(query.annotate(_pending_quote_count=Window(expression=Count('pk'))).order_by('-issued_at', '-pk')[:8])
+    return {'count': rows[0]._pending_quote_count if rows else 0, 'results': [quote_payload(quote, actor) for quote in rows]}
+
+
 def send_quote_notices(quote_id, event, occurrence):
     """Committed, deduplicated application notices; no external provider calls."""
     from .notification_models import InAppNotification
@@ -367,7 +384,18 @@ def quote_notification_payload(item, actor):
         return {'title': 'Devis de réparation', 'body': 'Ce devis ne relève plus de votre compte.', 'target': None,
                 'target_id': None, 'actionable': False, 'details': {}}
     data = quote_payload(quote, actor)
-    body = f'Devis de réparation {quote.reference} disponible.' if item.payload.get('event') == 'issued' else f'Le client a enregistré un nouvel avis pour {quote.reference}.'
-    return {'title': 'Devis de réparation', 'body': body, 'target': 'repair_quote', 'target_id': quote.pk, 'actionable': True,
+    title = 'Devis de réparation'
+    body = f'Devis de réparation {quote.reference} disponible.'
+    if item.payload.get('event') == 'decision':
+        occurrence = item.payload.get('occurrence')
+        # A historical notice describes that immutable opinion, even when the
+        # current customer response subsequently changes again.
+        entry = RepairQuoteDecision.objects.filter(pk=occurrence, quote=quote).first() if type(occurrence) is int and 0 < occurrence <= MAX_REVISION else None
+        if entry:
+            title = 'Devis accepté' if entry.decision == 'accepted' else 'Devis refusé'
+            body = f'Devis {quote.reference} {"accepté" if entry.decision == "accepted" else "refusé"} par le client.'
+        else:
+            body = f'Le client a enregistré un nouvel avis pour {quote.reference}.'
+    return {'title': title, 'body': body, 'target': 'repair_quote', 'target_id': quote.pk, 'actionable': True,
             'service_request': data['service_request'], 'call_number': data['call_number'], 'client_reference': data['client_reference'],
             'details': {'quote': quote.pk, 'reference': quote.reference, 'is_current': data['is_current'], 'state': quote.state, 'decision': data['decision']}}

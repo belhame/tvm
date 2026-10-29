@@ -96,7 +96,7 @@ class IndependentRepairQuoteReviewTests(TestCase):
         first = self.issue(self.draft())
         first_bytes = bytes(RepairQuote.objects.get(pk=first['id']).pdf_data)
         self.api.force_authenticate(self.customer)
-        for choice, status in (('accepted', 'approved'), ('refused', 'rejected'), ('accepted', 'approved')):
+        for choice, status in (('accepted', 'to_repair'), ('refused', 'rejected'), ('accepted', 'to_repair')):
             response = self.decide(first, choice)
             self.assertEqual(response.status_code, 200, response.data)
             first = response.data
@@ -187,7 +187,7 @@ class IndependentRepairQuoteReviewTests(TestCase):
         self.assertTrue(quote['amounts']['fully_discounted'])
         self.assertEqual(quote['amounts']['total_ttc'], '0.000')
         self.record.refresh_from_db()
-        self.assertEqual(self.record.status, 'quotation')
+        self.assertEqual(self.record.status, 'quote_sent')
         self.assertIsNone(self.record.closed_at)
         self.assertFalse(hasattr(self.record, 'disposition_process'))
         self.assertFalse(hasattr(self.record, 'exchange_process'))

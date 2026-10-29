@@ -1,0 +1,86 @@
+.customer-quote-inbox,
+.quote-home-workflow {
+  margin: 0 0 24px;
+  padding: 22px;
+  border: 1px solid #b2c7ee;
+  border-radius: 16px;
+  background: #f1f6ff;
+  color: #172d50;
+}
+.customer-quote-inbox-heading,
+.customer-quote-inbox-title,
+.customer-quote-inbox-actions,
+.quote-home-workflow-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.customer-quote-inbox-heading,
+.quote-home-workflow-heading { justify-content: space-between; }
+.customer-quote-inbox-title { align-items: flex-start; }
+.customer-quote-inbox-title-line { display: flex; align-items: center; gap: 10px; }
+.customer-quote-inbox h2,
+.quote-home-workflow h2 { margin: 0; color: #172d50; font-size: 20px; }
+.customer-quote-inbox-heading p { margin: 7px 0 0; color: #314b70; }
+.customer-quote-inbox-count {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 28px;
+  padding: 2px 8px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #174eaf;
+  color: white;
+  font-size: 15px;
+  vertical-align: middle;
+}
+.customer-quote-inbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.customer-quote-inbox-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #c2d0e8;
+  border-top: 4px solid #2260bd;
+  border-radius: 12px;
+  background: white;
+  overflow-wrap: anywhere;
+}
+.customer-quote-inbox-card-heading h3 { margin: 0 0 5px; color: #172d50; font-size: 17px; }
+.customer-quote-inbox-card-heading > span { color: #6d4407; font-size: 13px; font-weight: 600; }
+.customer-quote-inbox-card .call-reference { margin: 15px 0; }
+.customer-quote-inbox-card dl { display: grid; gap: 9px; margin: 0 0 17px; }
+.customer-quote-inbox-card dl > div { display: flex; justify-content: space-between; gap: 14px; }
+.customer-quote-inbox-card dt { color: #405472; }
+.customer-quote-inbox-card dd { min-width: 0; margin: 0; color: #172d50; text-align: right; }
+.customer-quote-inbox-card .customer-quote-inbox-total { padding-top: 11px; margin-top: 4px; border-top: 1px solid #dce4f0; font-weight: 700; }
+.customer-quote-inbox-total dd { color: #174eaf; font-size: 18px; }
+.customer-quote-inbox-card > button { width: 100%; justify-content: center; }
+.customer-quote-inbox-empty { display: flex; gap: 9px; align-items: center; margin: 20px 0 0; color: #23543e; }
+.customer-quote-inbox-more { color: #314b70; margin: 15px 0 0; }
+.quote-home-error { display: flex; gap: 9px; align-items: flex-start; margin: 16px 0; color: #9a2335; font-weight: 500; }
+.quote-home-workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 17px; }
+.quote-home-workflow-card { display: flex; align-items: center; gap: 15px; min-width: 0; padding: 18px; border: 1px solid #c2d0e8; border-radius: 12px; background: white; }
+.quote-home-workflow-card > div { flex: 1; min-width: 0; }
+.quote-home-workflow-card > svg { color: #174eaf; flex-shrink: 0; }
+.quote-home-workflow-card h3 { margin: 0; color: #172d50; font-size: 16px; }
+.quote-home-workflow-count { display: block; margin-top: 3px; font-size: 27px; color: #174eaf; }
+.quote-home-workflow-card p { margin: 5px 0 0; color: #405472; font-size: 13px; }
+.badge.status-quote_sent { background: #fff1d9; color: #744500; }
+.badge.status-to_repair { background: #dff5e9; color: #185a3b; }
+@media (max-width: 1150px) {
+  .customer-quote-inbox-heading { align-items: flex-start; flex-direction: column; }
+  .quote-home-workflow-card { flex-wrap: wrap; }
+  .quote-home-workflow-card > button { width: 100%; justify-content: center; }
+}
+@media (max-width: 650px) {
+  .customer-quote-inbox,
+  .quote-home-workflow { padding: 16px; }
+  .customer-quote-inbox-grid,
+  .quote-home-workflow-grid { grid-template-columns: minmax(0, 1fr); }
+  .customer-quote-inbox-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .customer-quote-inbox-actions > button { width: 100%; justify-content: center; }
+  .customer-quote-inbox-card { padding: 16px; }
+  .customer-quote-inbox h2,
+  .quote-home-workflow h2 { font-size: 18px; }
+  .quote-home-workflow-heading { align-items: flex-start; }
+}

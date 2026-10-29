@@ -65,7 +65,7 @@ test('les sous-catégories et la recherche retrouvent les états réels, y compr
   const mapping = {
     unassigned: ['new'], maintenance: ['maintenance', 'in_progress'], testing: ['testing'],
     overdue: states.filter(status => status !== 'closed'),
-    processed: ['resolved'], quotation: ['quotation'], pending: ['pending', 'scheduled'],
+    processed: ['resolved'], quotation: ['quotation'], quote_sent: [], to_repair: [], pending: ['pending', 'scheduled'],
     approved: ['approved'], rejected: ['rejected'], exchange: ['exchange'], ready_for_delivery: ['ready_for_delivery'], return_to_client: ['return_to_client'], closed: ['closed'], all: states,
   };
   const filteredCounts = await api(page, `requests/categories/?q=${marker}`);

@@ -367,6 +367,10 @@ def dashboard_view(request):
         'equipment_count': equipment.count(), 'client_count': clients.count(),
         'completed_interventions': interventions.filter(status='completed').count(),
     }
+    if user.effective_role != 'client':
+        personal = requests.filter(assigned_technician=user) if user.effective_role == 'technician' else requests
+        metrics['to_repair_requests'] = personal.filter(status='to_repair').count()
+        metrics['awaiting_quote_reply_requests'] = personal.filter(status='quote_sent').count()
     today = timezone.localdate()
     first_day = today - timedelta(days=29)
     intervention_counts = {row['created_at__date']: row['count'] for row in interventions.filter(created_at__date__gte=first_day).values('created_at__date').annotate(count=Count('id')).order_by()}
@@ -379,7 +383,13 @@ def dashboard_view(request):
     serializer_context = {'request': request}
     upcoming = interventions.filter(status__in=['scheduled', 'in_progress', 'testing'], scheduled_at__isnull=False).order_by('scheduled_at')[:8]
     request_distribution = [{'name': row['status'], 'status': row['status'], 'count': row['count'], 'value': row['count']} for row in requests.values('status').annotate(count=Count('id')).order_by('status')]
-    return Response({'metrics': metrics, 'recent_requests': ServiceRequestSerializer(requests.order_by('-created_at', '-id')[:10], many=True, context=serializer_context).data, 'request_status_distribution': request_distribution, 'recent_interventions': InterventionSerializer(interventions.order_by('-created_at')[:8], many=True, context=serializer_context).data, 'activity': activity, 'status_distribution': distribution, 'upcoming': InterventionSerializer(upcoming, many=True, context=serializer_context).data})
+    payload = {'metrics': metrics, 'recent_requests': ServiceRequestSerializer(requests.order_by('-created_at', '-id')[:10], many=True, context=serializer_context).data, 'request_status_distribution': request_distribution, 'recent_interventions': InterventionSerializer(interventions.order_by('-created_at')[:8], many=True, context=serializer_context).data, 'activity': activity, 'status_distribution': distribution, 'upcoming': InterventionSerializer(upcoming, many=True, context=serializer_context).data}
+    if user.effective_role == 'client':
+        from .repair_quote_service import pending_client_quotes
+        payload['pending_repair_quotes'] = pending_client_quotes(user)
+    response = Response(payload)
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @api_view(['GET'])

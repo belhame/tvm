@@ -193,7 +193,7 @@ test('un responsable prépare une remise HT précise, récupère un brouillon co
   expect(hash((await pdf(page, quote)).bytes)).toBe(hash(document.bytes));
   expect((await response(page, `repair-quotes/${quote.id}/`, 'PATCH', { expected_revision: quote.revision, discount_value: '100' })).status()).toBe(409);
   const record = await api(page, `requests/${data.record.id}/`);
-  expect(record).toMatchObject({ status: 'quotation', closed_at: null });
+  expect(record).toMatchObject({ status: 'quote_sent', closed_at: null });
   expect(record.disposition?.finance_validated_at ?? null).toBeNull();
   await page.setViewportSize({ width: 390, height: 844 });
   const mobile = page.getByRole('dialog', { name: 'Devis de réparation', exact: true });
@@ -230,7 +230,7 @@ test('le client change d’avis sur le devis courant et une nouvelle révision d
     first = await decideViaUI(portal, first, 'refused');
     first = await decideViaUI(portal, first, 'accepted');
     expect(first.history.map(row => row.decision)).toEqual(['accepted', 'refused', 'accepted']);
-    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('approved');
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('to_repair');
     expect(hash((await pdf(portal, first)).bytes)).toBe(hash(firstPDF.bytes));
 
     const adminDetail = await openQuote(page, first);
@@ -249,7 +249,7 @@ test('le client change d’avis sur le devis courant et une nouvelle révision d
     second = await saved(issued, 201);
     expect(second).toMatchObject({ version: first.version + 1, decision: 'pending', history: [], is_current: true });
     expect(second.amounts).toMatchObject({ subtotal_ht: '62.600', discount_ht: '1.000', net_ht: '61.600', vat_amount: '11.704', total_ttc: '73.304' });
-    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('quotation');
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('quote_sent');
     detail = portal.getByRole('dialog', { name: 'Devis de réparation', exact: true });
     await detail.getByRole('button', { name: 'Actualiser le devis', exact: true }).click();
     await expect(detail).toContainText('Cette version a été remplacée.');
@@ -315,7 +315,7 @@ test('les devis de deux centres partageant la même référence restent isolés,
     expect(full.decision).toBe('pending');
     expect((await pdf(supervisor, full)).text).toContain('REMISE TOTALE');
     const record = await api(page, `requests/${data.record.id}/`);
-    expect(record).toMatchObject({ status: 'quotation', closed_at: null });
+    expect(record).toMatchObject({ status: 'quote_sent', closed_at: null });
     expect(record.disposition?.finance_validated_at ?? null).toBeNull();
     expect(record.exchange?.billing_validated_at ?? null).toBeNull();
   } finally { await Promise.all([context.close(), driverContext.close(), managerContext.close()]); }
@@ -423,4 +423,177 @@ test('À facturer donne au technicien confirmé un devis envoyé au client, et u
     expect((await api(page, `repair-quotes/${next.id}/`))).toMatchObject({ state: 'draft', terms: quoteInput().terms });
     expect((await api(portal, 'repair-quotes/')).map(item => item.id)).toEqual([quote.id]);
   } finally { await Promise.all([techContext.close(), clientContext.close()]); }
+});
+
+test('l’accueil client présente seulement ses devis courants à confirmer puis son accord classe le dossier À réparer et prévient l’admin', async ({ page, browser }) => {
+  test.setTimeout(180000);
+  await login(page);
+  const tag = marker(), clientReference = `000-ACCUEIL-${tag}`;
+  const data = await fixture(page, `${tag}-ACCUEIL`, clientReference);
+  const foreign = await fixture(page, `${tag}-AUTRE-CENTRE`, clientReference);
+  const technician = await api(page, 'users/', 'POST', {
+    username: `accueil-technicien-${tag}`, first_name: 'Technicien accueil fictif', role: 'technician', password,
+  });
+  const customer = await api(page, 'users/', 'POST', {
+    username: `accueil-client-${tag}`, role: 'client', client: data.company.id, password,
+  });
+  const assigned = await api(page, `requests/${data.record.id}/assignment/`, 'POST', {
+    technician: technician.id, expected_revision: 0,
+  });
+  const techContext = await browser.newContext(), customerContext = await browser.newContext();
+  const tech = await techContext.newPage(), portal = await customerContext.newPage();
+  async function homeInbox() {
+    const detail = portal.getByRole('dialog', { name: 'Devis de réparation', exact: true });
+    if (await detail.isVisible()) await detail.getByRole('button', { name: 'Fermer', exact: true }).first().click();
+    const navigation = portal.getByRole('navigation', { name: 'Navigation principale', exact: true });
+    const menu = portal.getByRole('button', { name: 'Ouvrir le menu', exact: true });
+    if (await menu.isVisible() && !await portal.locator('.sidebar.open').count()) await menu.click();
+    await navigation.getByRole('button', { name: 'Tableau de bord', exact: true }).click();
+    await expect(portal.getByRole('heading', { name: 'Tableau de bord', exact: true })).toBeVisible();
+    const inbox = portal.locator('.customer-quote-inbox');
+    await expect(inbox.getByRole('heading', { name: /^Devis à confirmer(?:\s|$)/ })).toBeVisible();
+    const refreshed = portal.waitForResponse(result => new URL(result.url()).pathname === '/api/dashboard/' && result.request().method() === 'GET');
+    await inbox.getByRole('button', { name: 'Actualiser les devis à confirmer', exact: true }).click();
+    expect((await refreshed).status()).toBe(200);
+    return inbox;
+  }
+  try {
+    await login(tech, technician.username);
+    await api(tech, `requests/${data.record.id}/assignment/confirm/`, 'POST', {
+      expected_revision: assigned.assignment.revision, accept: true,
+    });
+    const superseded = await issue(page, await draft(page, data));
+    let current = await issue(page, await draft(page, data, { terms: 'Version courante fictive à confirmer.' }));
+    const prepared = await draft(page, data, { terms: 'Brouillon suivant non envoyé.' });
+    const foreignQuote = await issue(page, await draft(page, foreign));
+    const draftEquipment = await api(page, 'equipment/', 'POST', {
+      client: data.company.id, serial_number: `${tag}-BROUILLON-SEUL`, model: 'Autre onduleur fictif',
+    });
+    const draftRecord = await api(page, 'requests/', 'POST', {
+      equipment: draftEquipment.id, subject: 'Dossier fictif sans devis envoyé', client_reference: `${clientReference}-BROUILLON`,
+    });
+    const unpublished = await draft(page, { record: draftRecord });
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('quote_sent');
+
+    await login(portal, customer.username);
+    let inbox = await homeInbox();
+    const pending = (await api(portal, 'dashboard/')).pending_repair_quotes;
+    expect(pending.count).toBe(1);
+    expect(pending.results.map(item => item.id)).toEqual([current.id]);
+    await expect(inbox.locator('.customer-quote-inbox-card')).toHaveCount(1);
+    const card = inbox.locator('.customer-quote-inbox-card');
+    for (const text of [current.reference, data.record.client_reference, data.equipment.serial_number]) await expect(card).toContainText(text);
+    await expect(card).toContainText(/41,733\s*TND/);
+    for (const text of [superseded.reference, foreignQuote.reference, foreign.company.name, draftEquipment.serial_number]) await expect(inbox).not.toContainText(text);
+    expect((await api(portal, 'repair-quotes/')).map(item => item.id)).not.toContain(prepared.id);
+    expect((await api(portal, 'repair-quotes/')).map(item => item.id)).not.toContain(unpublished.id);
+    await inbox.getByRole('button', { name: 'Voir les devis à confirmer', exact: true }).click();
+    await expect(portal.getByRole('heading', { name: 'Mes devis', exact: true })).toBeVisible();
+    await expect(portal.getByLabel('État des devis', { exact: true })).toHaveValue('pending');
+    await expect(portal.locator('.repair-quotes-card')).toHaveCount(1);
+    await expect(portal.locator('.repair-quotes-card')).toContainText(current.reference);
+    inbox = await homeInbox();
+    const prominence = await inbox.evaluate(element => ({ top: element.getBoundingClientRect().top,
+      metricsTop: document.querySelector('.metric-value')?.getBoundingClientRect().top }));
+    expect(prominence.top).toBeLessThan(prominence.metricsTop);
+    await portal.setViewportSize({ width: 390, height: 844 });
+    const bounds = await card.evaluate(element => ({ left: element.getBoundingClientRect().left,
+      right: element.getBoundingClientRect().right, viewport: innerWidth,
+      width: element.clientWidth, content: element.scrollWidth }));
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(bounds.viewport);
+    expect(bounds.content).toBeLessThanOrEqual(bounds.width + 2);
+    await portal.screenshot({ path: '../../.local/customer-pending-quotes-mobile.png', animations: 'disabled' });
+    await inbox.screenshot({ path: '../../.local/customer-pending-quotes-mobile-section.png', animations: 'disabled' });
+    await card.getByRole('button', { name: `Confirmer le devis ${current.reference}`, exact: true }).click();
+    await expect(portal.getByRole('dialog', { name: 'Devis de réparation', exact: true })).toContainText(current.reference);
+    current = await decideViaUI(portal, current, 'accepted');
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('to_repair');
+    // A second accepted but unassigned dossier makes the global and own counts
+    // deliberately different, independent of previous browser test fixtures.
+    const unassignedQuote = await issue(page, unpublished);
+    await api(portal, `repair-quotes/${unassignedQuote.id}/decision/`, 'POST', {
+      request_key: randomUUID(), expected_revision: unassignedQuote.decision_revision, decision: 'accepted',
+    });
+    inbox = await homeInbox();
+    await expect(inbox.locator('.customer-quote-inbox-card')).toHaveCount(0);
+    expect((await api(portal, 'dashboard/')).pending_repair_quotes.count).toBe(0);
+
+    const techHomeRead = tech.waitForResponse(result => new URL(result.url()).pathname === '/api/dashboard/' && result.request().method() === 'GET');
+    await tech.getByRole('button', { name: 'Actualiser les dossiers de devis', exact: true }).click();
+    const techHome = await (await techHomeRead).json();
+    expect(techHome.metrics.to_repair_requests).toBe(1);
+    const ownQueueRead = tech.waitForResponse(result => {
+      const url = new URL(result.url());
+      return url.pathname === '/api/requests/' && result.request().method() === 'GET'
+        && url.searchParams.get('assigned_technician') === String(technician.id)
+        && url.searchParams.get('category') === 'to_repair';
+    });
+    await tech.getByRole('button', { name: 'Voir mes dossiers à réparer', exact: true }).click();
+    const ownQueue = await (await ownQueueRead).json();
+    expect(ownQueue.map(record => record.id)).toEqual([data.record.id]);
+    await expect(tech.getByRole('heading', { name: 'Demandes SAV', exact: true })).toBeVisible();
+    expect(new URL(tech.url()).hash).toBe('#requests/to_repair/mine');
+    await expect(tech.getByRole('group', { name: 'Catégories des demandes SAV', exact: true }).getByRole('button', { name: /^À réparer / })).toHaveAttribute('aria-pressed', 'true');
+    await tech.getByLabel('Rechercher une demande', { exact: true }).fill(data.record.reference);
+    await tech.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
+    const repairRow = tech.locator('tbody tr').filter({ hasText: data.record.reference });
+    await expect(repairRow).toHaveCount(1);
+    await expect(repairRow).toContainText('À réparer');
+    const ownSidebarCount = tech.getByRole('button', { name: 'Demandes : À réparer', exact: true }).locator('.nav-subcount');
+    await expect(ownSidebarCount).toHaveText('1');
+    const globalCount = (await api(tech, 'requests/categories/')).categories.find(item => item.key === 'to_repair').count;
+    expect(globalCount).toBeGreaterThanOrEqual(2);
+    await tech.getByRole('navigation', { name: 'Navigation principale', exact: true }).getByRole('button', { name: 'Tableau de bord', exact: true }).click();
+    let releaseGlobalCount, reportGlobalCount;
+    const countHeld = new Promise(resolve => { releaseGlobalCount = resolve; });
+    const countStarted = new Promise(resolve => { reportGlobalCount = resolve; });
+    const countPattern = '**/api/requests/categories/**';
+    const holdGlobalCount = async route => {
+      const url = new URL(route.request().url());
+      if (!url.searchParams.has('assigned_technician')) {
+        reportGlobalCount();
+        await countHeld;
+      }
+      await route.continue();
+    };
+    await tech.route(countPattern, holdGlobalCount);
+    try {
+      await openRequestsWorkspace(tech);
+      await countStarted;
+      const globalSidebarCount = tech.getByRole('button', { name: 'Demandes : À réparer', exact: true }).locator('.nav-subcount');
+      await expect(globalSidebarCount).toHaveText('—');
+      releaseGlobalCount();
+      await expect(globalSidebarCount).toHaveText(String(globalCount));
+      expect(new URL(tech.url()).hash).toBe('#requests');
+    } finally {
+      releaseGlobalCount();
+      await tech.unroute(countPattern, holdGlobalCount);
+    }
+    const notices = await api(page, 'logistics/notifications/');
+    const acceptedNotice = notices.results.find(item => item.target === 'repair_quote' && item.target_id === current.id && item.title === 'Devis accepté');
+    expect(acceptedNotice).toBeTruthy();
+    expect(acceptedNotice.body).toContain('accepté par le client');
+    await page.getByRole('button', { name: 'Notifications et rappels', exact: true }).click();
+    const notifications = page.getByRole('dialog', { name: 'Notifications et rappels', exact: true });
+    const adminNotice = notifications.locator('.notification-list article').filter({ hasText: current.reference }).filter({ hasText: 'Devis accepté' });
+    await expect(adminNotice).toHaveCount(1);
+    await expect(adminNotice).toContainText('accepté par le client');
+
+    await portal.setViewportSize({ width: 1440, height: 1000 });
+    await openQuote(portal, current, true);
+    current = await decideViaUI(portal, current, 'refused');
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('rejected');
+    inbox = await homeInbox();
+    await expect(inbox.locator('.customer-quote-inbox-card')).toHaveCount(0);
+    const next = await issue(page, prepared);
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('quote_sent');
+    inbox = await homeInbox();
+    await expect(inbox.locator('.customer-quote-inbox-card')).toHaveCount(1);
+    await expect(inbox).toContainText(next.reference);
+    await expect(inbox).not.toContainText(current.reference);
+    expect((await api(portal, 'dashboard/')).pending_repair_quotes.results.map(item => item.id)).toEqual([next.id]);
+    const oldOpinion = (await api(page, 'logistics/notifications/')).results.find(item => item.id === acceptedNotice.id);
+    expect(oldOpinion).toMatchObject({ title: 'Devis accepté', body: acceptedNotice.body });
+  } finally { await Promise.all([techContext.close(), customerContext.close()]); }
 });

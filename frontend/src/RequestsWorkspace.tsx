@@ -7,6 +7,7 @@ import {
   Search,
   Clock3,
   FileText,
+  Wrench,
 } from "lucide-react";
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import { requestCategories, requestStatusLabels, statuses } from "./resources";
@@ -45,6 +46,8 @@ export default function RequestsWorkspace({
   technicians = [],
   onChanged,
   onCreateQuote,
+  assignedTechnicianId,
+  onClearAssignmentFilter,
 }: {
   category: string;
   user: User;
@@ -57,6 +60,8 @@ export default function RequestsWorkspace({
   technicians?: RecordData[];
   onChanged: () => Promise<void>;
   onCreateQuote?: (record: RecordData) => void;
+  assignedTechnicianId?: number;
+  onClearAssignmentFilter?: () => void;
 }) {
   const [search, setSearch] = useState(initialSearch);
   const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
@@ -69,7 +74,7 @@ export default function RequestsWorkspace({
   const [countsError, setCountsError] = useState("");
   const [retry, setRetry] = useState(0);
   const [timingRefresh, setTimingRefresh] = useState(0);
-  const currentScope = useRef(JSON.stringify([category, submittedSearch]));
+  const currentScope = useRef(JSON.stringify([category, submittedSearch, assignedTechnicianId]));
   const listController = useRef<AbortController | null>(null);
   useServerTimingRefresh(() => setTimingRefresh((value) => value + 1));
 
@@ -81,7 +86,10 @@ export default function RequestsWorkspace({
     const controller = new AbortController();
     setCountsError("");
     // Counts describe the authorized workspace, independent of the selected tab.
-    api<RequestCategoryResponse>("requests/categories/", {
+    const countParameters = new URLSearchParams();
+    if (assignedTechnicianId)
+      countParameters.set("assigned_technician", String(assignedTechnicianId));
+    api<RequestCategoryResponse>(`requests/categories/${countParameters.size ? `?${countParameters}` : ""}`, {
       signal: controller.signal,
     })
       .then((result) => {
@@ -94,16 +102,18 @@ export default function RequestsWorkspace({
         if (!controller.signal.aborted) setCountsError(failure.message);
       });
     return () => controller.abort();
-  }, [refreshKey, onCountsChange, retry, timingRefresh]);
+  }, [refreshKey, onCountsChange, retry, timingRefresh, assignedTechnicianId]);
 
   useEffect(() => {
     const controller = new AbortController();
     listController.current = controller;
     const parameters = new URLSearchParams({ category });
+    if (assignedTechnicianId)
+      parameters.set("assigned_technician", String(assignedTechnicianId));
     if (submittedSearch.trim()) parameters.set("q", submittedSearch.trim());
     setLoading(true);
     setError("");
-    const scope = JSON.stringify([category, submittedSearch]);
+    const scope = JSON.stringify([category, submittedSearch, assignedTechnicianId]);
     if (scope !== currentScope.current) {
       currentScope.current = scope;
       setRows([]);
@@ -119,7 +129,7 @@ export default function RequestsWorkspace({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [category, submittedSearch, refreshKey, retry, timingRefresh]);
+  }, [category, submittedSearch, refreshKey, retry, timingRefresh, assignedTechnicianId]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -147,6 +157,17 @@ export default function RequestsWorkspace({
           </button>
         )}
       </div>
+      {assignedTechnicianId && (
+        <div className="repair-quotes-info">
+          <Wrench size={17} />
+          Mes dossiers affectés : les listes et compteurs concernent votre prise en charge.
+          {onClearAssignmentFilter && (
+            <button type="button" className="text-button" onClick={onClearAssignmentFilter}>
+              Voir toutes les demandes
+            </button>
+          )}
+        </div>
+      )}
       <div
         className="request-category-tabs"
         role="group"

@@ -84,7 +84,7 @@ class TechnicianRepairQuoteTests(TestCase):
         self.assertEqual(self.api.get(BASE).data[0]['id'], quote.pk)
         self.assertEqual(self.api.get(f'{BASE}{quote.pk}/pdf/').status_code, 200)
         self.record.refresh_from_db()
-        self.assertEqual((self.record.status, self.record.get_status_display()), ('quotation', 'À facturer'))
+        self.assertEqual((self.record.status, self.record.get_status_display()), ('quote_sent', 'Devis envoyé — attente de réponse'))
 
     def test_unassigned_pending_and_foreign_technicians_cannot_create(self):
         self.api.force_authenticate(self.tech)

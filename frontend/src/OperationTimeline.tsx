@@ -610,7 +610,12 @@ function ScopedOperationTimeline({
                       value={value}
                       disabled={
                         value !== requestRecord?.status &&
-                        (["ready_for_delivery", "return_to_client"].includes(
+                        ([
+                          "ready_for_delivery",
+                          "return_to_client",
+                          "quote_sent",
+                          "to_repair",
+                        ].includes(
                           value,
                         ) ||
                           (value === "new" &&

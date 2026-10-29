@@ -14,6 +14,8 @@ CATEGORIES = (
     ('overdue', 'En dépassement de délai', ()),
     ('processed', 'Traité', ('resolved',)),
     ('quotation', 'À facturer', ('quotation',)),
+    ('quote_sent', 'Devis envoyé — attente de réponse', ('quote_sent',)),
+    ('to_repair', 'À réparer', ('to_repair',)),
     ('pending', 'En attente', ('pending', 'scheduled')),
     ('approved', 'Validé', ('approved',)),
     ('rejected', 'Refusé', ('rejected',)),

@@ -53,6 +53,7 @@ export default function RepairQuotesWorkspace({
   requestId,
   quoteId,
   createRequested = false,
+  initialFilter = "all",
   onNavigate,
   onOpenRequest,
   onChanged,
@@ -63,6 +64,7 @@ export default function RepairQuotesWorkspace({
   requestId?: number;
   quoteId?: number;
   createRequested?: boolean;
+  initialFilter?: "all" | "pending";
   onNavigate: (path: string) => void;
   onOpenRequest: (record: RecordData) => void;
   onChanged?: () => Promise<void>;
@@ -80,7 +82,7 @@ export default function RepairQuotesWorkspace({
   const [detailError, setDetailError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<string>(initialFilter);
   const [creation, setCreation] = useState<Creation | null>(
     createRequested && canCompose ? { requestId: requestId ?? null } : null,
   );
@@ -114,6 +116,8 @@ export default function RepairQuotesWorkspace({
   const writableRequests = requestOptions.filter((record) =>
     canWriteRequest(record, user),
   );
+
+  useEffect(() => setFilter(initialFilter), [initialFilter]);
 
   useEffect(() => {
     mounted.current = true;
@@ -483,7 +487,8 @@ export default function RepairQuotesWorkspace({
       (quote) =>
         (filter === "all" || filter === "draft"
           ? filter === "all" || quote.state === "draft"
-          : quote.state === "issued" && quote.decision === filter) &&
+          : quote.state === "issued" && quote.decision === filter &&
+            (filter !== "pending" || quote.is_current)) &&
         [
           quote.reference,
           quote.call_number,
@@ -590,7 +595,7 @@ export default function RepairQuotesWorkspace({
                 {
                   rows.filter(
                     (row) =>
-                      row.state === "issued" && row.decision === "pending",
+                      row.state === "issued" && row.is_current && row.decision === "pending",
                   ).length
                 }
                 )

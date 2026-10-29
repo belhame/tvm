@@ -306,7 +306,12 @@ export default function RequestFollowup({
                   value={key}
                   disabled={
                     key !== record.status &&
-                    (["ready_for_delivery", "return_to_client"].includes(key) ||
+                    ([
+                      "ready_for_delivery",
+                      "return_to_client",
+                      "quote_sent",
+                      "to_repair",
+                    ].includes(key) ||
                       (key === "new" &&
                         Boolean(
                           record.assignment?.technician ||
@@ -320,7 +325,8 @@ export default function RequestFollowup({
             </select>
             <small>
               Les états Prêt à être livré et Retour client nécessitent les
-              validations de Livraison / Retour ou d’Échange.
+              validations de Livraison / Retour ou d’Échange. Les états Devis
+              envoyé et À réparer suivent l’envoi du devis et l’accord du client.
             </small>
           </div>
           <div className="field">

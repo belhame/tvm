@@ -80,7 +80,7 @@ class RepairQuoteTests(QuoteFactory, TestCase):
         quote = self.issued()
         self.choose(quote)
         self.record.refresh_from_db()
-        self.assertEqual(self.record.status, 'approved')
+        self.assertEqual(self.record.status, 'to_repair')
         self.choose(quote, 'refused')
         self.record.refresh_from_db()
         self.assertEqual(self.record.status, 'rejected')

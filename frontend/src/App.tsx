@@ -93,6 +93,7 @@ import RequestsWorkspace, {
 } from "./RequestsWorkspace";
 import RequestDossier from "./RequestDossier";
 import RepairQuotesWorkspace from "./RepairQuotesWorkspace";
+import QuoteHomeTasks from "./QuoteHomeTasks";
 import NotificationCenter from "./NotificationCenter";
 import CourierNotificationBell from "./CourierNotificationBell";
 import OperationTimeline from "./OperationTimeline";
@@ -1916,6 +1917,12 @@ function Dashboard({
           </div>
         </div>
       </div>
+      <QuoteHomeTasks
+        key={`${user.id}:${user.role}:${user.client ?? "internal"}`}
+        user={user}
+        dashboard={dashboard}
+        onNavigate={onNavigate}
+      />
       <div className="metric-grid">
         {metrics.map((metric, index) => (
           <button
@@ -3198,7 +3205,10 @@ export default function App() {
     [modal, setModal] = useState<ModalState | null>(null),
     [detail, setDetail] = useState<RecordData | null>(null),
     [requestDetail, setRequestDetail] = useState<RecordData | null>(null),
-    [requestCounts, setRequestCounts] = useState<RequestCategoryCount[] | null>(
+    [requestCounts, setRequestCounts] = useState<{
+      scope: string;
+      rows: RequestCategoryCount[];
+    } | null>(
       null,
     ),
     [query, setQuery] = useState(""),
@@ -3213,6 +3223,23 @@ export default function App() {
       requestId?: number;
       interventionId?: number;
     }>({});
+  const requestCountsScope = JSON.stringify([
+    user?.id,
+    user?.role,
+    user?.client,
+    user?.role === "technician" &&
+    page.startsWith("requests/") &&
+    page.split("/")[2] === "mine"
+      ? user.id
+      : null,
+  ]);
+  const receiveRequestCounts = useCallback(
+    (rows: RequestCategoryCount[]) =>
+      setRequestCounts({ scope: requestCountsScope, rows }),
+    [requestCountsScope],
+  );
+  const visibleRequestCounts =
+    requestCounts?.scope === requestCountsScope ? requestCounts.rows : null;
   useEffect(() => {
     api("session/")
       .then((s) => {
@@ -3465,6 +3492,8 @@ export default function App() {
   )
     ? page.split("/")[1]
     : "all";
+  const ownRequestScope =
+    user.role === "technician" && page.split("/")[2] === "mine";
   const allowedPage =
     (user.role === "client" && !clientPages.has(basePage)) ||
     (basePage === "logistics" && !["admin", "manager"].includes(user.role)) ||
@@ -3566,11 +3595,11 @@ export default function App() {
                             key={entry.key}
                             aria-label={`Demandes : ${entry.label}`}
                             className={`nav-subitem ${requestCategory === entry.key ? "active" : ""}`}
-                            onClick={() => navigate(`requests/${entry.key}`)}
+                            onClick={() => navigate(`requests/${entry.key}${ownRequestScope ? "/mine" : ""}`)}
                           >
                             <span>{entry.label}</span>
                             <span className="nav-subcount">
-                              {requestCounts?.find(
+                              {visibleRequestCounts?.find(
                                 (row) => row.key === entry.key,
                               )?.count ?? "—"}
                             </span>
@@ -3724,6 +3753,7 @@ export default function App() {
               user={user}
               requests={data.requests || []}
               onChanged={reload}
+              initialFilter={quoteSegments[1] === "pending" ? "pending" : "all"}
               quoteId={
                 Number.isSafeInteger(quoteRouteId) && quoteRouteId > 0
                   ? quoteRouteId
@@ -3776,13 +3806,19 @@ export default function App() {
             <RequestsWorkspace
               category={requestCategory}
               user={user}
-              onCategoryChange={(key) => navigate(`requests/${key}`)}
+              onCategoryChange={(key) =>
+                navigate(`requests/${key}${ownRequestScope ? "/mine" : ""}`)
+              }
+              assignedTechnicianId={
+                ownRequestScope ? user.id : undefined
+              }
+              onClearAssignmentFilter={() => navigate(`requests/${requestCategory}`)}
               onOpen={setRequestDetail}
               onCreate={() => openModal({ resource: "requests" })}
               onCreateQuote={(record) =>
                 navigate(`repair-quotes/new/${record.id}`)
               }
-              onCountsChange={setRequestCounts}
+              onCountsChange={receiveRequestCounts}
               technicians={data.users || []}
               onChanged={saved}
               refreshKey={data.requests}

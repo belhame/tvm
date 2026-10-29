@@ -168,6 +168,8 @@ class ServiceRequest(ReferencedModel):
         TESTING = 'testing', 'En test'
         RESOLVED = 'resolved', 'Traité'
         QUOTATION = 'quotation', 'À facturer'
+        QUOTE_SENT = 'quote_sent', 'Devis envoyé — attente de réponse'
+        TO_REPAIR = 'to_repair', 'À réparer'
         PENDING = 'pending', 'En attente'
         APPROVED = 'approved', 'Validé'
         REJECTED = 'rejected', 'Refusé'
@@ -243,6 +245,8 @@ class ServiceRequest(ReferencedModel):
             kwargs['update_fields'] = set(kwargs['update_fields']) | {'closed_at'}
         from .exchange_workflow import guard_request_update, register_exchange_request
         old_status = guard_request_update(self, kwargs.get('update_fields'))
+        from .repair_quote_workflow import guard_quote_status
+        guard_quote_status(self, kwargs.get('update_fields'), old_status)
         from .logistics_service import guard_logistics_request_update
         guard_logistics_request_update(self, kwargs.get('update_fields'))
         from .disposition_workflow import guard_disposition_update, register_disposition_request
