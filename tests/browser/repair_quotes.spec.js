@@ -159,7 +159,7 @@ test('un responsable prépare une remise HT précise, récupère un brouillon co
   expect(quote.amounts).toMatchObject({ subtotal_ht: '37.913', discount_ht: '2.843', net_ht: '35.070', vat_amount: '6.663', total_ttc: '41.733' });
   expect(quote.client_reference).toBe(data.record.client_reference);
   dialog = page.getByRole('dialog', { name: 'Devis de réparation', exact: true });
-  await expect(dialog.getByRole('button', { name: 'Émettre le devis', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Envoyer au client', exact: true })).toBeEnabled();
 
   const otherTerms = `Conditions concurrentes fictives ${data.tag}.`;
   const other = await api(page, `repair-quotes/${quote.id}/`, 'PATCH', { expected_revision: quote.revision, terms: otherTerms });
@@ -179,7 +179,7 @@ test('un responsable prépare une remise HT précise, récupère un brouillon co
   quote = await saved(corrected);
   expect(quote.revision).toBe(other.revision + 1);
   const issued = mutation(page, `repair-quotes/${quote.id}/issue/`);
-  await dialog.getByRole('button', { name: 'Émettre le devis', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Envoyer au client', exact: true }).click();
   quote = await saved(issued, 201);
   expect(quote).toMatchObject({ state: 'issued', decision: 'pending', is_current: true });
   await expect(page.getByRole('dialog', { name: 'Devis de réparation', exact: true }).getByRole('link', { name: 'Télécharger le devis PDF', exact: true })).toHaveAttribute('href', quote.pdf_url);
@@ -245,7 +245,7 @@ test('le client change d’avis sur le devis courant et une nouvelle révision d
     expect((await api(portal, `repair-quotes/${first.id}/`))).toMatchObject({ decision: 'accepted', is_current: true });
     expect((await api(portal, 'repair-quotes/')).map(quote => quote.id)).toEqual([first.id]);
     const issued = mutation(page, `repair-quotes/${second.id}/issue/`);
-    await page.getByRole('dialog', { name: 'Devis de réparation', exact: true }).getByRole('button', { name: 'Émettre le devis', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Devis de réparation', exact: true }).getByRole('button', { name: 'Envoyer au client', exact: true }).click();
     second = await saved(issued, 201);
     expect(second).toMatchObject({ version: first.version + 1, decision: 'pending', history: [], is_current: true });
     expect(second.amounts).toMatchObject({ subtotal_ht: '62.600', discount_ht: '1.000', net_ht: '61.600', vat_amount: '11.704', total_ttc: '73.304' });
@@ -319,4 +319,108 @@ test('les devis de deux centres partageant la même référence restent isolés,
     expect(record.disposition?.finance_validated_at ?? null).toBeNull();
     expect(record.exchange?.billing_validated_at ?? null).toBeNull();
   } finally { await Promise.all([context.close(), driverContext.close(), managerContext.close()]); }
+});
+
+test('À facturer donne au technicien confirmé un devis envoyé au client, et une réaffectation retire immédiatement ses droits', async ({ page, browser }) => {
+  test.setTimeout(180000);
+  await login(page);
+  const data = await fixture(page, marker());
+  const technician = await api(page, 'users/', 'POST', {
+    username: `devis-technicien-${data.tag}`, first_name: 'Technicien devis fictif', role: 'technician', password,
+  });
+  const replacement = await api(page, 'users/', 'POST', {
+    username: `devis-relais-${data.tag}`, first_name: 'Technicien relais fictif', role: 'technician', password,
+  });
+  const customer = await api(page, 'users/', 'POST', {
+    username: `devis-destinataire-${data.tag}`, role: 'client', client: data.company.id, password,
+  });
+  const assigned = await api(page, `requests/${data.record.id}/assignment/`, 'POST', {
+    technician: technician.id, expected_revision: 0,
+  });
+  const techContext = await browser.newContext(), clientContext = await browser.newContext();
+  const tech = await techContext.newPage(), portal = await clientContext.newPage();
+  try {
+    await login(tech, technician.username);
+    const premature = await response(tech, 'repair-quotes/', 'POST', {
+      request_key: randomUUID(), service_request: data.record.id, ...quoteInput(),
+    });
+    expect(premature.status()).toBe(403);
+    await openRequestsWorkspace(tech);
+    await tech.getByLabel('Rechercher une demande', { exact: true }).fill(data.record.reference);
+    await tech.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
+    const row = tech.locator('tbody tr').filter({ hasText: data.record.reference });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByRole('button', { name: `Créer un devis pour ${data.record.reference}`, exact: true })).toHaveCount(0);
+    await row.getByRole('button', { name: `Ouvrir ${data.record.reference}`, exact: true }).click();
+    const dossier = tech.getByRole('dialog', { name: 'Dossier SAV', exact: true });
+    await expect(dossier.getByRole('button', { name: 'Créer un devis', exact: true })).toHaveCount(0);
+    await dossier.getByRole('button', { name: 'Confirmer la prise en charge', exact: true }).click();
+    const confirmation = tech.getByRole('alertdialog', { name: 'Confirmer la prise en charge', exact: true });
+    const acceptance = mutation(tech, `requests/${data.record.id}/assignment/confirm/`);
+    await confirmation.getByRole('button', { name: 'Oui', exact: true }).click();
+    expect((await saved(acceptance)).assignment.accepted).toBe(true);
+    const status = dossier.getByLabel('État du dossier', { exact: true });
+    await expect(status.locator('option[value="quotation"]')).toHaveText('À facturer');
+    await status.selectOption('quotation');
+    await dossier.getByLabel('Observation', { exact: true }).fill(`Chiffrage nécessaire pour cette réparation hors garantie ${data.tag}.`);
+    const followed = mutation(tech, `requests/${data.record.id}/followup/`);
+    await dossier.getByRole('button', { name: 'Enregistrer le suivi', exact: true }).click();
+    expect((await saved(followed, 201)).request.status).toBe('quotation');
+    await expect(dossier.locator('.request-dossier-heading .badge')).toHaveText('À facturer');
+    await dossier.getByRole('button', { name: 'Fermer', exact: true }).first().click();
+    await expect(row).toContainText('À facturer');
+    const categories = await api(tech, 'requests/categories/');
+    expect(categories.categories.find(item => item.key === 'quotation')?.label).toBe('À facturer');
+    const contextRead = tech.waitForResponse(result => new URL(result.url()).pathname === `/api/requests/${data.record.id}/` && result.request().method() === 'GET');
+    await row.getByRole('button', { name: `Créer un devis pour ${data.record.reference}`, exact: true }).click();
+    expect((await contextRead).status()).toBe(200);
+    const creation = tech.getByRole('dialog', { name: 'Créer un devis de réparation', exact: true });
+    await expect(creation.getByLabel('Dossier SAV concerné', { exact: true })).toHaveValue(String(data.record.id));
+    await creation.getByLabel('Devise du devis', { exact: true }).selectOption('TND');
+    await creation.getByLabel('Taux de TVA du devis (%)', { exact: true }).fill('19');
+    await creation.getByLabel('Description de la ligne 1', { exact: true }).fill('Réparation hors garantie fictive');
+    await creation.getByLabel('Quantité de la ligne 1', { exact: true }).fill('1');
+    await creation.getByLabel('Prix unitaire HT de la ligne 1', { exact: true }).fill('100.000');
+    const created = mutation(tech, 'repair-quotes/');
+    await creation.getByRole('button', { name: 'Enregistrer le brouillon', exact: true }).click();
+    let quote = await saved(created, 201);
+    expect(quote).toMatchObject({ service_request: data.record.id, can_edit: true, can_issue: true, state: 'draft' });
+    const detail = tech.getByRole('dialog', { name: 'Devis de réparation', exact: true });
+    const issued = mutation(tech, `repair-quotes/${quote.id}/issue/`);
+    await detail.getByRole('button', { name: 'Envoyer au client', exact: true }).click();
+    quote = await saved(issued, 201);
+    expect(quote).toMatchObject({ state: 'issued', decision: 'pending', is_current: true });
+    expect(quote.amounts.total_ttc).toBe('119.000');
+    expect((await pdf(tech, quote)).text).toContain(data.record.client_reference);
+
+    await login(portal, customer.username);
+    await portal.getByRole('button', { name: 'Notifications et rappels', exact: true }).click();
+    const notifications = portal.getByRole('dialog', { name: 'Notifications et rappels', exact: true });
+    const notice = notifications.locator('.notification-list article').filter({ hasText: quote.reference });
+    await expect(notice).toHaveCount(1);
+    await notice.getByRole('button', { name: 'Voir le devis', exact: true }).click();
+    const customerDetail = portal.getByRole('dialog', { name: 'Devis de réparation', exact: true });
+    await expect(customerDetail).toContainText(quote.reference);
+    await expect(customerDetail).toContainText(data.record.client_reference);
+    quote = await decideViaUI(portal, quote, 'accepted');
+    quote = await decideViaUI(portal, quote, 'refused');
+    expect(quote.history.map(item => item.decision)).toEqual(['accepted', 'refused']);
+    expect((await api(page, `requests/${data.record.id}/`)).status).toBe('rejected');
+
+    // An open draft never grants its former technician rights after a handoff.
+    const next = await draft(tech, data);
+    await api(page, `requests/${data.record.id}/assignment/`, 'POST', {
+      technician: replacement.id, expected_revision: assigned.assignment.revision,
+    });
+    for (const action of [
+      ['PATCH', `repair-quotes/${next.id}/`, { expected_revision: next.revision, terms: 'Modification devenue interdite.' }],
+      ['POST', `repair-quotes/${next.id}/issue/`, { expected_revision: next.revision, request_key: randomUUID() }],
+      ['POST', 'repair-quotes/', { request_key: randomUUID(), service_request: data.record.id, ...quoteInput() }],
+    ]) {
+      const denied = await response(tech, action[1], action[0], action[2]);
+      expect([403, 404]).toContain(denied.status());
+    }
+    expect((await api(page, `repair-quotes/${next.id}/`))).toMatchObject({ state: 'draft', terms: quoteInput().terms });
+    expect((await api(portal, 'repair-quotes/')).map(item => item.id)).toEqual([quote.id]);
+  } finally { await Promise.all([techContext.close(), clientContext.close()]); }
 });

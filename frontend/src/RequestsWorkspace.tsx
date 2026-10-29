@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   Clock3,
+  FileText,
 } from "lucide-react";
 import { api, dateFR, listResult, type RecordData, type User } from "./api";
 import { requestCategories, requestStatusLabels, statuses } from "./resources";
@@ -13,6 +14,7 @@ import RequestTimer, { useServerTimingRefresh } from "./RequestTimer";
 import { callIdentity, callPrimary } from "./CallReference";
 import RequestAssignment from "./RequestAssignment";
 import RequestIntakeIndicators from "./RequestIntakeIndicators";
+import { canWriteRequest } from "./requestAccess";
 
 export type RequestCategoryCount = {
   key: string;
@@ -42,6 +44,7 @@ export default function RequestsWorkspace({
   initialSearch = "",
   technicians = [],
   onChanged,
+  onCreateQuote,
 }: {
   category: string;
   user: User;
@@ -53,6 +56,7 @@ export default function RequestsWorkspace({
   initialSearch?: string;
   technicians?: RecordData[];
   onChanged: () => Promise<void>;
+  onCreateQuote?: (record: RecordData) => void;
 }) {
   const [search, setSearch] = useState(initialSearch);
   const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
@@ -327,6 +331,22 @@ export default function RequestsWorkspace({
                       </span>
                     </td>
                     <td className="action-cell">
+                      {row.status === "quotation" &&
+                        canWriteRequest(row, user) &&
+                        onCreateQuote && (
+                          <button
+                            type="button"
+                            className="button secondary small"
+                            aria-label={`Créer un devis pour ${row.reference}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onCreateQuote(row);
+                            }}
+                          >
+                            <FileText size={16} />
+                            Devis
+                          </button>
+                        )}
                       <button
                         type="button"
                         className="icon-button"

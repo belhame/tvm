@@ -12,6 +12,7 @@ from rest_framework.exceptions import APIException, NotFound, PermissionDenied, 
 
 from .models import AuditLog, ServiceRequest
 from .repair_quote_models import RepairQuote, RepairQuoteBook, RepairQuoteDecision
+from .request_assignment import assignment_is_accepted, require_accepted_assignment, technician_has_accepted_assignment
 from .workflow_events import actor_context, append_event
 
 MAX_REVISION = 9_223_372_036_854_775_807
@@ -30,13 +31,26 @@ def _allowed(actor):
     return actor
 
 
-def _fresh_actor(actor, *, staff=False, customer=False):
+def _fresh_actor(actor, *, staff=False, customer=False, service_request=None):
     actor = _allowed(get_user_model().objects.select_for_update(no_key=True).filter(pk=getattr(actor, 'pk', None)).first())
-    if staff and actor.effective_role not in ('admin', 'manager'):
-        raise PermissionDenied('Le responsable SAV ou l’administrateur prépare et émet les devis.')
+    if staff:
+        if actor.effective_role not in ('admin', 'manager', 'technician'):
+            raise PermissionDenied('Les devis sont préparés par l’administrateur, le responsable SAV ou le technicien affecté.')
+        # Every mutation has already locked/reloaded its SAV. An old browser
+        # capability or a reassigned author's draft never grants write access.
+        actor = require_accepted_assignment(actor, service_request)
     if customer and actor.effective_role != 'client':
         raise PermissionDenied('La décision appartient au compte client connecté.')
     return actor
+
+
+def can_prepare_quote(actor, record):
+    """Read-only capability; mutations recheck the current accepted assignment."""
+    try:
+        actor = _allowed(actor)
+    except PermissionDenied:
+        return False
+    return actor.effective_role in ('admin', 'manager') or technician_has_accepted_assignment(actor, record)
 
 
 def quotes_for(actor):
@@ -175,7 +189,7 @@ def create_draft(actor, *, service_request, request_key, **data):
                                 'valid_until': values['valid_until'].isoformat() if values['valid_until'] else None})
     _key_lock('create', key)
     record = _request_lock(service_request)
-    actor = _fresh_actor(actor, staff=True)
+    actor = _fresh_actor(actor, staff=True, service_request=record)
     replay = RepairQuote.objects.filter(request_key=key).first()
     if replay:
         if replay.created_by_id != actor.pk or replay.create_hash != fingerprint:
@@ -201,7 +215,7 @@ def create_draft(actor, *, service_request, request_key, **data):
 def edit_draft(actor, identifier, *, expected_revision, **data):
     expected = _expected(expected_revision)
     record, book, quote = _quote_lock(identifier)
-    actor = _fresh_actor(actor, staff=True)
+    actor = _fresh_actor(actor, staff=True, service_request=record)
     if quote.state != 'draft' or quote.revision != expected:
         raise QuoteConflict()
     if quote.client_id != record.equipment.client_id:
@@ -219,7 +233,7 @@ def issue_quote(actor, identifier, *, request_key, expected_revision):
     key, expected = _uuid(request_key), _expected(expected_revision)
     _key_lock('issue', key)
     record, book, quote = _quote_lock(identifier)
-    actor = _fresh_actor(actor, staff=True)
+    actor = _fresh_actor(actor, staff=True, service_request=record)
     replay = RepairQuote.objects.filter(issue_key=key).first()
     if replay:
         if replay.pk != quote.pk or replay.issue_revision != expected or replay.issued_by_id != actor.pk:
@@ -303,7 +317,7 @@ def quote_payload(quote, actor):
     current = book.current_quote_id == quote.pk and quote.state == 'issued'
     decisions = list(quote.decisions.all())
     decision = decisions[-1].decision if decisions else 'pending'
-    manager = actor.effective_role in ('admin', 'manager') and actor.role != 'courier'
+    author = can_prepare_quote(actor, record)
     source = quote.snapshot if quote.state == 'issued' else {}
     equipment = source.get('equipment') or {key: getattr(record.equipment, key) for key in ('serial_number', 'model', 'brand')}
     return {'id': quote.pk, 'service_request': record.pk, 'call_number': source.get('service_request', {}).get('call_number', record.reference),
@@ -317,7 +331,8 @@ def quote_payload(quote, actor):
         'pdf_url': f'/api/repair-quotes/{quote.pk}/pdf/' if quote.state == 'issued' else None, 'pdf_sha256': quote.pdf_sha256,
         'history': [{'id': row.pk, 'decision': row.decision, 'revision': row.revision, 'decided_at': row.decided_at.isoformat(),
                      'actor_label': row.actor_label, 'status_changed': row.status_changed} for row in decisions],
-        'can_edit': manager and quote.state == 'draft', 'can_issue': manager and quote.state == 'draft',
+        'can_edit': author and quote.state == 'draft', 'can_issue': author and quote.state == 'draft',
+        'can_create_revision': author,
         'can_decide': bool(actor.is_active and actor.effective_role == 'client' and current and quote.client_id == actor.client_id == record.equipment.client_id)}
 
 
@@ -331,7 +346,13 @@ def send_quote_notices(quote_id, event, occurrence):
     if record.equipment.client_id != quote.client_id:
         return
     users = get_user_model().objects.filter(is_active=True).exclude(role='courier')
-    users = users.filter(role='client', client_id=quote.client_id) if event == 'issued' else users.exclude(role='client').filter(Q(role__in=['admin', 'manager']) | Q(is_superuser=True))
+    if event == 'issued':
+        users = users.filter(role='client', client_id=quote.client_id)
+    else:
+        recipients = Q(role__in=['admin', 'manager']) | Q(is_superuser=True)
+        if assignment_is_accepted(record):
+            recipients |= Q(pk=record.assigned_technician_id, role='technician')
+        users = users.exclude(role='client').filter(recipients)
     now = timezone.now()
     for user in users.iterator():
         InAppNotification.objects.get_or_create(recipient=user, dedup_key=f'repair-quote:{event}:{occurrence}', defaults={

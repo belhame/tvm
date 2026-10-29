@@ -13,7 +13,7 @@ CATEGORIES = (
     ('testing', 'En test', ('testing',)),
     ('overdue', 'En dépassement de délai', ()),
     ('processed', 'Traité', ('resolved',)),
-    ('quotation', 'Devis', ('quotation',)),
+    ('quotation', 'À facturer', ('quotation',)),
     ('pending', 'En attente', ('pending', 'scheduled')),
     ('approved', 'Validé', ('approved',)),
     ('rejected', 'Refusé', ('rejected',)),

@@ -130,7 +130,7 @@ Les catégories de demandes correspondent aux états suivants :
 | En entretien | États `maintenance` et ancien `in_progress` |
 | En test | État `testing` |
 | Traité | État `resolved` |
-| Devis | État `quotation` |
+| À facturer | État `quotation` ; bouton Devis pour préparer la proposition au client |
 | En attente | États `pending` et ancien `scheduled` |
 | Validé | État `approved` |
 | Refusé | État `rejected` |
@@ -236,20 +236,22 @@ La fiche et le PDF de **Mise en service** présentent séparément le matériel,
 
 ## Devis de réparation et réponse du client
 
-Pour chiffrer une réparation, notamment hors garantie, l'administrateur ou le responsable utilise **Devis**, ou **Créer un devis** depuis le dossier SAV. Ce devis de réparation est distinct du devis de diagnostic d'un matériel non réparable décrit plus bas. Le statut Devis d'une demande ne crée pas à lui seul un document.
+Pour chiffrer une réparation, notamment hors garantie, l’administrateur ou le responsable utilise **Devis**, ou **Créer un devis** depuis le dossier SAV. Le technicien ayant confirmé son affectation courante dispose du même parcours sur ses dossiers. Dans la catégorie **À facturer**, le bouton **Devis** donne accès à la proposition du dossier. Ce statut remplace l’ancien libellé **Devis** et ne crée pas à lui seul un document ou une facture. Le devis de réparation reste distinct du devis de diagnostic d’un matériel non réparable décrit plus bas.
 
 1. Dans **Créer un devis de réparation**, choisir le **Dossier SAV concerné**, puis renseigner la **Description**, la **Quantité** et le **Prix unitaire HT** de chaque ligne.
 2. Renseigner la **Devise du devis** et le **Taux de TVA du devis (%)**, y compris zéro. Choisir le **Type de remise** : aucune, pourcentage ou montant HT. La remise se déduit du sous-total **avant** le calcul de la TVA. Les montants acceptent trois décimales en TND, deux en EUR/USD ; le pourcentage et la TVA en acceptent deux.
 3. Ajouter si nécessaire les **Conditions / notes publiques** et **Valable jusqu'au (facultatif)**. Les conditions figurent sur le PDF destiné au client ; conserver les notes privées dans le suivi SAV. **Enregistrer le brouillon** ne le publie pas au portail.
-4. Vérifier le calcul serveur, puis cliquer sur **Émettre le devis**. **Télécharger le devis PDF** retrouve le document figé, avec sa référence et sa version.
+4. Vérifier le calcul serveur, puis cliquer sur **Envoyer au client**. Cette action émet le document, le publie dans **Mes devis** du centre concerné et crée sa notification dans TVM. **Télécharger le devis PDF** retrouve le document figé, avec sa référence et sa version.
 
 Le client ouvre **Mes devis**, consulte le document puis choisit **Accepter le devis** ou **Refuser le devis**, et **Oui, confirmer**. **Annuler** n'enregistre aucune réponse. Seule la version émise courante reçoit un nouvel avis. Après une réponse, **Changer d'avis** permet de revenir sur ce choix ; l'**Historique des réponses** conserve chaque avis, son auteur et sa date. Une date de validité renseignée ne provoque pas d'expiration automatique : le client peut toujours enregistrer son avis sur la version courante.
 
-Tant que le dossier reste en attente commerciale sans opération réalisée, l'émission peut le classer Devis, puis la réponse client Validé ou Refusé. Si des travaux, tests, échanges, décisions financières ou transports sont déjà enregistrés, le nouvel avis est conservé et signalé à l'administration sans remettre ces faits en arrière. Il ne constitue ni un ordre automatique de réparation, ni une annulation de livraison ou de facture.
+Tant que le dossier reste en attente commerciale sans opération réalisée, l'émission peut le classer **À facturer**, puis la réponse client Validé ou Refusé. Si des travaux, tests, échanges, décisions financières ou transports sont déjà enregistrés, le nouvel avis est conservé et signalé à l'administration sans remettre ces faits en arrière. Il ne constitue ni un ordre automatique de réparation, ni une annulation de livraison ou de facture.
+
+Après une réaffectation, l’ancien technicien ne peut plus modifier ou envoyer le brouillon ; le nouveau confirme sa prise en charge avant de poursuivre. L’administrateur et le responsable gardent leurs droits habituels.
 
 Un devis émis ne se corrige pas en place. **Créer une nouvelle révision** prépare un autre brouillon ; la version émise précédente reste courante jusqu'à l'émission de la suivante. Cette nouvelle émission exige un nouvel accord : **l'acceptation d'un ancien prix ou d'une ancienne remise n'est pas reprise**. Les anciens PDF et réponses restent consultables, sans pouvoir répondre à une version remplacée. Une remise totale ne valide ni un paiement ni la gratuité financière du diagnostic non réparable.
 
-L'émission notifie les comptes du centre client dans TVM ; un avis client notifie les administrateurs et responsables. **Voir le devis** ouvre la version concernée. Aucun message WhatsApp/e-mail, facture, paiement, mouvement de stock ou remise physique n'est créé par ces actions.
+L'émission notifie les comptes du centre client dans TVM ; un avis client notifie les administrateurs, responsables et le technicien actuellement affecté ayant confirmé sa prise en charge. **Voir le devis** ouvre la version concernée. Aucun message WhatsApp/e-mail, facture, paiement, mouvement de stock ou remise physique n'est créé par ces actions.
 
 ## Prêt à être livré et retour d'un matériel non réparable
 

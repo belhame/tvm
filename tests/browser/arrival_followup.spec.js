@@ -48,6 +48,11 @@ test('la réception enregistre la vraie arrivée et les informations de suivi da
   const equipment = await api(page, 'equipment/', 'POST', { client: client.id, serial_number: marker, model: 'Onduleur de réception fictif' });
   await reload(page);
   await navigate(page, 'Demandes SAV');
+  // Keep this intake scenario scoped to its own fictional dossier even when
+  // the persistent E2E database contains earlier runs' requests.
+  await page.getByLabel('Rechercher une demande', { exact: true }).fill(marker);
+  await page.locator('.request-workspace-toolbar').getByRole('button', { name: 'Rechercher', exact: true }).click();
+  await expect(page.locator('.request-workspace tbody tr')).toHaveCount(0);
   await page.getByRole('button', { name: 'Nouvelle demande SAV', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Options avancées', exact: true }).click();
   let dialog = page.getByRole('dialog');
@@ -67,7 +72,9 @@ test('la réception enregistre la vraie arrivée et les informations de suivi da
   await dialog.getByLabel('Situation de garantie du dossier', { exact: true }).selectOption('quotation');
   await dialog.getByLabel('Nom du contact', { exact: true }).fill('Contact de réception');
   await dialog.getByLabel('E-mail du contact', { exact: true }).fill('reception@example.invalid');
+  const created = page.waitForResponse(result => new URL(result.url()).pathname === '/api/requests/intake/' && result.request().method() === 'POST');
   await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  expect((await created).status()).toBe(201);
   await expect(dialog).toHaveCount(0);
   const rows = await api(page, `requests/?q=${encodeURIComponent(marker)}`);
   expect(rows).toHaveLength(1);

@@ -22,6 +22,7 @@ import { ApiError, api, dateFR, type RecordData, type User } from "./api";
 import CallReference from "./CallReference";
 import RepairQuoteEditor from "./RepairQuoteEditor";
 import RepairQuoteSummary from "./RepairQuoteSummary";
+import { canWriteRequest } from "./requestAccess";
 import {
   repairQuoteDecisionLabels,
   repairQuoteInput,
@@ -68,7 +69,7 @@ export default function RepairQuotesWorkspace({
   Dialog: DialogComponent;
 }) {
   const id = useId();
-  const canManage = user.role === "admin" || user.role === "manager";
+  const canCompose = ["admin", "manager", "technician"].includes(user.role);
   const [rows, setRows] = useState<RepairQuote[]>([]);
   const [detailState, setDetail] = useState<RepairQuote | null>(null);
   const detail = detailState?.id === quoteId ? detailState : null;
@@ -81,7 +82,7 @@ export default function RepairQuotesWorkspace({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [creation, setCreation] = useState<Creation | null>(
-    createRequested && canManage ? { requestId: requestId ?? null } : null,
+    createRequested && canCompose ? { requestId: requestId ?? null } : null,
   );
   const [decisionAttempt, setDecisionAttempt] =
     useState<DecisionAttempt | null>(null);
@@ -107,10 +108,12 @@ export default function RepairQuotesWorkspace({
   currentQuoteId.current = quoteId;
   const contextRequestId = creation?.requestId ?? requestId;
   const requestOptions: RecordData[] =
-    contextRequest && contextRequest.id === contextRequestId &&
-    !requests.some((row) => row.id === contextRequestId)
-      ? [contextRequest, ...requests]
+    contextRequest && contextRequest.id === contextRequestId
+      ? [contextRequest, ...requests.filter((row) => row.id !== contextRequest.id)]
       : requests;
+  const writableRequests = requestOptions.filter((record) =>
+    canWriteRequest(record, user),
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -123,21 +126,18 @@ export default function RepairQuotesWorkspace({
     };
   }, []);
   useEffect(() => {
-    if (createRequested && canManage)
+    if (createRequested && canCompose)
       setCreation((current) =>
         current?.requestId === requestId
           ? current
           : { requestId: requestId ?? null },
       );
     else setCreation(null);
-  }, [requestId, createRequested, canManage]);
+  }, [requestId, createRequested, canCompose]);
   useEffect(() => {
     setContextRequest(null);
     setContextError("");
-    if (
-      !contextRequestId ||
-      requests.some((row) => row.id === contextRequestId)
-    ) {
+    if (!contextRequestId) {
       setContextLoading(false);
       return;
     }
@@ -173,11 +173,10 @@ export default function RepairQuotesWorkspace({
     if (
       detail?.id === quoteId &&
       detail?.state === "draft" &&
-      canManage &&
       detail.can_edit
     )
       setEditingQuoteId(detail.id);
-  }, [detail?.id, quoteId, canManage]);
+  }, [detail?.id, quoteId, detail?.can_edit]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -292,9 +291,9 @@ export default function RepairQuotesWorkspace({
     signal: AbortSignal,
     expectedRevision?: number,
   ) {
-    if (!canManage)
+    if (!canCompose)
       throw new Error(
-        "La création et l’édition sont réservées aux responsables SAV.",
+        "La création et l’édition sont réservées à l’équipe SAV autorisée.",
       );
     if (detail?.state === "draft" && !creation) {
       if (typeof expectedRevision !== "number")
@@ -316,9 +315,17 @@ export default function RepairQuotesWorkspace({
       throw new Error(
         "Sélectionnez le dossier SAV concerné avant d’enregistrer.",
       );
+    if (contextLoading || contextRequest?.id !== creation.requestId || contextError)
+      throw new Error(
+        "Attendez l’actualisation du dossier SAV avant d’enregistrer ce devis.",
+      );
     if (!requestOptions.some((row) => row.id === creation.requestId))
       throw new Error(
         "Le dossier SAV doit être chargé avant d’enregistrer ce devis. Utilisez « Recharger le dossier » si nécessaire.",
+      );
+    if (!writableRequests.some((row) => row.id === creation.requestId))
+      throw new Error(
+        "Vous devez être le technicien affecté et avoir confirmé la prise en charge pour créer un devis sur ce dossier.",
       );
     const payload = { service_request: creation.requestId, ...input };
     const fingerprint = JSON.stringify(payload);
@@ -371,7 +378,7 @@ export default function RepairQuotesWorkspace({
       apply(result);
       notifyRequestChanged();
       setNotice(
-        "Devis émis. Le PDF de cette version est figé et le client peut répondre dans son espace.",
+        "Devis envoyé dans l’espace du client avec une notification. Le client peut le valider ou le refuser.",
       );
       setCreation(null);
       setEditingQuoteId(null);
@@ -510,7 +517,7 @@ export default function RepairQuotesWorkspace({
               : "Préparez des devis chiffrés et conservez chaque version ainsi que les réponses du client."}
           </p>
         </div>
-        {canManage && (
+        {canCompose && (
           <button
             type="button"
             className="button primary"
@@ -608,7 +615,7 @@ export default function RepairQuotesWorkspace({
                 }
                 )
               </option>
-              {canManage && (
+              {canCompose && (
                 <option value="draft">
                   Brouillons (
                   {rows.filter((row) => row.state === "draft").length})
@@ -725,7 +732,7 @@ export default function RepairQuotesWorkspace({
               </p>
             ) : detail ? (
               <>
-                {editingQuoteId === detail.id && canManage ? (
+                {editingQuoteId === detail.id && detail.can_edit ? (
                   <RepairQuoteEditor
                     quote={detail}
                     onSave={save}
@@ -754,7 +761,7 @@ export default function RepairQuotesWorkspace({
                     <FileText size={16} />
                     Ouvrir le dossier SAV
                   </button>
-                  {canManage && detail.state === "issued" && (
+                  {detail.can_create_revision && detail.state === "issued" && (
                     <button
                       type="button"
                       className="button secondary small"
@@ -846,10 +853,10 @@ export default function RepairQuotesWorkspace({
           </div>
         </Dialog>
       )}
-      {creation && canManage && (
+      {creation && canCompose && (
         <Dialog
           title="Créer un devis de réparation"
-          subtitle="Brouillon : aucun envoi ni accord automatique"
+          subtitle="Enregistrez le brouillon puis envoyez le devis dans l’espace du client."
           onClose={() => {
             setCreation(null);
             setExistingDraft(null);
@@ -881,16 +888,18 @@ export default function RepairQuotesWorkspace({
               >
                 <option value="">Choisir un dossier SAV</option>
                 {creation.requestId &&
-                  !requestOptions.some(
+                  !writableRequests.some(
                     (row) => row.id === creation.requestId,
                   ) && (
-                    <option value={creation.requestId}>
+                    <option value={creation.requestId} disabled>
                       {contextLoading
                         ? "Chargement du dossier SAV…"
-                        : "Dossier SAV à charger"}
+                        : selectedRequest
+                          ? `${selectedRequest.call_number || selectedRequest.reference} · Prise en charge à confirmer`
+                          : "Dossier SAV à charger"}
                     </option>
                   )}
-                {requestOptions.map((request) => (
+                {writableRequests.map((request) => (
                   <option key={request.id} value={request.id}>
                     {request.call_number || request.reference} ·{" "}
                     {request.client_reference
@@ -904,6 +913,17 @@ export default function RepairQuotesWorkspace({
             {contextLoading && (
               <p role="status">Chargement du dossier SAV sélectionné…</p>
             )}
+            {creation.requestId && !contextError && (
+              <button
+                type="button"
+                className="button secondary small"
+                disabled={contextLoading}
+                onClick={() => setContextReload((value) => value + 1)}
+              >
+                <RefreshCw size={16} />
+                Actualiser le dossier SAV
+              </button>
+            )}
             {contextError && (
               <div className="error-box" role="alert">
                 <AlertCircle size={17} />
@@ -915,6 +935,21 @@ export default function RepairQuotesWorkspace({
                 >
                   Recharger le dossier
                 </button>
+              </div>
+            )}
+            {user.role === "technician" && (
+              <div className="repair-quotes-info">
+                <Info size={17} />
+                Vous pouvez créer un devis pour les dossiers dont vous avez
+                confirmé la prise en charge. Les autres dossiers restent
+                consultables selon vos droits.
+              </div>
+            )}
+            {selectedRequest && !canWriteRequest(selectedRequest, user) && (
+              <div className="error-box" role="alert">
+                <AlertCircle size={17} />
+                Ce dossier ne vous est plus affecté ou sa prise en charge n’est
+                pas confirmée. Actualisez le dossier SAV avant de continuer.
               </div>
             )}
             {selectedRequest?.warranty_status === "warranty" && (
@@ -948,19 +983,21 @@ export default function RepairQuotesWorkspace({
                 </button>
               </div>
             )}
-            <RepairQuoteEditor
-              key={`${creation.requestId || "none"}:${creation.values ? "revision" : "new"}`}
-              initialValues={creation.values}
-              onSave={save}
-              onIssue={issue}
-              onSaved={(value) => {
-                apply(value);
-                if (value.state === "draft") {
-                  setCreation(null);
-                  onNavigate(`repair-quotes/${value.id}`);
-                }
-              }}
-            />
+            {(!selectedRequest || canWriteRequest(selectedRequest, user)) && (
+              <RepairQuoteEditor
+                key={`${creation.requestId || "none"}:${creation.values ? "revision" : "new"}`}
+                initialValues={creation.values}
+                onSave={save}
+                onIssue={issue}
+                onSaved={(value) => {
+                  apply(value);
+                  if (value.state === "draft") {
+                    setCreation(null);
+                    onNavigate(`repair-quotes/${value.id}`);
+                  }
+                }}
+              />
+            )}
           </div>
         </Dialog>
       )}

@@ -3779,6 +3779,9 @@ export default function App() {
               onCategoryChange={(key) => navigate(`requests/${key}`)}
               onOpen={setRequestDetail}
               onCreate={() => openModal({ resource: "requests" })}
+              onCreateQuote={(record) =>
+                navigate(`repair-quotes/new/${record.id}`)
+              }
               onCountsChange={setRequestCounts}
               technicians={data.users || []}
               onChanged={saved}

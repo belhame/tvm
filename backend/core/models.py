@@ -167,7 +167,7 @@ class ServiceRequest(ReferencedModel):
         MAINTENANCE = 'maintenance', 'En entretien'
         TESTING = 'testing', 'En test'
         RESOLVED = 'resolved', 'Traité'
-        QUOTATION = 'quotation', 'Devis'
+        QUOTATION = 'quotation', 'À facturer'
         PENDING = 'pending', 'En attente'
         APPROVED = 'approved', 'Validé'
         REJECTED = 'rejected', 'Refusé'

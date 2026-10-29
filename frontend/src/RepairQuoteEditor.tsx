@@ -277,7 +277,7 @@ export default function RepairQuoteEditor({
       setNotice(
         mode === "save"
           ? "Brouillon enregistré. Les montants ci-dessous sont calculés par le serveur."
-          : "Devis émis. Son contenu et ses montants sont figés dans le PDF.",
+          : "Devis envoyé dans l’espace du client. Son contenu et ses montants sont figés dans le PDF.",
       );
       try {
         callbackRef.current.onSaved?.(response);
@@ -795,7 +795,7 @@ export default function RepairQuoteEditor({
           <div className="repair-quotes-editor-action-note">
             {saved?.state === "issued"
               ? "Le PDF correspond à la version émise."
-              : "L’émission fige le contenu du devis et génère son PDF. Enregistrez d’abord toutes les modifications."}
+              : "L’envoi génère le PDF et notifie le client dans son espace pour validation ou refus. Enregistrez d’abord toutes les modifications."}
           </div>
           <div className="repair-quotes-actions">
             {onClose && (
@@ -845,7 +845,7 @@ export default function RepairQuoteEditor({
                 ) : (
                   <FileCheck2 size={17} />
                 )}
-                Émettre le devis
+                Envoyer au client
               </button>
             )}
           </div>

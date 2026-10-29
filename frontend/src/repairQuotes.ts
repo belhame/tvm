@@ -55,6 +55,7 @@ export type RepairQuote = RepairQuoteInput & {
   can_edit: boolean;
   can_issue: boolean;
   can_decide: boolean;
+  can_create_revision: boolean;
   created_at: string;
 };
 

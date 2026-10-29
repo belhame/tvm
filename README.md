@@ -22,7 +22,7 @@ L'annuaire clients propose un import CSV avec prévisualisation, sans écraser l
 
 Pour la prévention, l'objectif de visites du dossier reste distinct du nombre calculé de fiches réellement terminées. Les visites conservent le même appel TVM et leurs références secondaires ; la mise en service dispose de sa fiche et de son PDF dédiés.
 
-Les administrateurs et responsables préparent des **devis de réparation** avec remise en pourcentage ou montant HT avant TVA. Dans **Mes devis**, le client consulte le PDF, accepte, refuse ou change d'avis sur la version courante. Une nouvelle révision conserve l'ancien PDF et exige un nouvel accord ; les avis ne remettent pas en arrière les opérations réalisées. Voir [les devis de réparation](docs/GUIDE_SUIVI_SAV.md#devis-de-réparation-et-réponse-du-client).
+Le statut SAV **À facturer** remplace **Devis**. Son bouton **Devis** permet à l’administrateur, au responsable ou au technicien ayant confirmé son affectation de préparer un **devis de réparation**, puis de l’envoyer dans l’espace du client. La remise en pourcentage ou montant HT se déduit avant TVA. Dans **Mes devis**, le client reçoit une notification, consulte le PDF, accepte, refuse ou change d'avis sur la version courante. Une nouvelle révision conserve l'ancien PDF et exige un nouvel accord ; les avis ne remettent pas en arrière les opérations réalisées. Voir [les devis de réparation](docs/GUIDE_SUIVI_SAV.md#devis-de-réparation-et-réponse-du-client).
 
 Les demandes classées **Échange** alimentent automatiquement leur file de suivi. La validation technique du remplacement et la confirmation financière sont distinctes ; la clôture attend la confirmation d'une facture émise dans le système externe de l'entreprise.
 

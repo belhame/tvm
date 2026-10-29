@@ -289,13 +289,17 @@ export default function RequestDossier({
           </span>
         </div>
         <RequestIntakeIndicators record={record} detailed />
-        {canManage && onOpenQuotes && (
+        {canAddOperation && onOpenQuotes && (
           <div className="request-test-decision-bar">
             <div>
-              <strong>Devis de réparation</strong>
+              <strong>
+                {record.status === "quotation"
+                  ? "À facturer · devis de réparation"
+                  : "Devis de réparation"}
+              </strong>
               <span>
-                Préparez un chiffrage et demandez l’accord du client sur une
-                version précise.
+                Créez le devis puis envoyez-le dans l’espace du client pour
+                validation ou refus.
               </span>
             </div>
             <button
@@ -542,7 +546,7 @@ export default function RequestDossier({
                       ? "Consulter mes devis du dossier"
                       : "Consulter les devis du dossier"}
                   </button>
-                  {canManage && (
+                  {canAddOperation && (
                     <button
                       type="button"
                       className="button primary"
